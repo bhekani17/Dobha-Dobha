@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  passwordHash       String              @map("password_hash")
+  name               String
+  role               String              @default("buyer")
+  phone              String?
+  location           String?
+  bio                String?
+  avatarUrl          String?             @map("avatar_url")
+  verificationStatus String              @default("pending") @map("verification_status")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+
+  items              Item[]
+  sentMessages       Message[]           @relation("SentMessages")
+  receivedMessages   Message[]           @relation("ReceivedMessages")
+  soldOrders         EscrowOrder[]       @relation("SellerOrders")
+  boughtOrders       EscrowOrder[]       @relation("BuyerOrders")
+  wallet             SellerWallet?
+  verification       UserVerification?
+  streams            Stream[]
+
+  @@map("users")
+}
+
+model Item {
+  id             String       @id @default(uuid())
+  sellerId       String       @map("seller_id")
+  seller         User         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  category       String
+  condition      String
+  price          Decimal      @db.Decimal(12, 2)
+  originalPrice  Decimal?     @db.Decimal(12, 2) @map("original_price")
+  location       String?
+  status         String       @default("active")
+  isVerified     Boolean      @default(false) @map("is_verified")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  images         ItemImage[]
+  escrowOrders   EscrowOrder[]
+  messages       Message[]
+
+  @@map("items")
+}
+
+model ItemImage {
+  id        String   @id @default(uuid())
+  itemId    String   @map("item_id")
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  imageUrl  String   @map("image_url")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("item_images")
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  senderId   String   @map("sender_id")
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String   @map("receiver_id")
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  itemId     String?  @map("item_id")
+  item       Item?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  content    String
+  isRead     Boolean  @default(false) @map("is_read")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("messages")
+}
+
+model EscrowOrder {
+  id              String    @id @default(uuid())
+  itemId          String    @map("item_id")
+  item            Item      @relation(fields: [itemId], references: [id], onDelete: Restrict)
+  sellerId        String    @map("seller_id")
+  seller          User      @relation("SellerOrders", fields: [sellerId], references: [id], onDelete: Restrict)
+  buyerId         String    @map("buyer_id")
+  buyer           User      @relation("BuyerOrders", fields: [buyerId], references: [id], onDelete: Restrict)
+  itemTitle       String    @map("item_title")
+  itemPrice       Decimal   @db.Decimal(12, 2) @map("item_price")
+  deliveryFee     Decimal   @db.Decimal(12, 2) @default(0) @map("delivery_fee")
+  totalAmount     Decimal   @db.Decimal(12, 2) @map("total_amount")
+  fulfillmentType String    @default("click_collect") @map("fulfillment_type")
+  pickupLocation  String?   @map("pickup_location")
+  deliveryAddress String?   @map("delivery_address")
+  paymentMethod   String?   @map("payment_method")
+  status          String    @default("HELD_IN_ESCROW")
+  pickupToken     String?   @map("pickup_token")
+  qrPayload       String?   @map("qr_payload")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  completedAt     DateTime? @map("completed_at")
+
+  @@map("escrow_orders")
+}
+
+model SellerWallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance   Decimal  @db.Decimal(12, 2) @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("seller_wallets")
+}
+
+model UserVerification {
+  id            String    @id @default(uuid())
+  userId        String    @unique @map("user_id")
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idNumber      String?   @map("id_number")
+  documentType  String?   @map("document_type")
+  documentUrl   String?   @map("document_url")
+  status        String    @default("pending")
+  submittedAt   DateTime  @default(now()) @map("submitted_at")
+  reviewedAt    DateTime? @map("reviewed_at")
+
+  @@map("user_verifications")
+}
+
+model Stream {
+  id            String       @id @default(uuid())
+  sellerId      String       @map("seller_id")
+  seller        User         @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  title         String
+  location      String?
+  status        String       @default("live")
+  viewerCount   Int          @default(0) @map("viewer_count")
+  playbackUrl   String?      @map("playback_url")
+  posterUrl     String?      @map("poster_url")
+  muxStreamId   String?      @map("mux_stream_id")
+  featuredItem  Json?        @map("featured_item")
+  startedAt     DateTime     @default(now()) @map("started_at")
+  endedAt       DateTime?    @map("ended_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  chats         StreamChat[]
+
+  @@map("streams")
+}
+
+model StreamChat {
+  id        String   @id @default(uuid())
+  streamId  String   @map("stream_id")
+  stream    Stream   @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  userId    String?  @map("user_id")
+  userName  String   @map("user_name")
+  text      String
+  reaction  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("stream_chats")
+}
