@@ -31,44 +31,50 @@ export const GoogleAuthService = {
    */
   async signInWithGoogle() {
     try {
-      // Create the OAuth request
+      const redirectUri = AuthSession.makeRedirectUri({
+        scheme: 'sky-local-trade',
+        path: 'auth'
+      });
+
       const request = new AuthSession.AuthRequest({
         clientId: GOOGLE_CLIENT_ID,
         scopes: ['openid', 'profile', 'email'],
-        redirectUri: AuthSession.makeRedirectUri({
-          scheme: 'sky-local-trade',
-          path: 'auth'
-        }),
+        redirectUri,
         usePKCE: true,
-        extraParams: {
-          prompt: 'select_account'
-        }
+        extraParams: { prompt: 'select_account' }
       });
 
-      // Show the Google auth page
       const result = await request.promptAsync(discovery);
 
-      if (result.type === 'success') {
-        // Exchange the authorization code with our backend
-        return await this.exchangeCodeWithBackend(result.params.code);
-      } else {
+      if (result.type !== 'success') {
         throw new Error('Google authentication was cancelled');
       }
+
+      // Exchange the auth code for tokens at Google's token endpoint
+      const tokenResponse = await AuthSession.exchangeCodeAsync(
+        {
+          clientId: GOOGLE_CLIENT_ID,
+          code: result.params.code,
+          redirectUri,
+          extraParams: { code_verifier: request.codeVerifier }
+        },
+        { tokenEndpoint: discovery.tokenEndpoint }
+      );
+
+      // Fetch user profile from Google using the access token
+      const userInfoResponse = await AuthSession.fetchUserInfoAsync(
+        tokenResponse,
+        { userInfoEndpoint: 'https://www.googleapis.com/oauth2/v3/userinfo' }
+      );
+
+      // Send resolved user info to our backend (not the raw code)
+      return await ApiService.googleAuthCallback({
+        email: userInfoResponse.email,
+        name: userInfoResponse.name,
+        googleId: userInfoResponse.sub
+      });
     } catch (error) {
       console.error('Google sign-in error:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Exchange authorization code with our backend
-   */
-  async exchangeCodeWithBackend(code) {
-    try {
-      const result = await ApiService.googleAuthCallback(code);
-      return result;
-    } catch (error) {
-      console.error('Backend auth exchange error:', error);
       throw error;
     }
   },

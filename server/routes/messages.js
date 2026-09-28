@@ -1,6 +1,6 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
-const { prisma } = require('../prisma');
+const Message = require('../models/Message');
 
 const router = express.Router();
 
@@ -9,41 +9,28 @@ router.get('/', authenticateToken, async (req, res, next) => {
     try {
         const currentUserId = req.user.userId;
 
-        const allMessages = await prisma.message.findMany({
-            where: {
-                OR: [
-                    { senderId: currentUserId },
-                    { receiverId: currentUserId }
-                ]
-            },
-            include: {
-                sender: { select: { id: true, name: true, avatarUrl: true } },
-                receiver: { select: { id: true, name: true, avatarUrl: true } }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+        const allMessages = await Message.find({
+            $or: [{ sender: currentUserId }, { receiver: currentUserId }]
+        })
+            .populate('sender', 'name avatarUrl')
+            .populate('receiver', 'name avatarUrl')
+            .sort({ createdAt: -1 });
 
-        // Group by conversation partner
         const conversationMap = new Map();
         for (const msg of allMessages) {
-            const isSender = msg.senderId === currentUserId;
+            const isSender = msg.sender._id.toString() === currentUserId;
             const partner = isSender ? msg.receiver : msg.sender;
-            const partnerId = partner.id;
+            const partnerId = partner._id.toString();
 
             if (!conversationMap.has(partnerId)) {
                 conversationMap.set(partnerId, {
-                    other_user: {
-                        id: partner.id,
-                        name: partner.name,
-                        avatar_url: partner.avatarUrl
-                    },
+                    other_user: { id: partnerId, name: partner.name, avatar_url: partner.avatarUrl },
                     last_message: msg.content,
                     last_message_at: msg.createdAt,
                     unread_count: (!msg.isRead && !isSender) ? 1 : 0
                 });
             } else if (!msg.isRead && !isSender) {
-                const conv = conversationMap.get(partnerId);
-                conv.unread_count += 1;
+                conversationMap.get(partnerId).unread_count += 1;
             }
         }
 
@@ -59,35 +46,26 @@ router.get(['/thread/:userId', '/:userId'], authenticateToken, async (req, res, 
         const currentUserId = req.user.userId;
         const otherId = req.params.userId;
 
-        const thread = await prisma.message.findMany({
-            where: {
-                OR: [
-                    { senderId: currentUserId, receiverId: otherId },
-                    { senderId: otherId, receiverId: currentUserId }
-                ]
-            },
-            include: {
-                sender: { select: { id: true, name: true, avatarUrl: true } },
-                receiver: { select: { id: true, name: true, avatarUrl: true } }
-            },
-            orderBy: { createdAt: 'asc' }
-        });
+        const thread = await Message.find({
+            $or: [
+                { sender: currentUserId, receiver: otherId },
+                { sender: otherId, receiver: currentUserId }
+            ]
+        })
+            .populate('sender', 'name avatarUrl')
+            .populate('receiver', 'name avatarUrl')
+            .sort({ createdAt: 1 });
 
-        // Mark incoming messages as read
-        await prisma.message.updateMany({
-            where: {
-                senderId: otherId,
-                receiverId: currentUserId,
-                isRead: false
-            },
-            data: { isRead: true }
-        });
+        await Message.updateMany(
+            { sender: otherId, receiver: currentUserId, isRead: false },
+            { isRead: true }
+        );
 
         const formatted = thread.map(msg => ({
             id: msg.id,
-            sender_id: msg.senderId,
+            sender_id: msg.sender._id.toString(),
             sender_name: msg.sender?.name || 'User',
-            receiver_id: msg.receiverId,
+            receiver_id: msg.receiver._id.toString(),
             receiver_name: msg.receiver?.name || 'User',
             item_id: msg.itemId,
             content: msg.content,
@@ -101,7 +79,7 @@ router.get(['/thread/:userId', '/:userId'], authenticateToken, async (req, res, 
     }
 });
 
-// 3. Send a message (supports POST /api/messages and POST /api/messages/send)
+// 3. Send a message
 router.post(['/send', '/'], authenticateToken, async (req, res, next) => {
     try {
         const { receiver_id, receiverId, item_id, itemId, content } = req.body;
@@ -112,28 +90,25 @@ router.post(['/send', '/'], authenticateToken, async (req, res, next) => {
             return res.status(400).json({ success: false, message: 'Receiver ID and content are required' });
         }
 
-        const msg = await prisma.message.create({
-            data: {
-                senderId: req.user.userId,
-                receiverId: resolvedReceiverId,
-                itemId: resolvedItemId,
-                content: content.trim(),
-                isRead: false
-            },
-            include: {
-                sender: { select: { id: true, name: true, avatarUrl: true } },
-                receiver: { select: { id: true, name: true, avatarUrl: true } }
-            }
+        const msg = new Message({
+            sender: req.user.userId,
+            receiver: resolvedReceiverId,
+            itemId: resolvedItemId,
+            content: content.trim(),
+            isRead: false
         });
+        await msg.save();
+        await msg.populate('sender', 'name avatarUrl');
+        await msg.populate('receiver', 'name avatarUrl');
 
         res.status(201).json({
             success: true,
             message: 'Message sent',
             data: {
                 id: msg.id,
-                sender_id: msg.senderId,
+                sender_id: msg.sender._id.toString(),
                 sender_name: msg.sender?.name,
-                receiver_id: msg.receiverId,
+                receiver_id: msg.receiver._id.toString(),
                 receiver_name: msg.receiver?.name,
                 item_id: msg.itemId,
                 content: msg.content,
@@ -149,13 +124,7 @@ router.post(['/send', '/'], authenticateToken, async (req, res, next) => {
 // 4. Mark single message as read
 router.put('/:id/read', authenticateToken, async (req, res, next) => {
     try {
-        await prisma.message.updateMany({
-            where: {
-                id: req.params.id,
-                receiverId: req.user.userId
-            },
-            data: { isRead: true }
-        });
+        await Message.updateOne({ _id: req.params.id, receiver: req.user.userId }, { isRead: true });
         res.json({ success: true, message: 'Marked as read' });
     } catch (error) {
         next(error);

@@ -624,8 +624,6 @@ export default function LiveStreamScreen({ navigation }) {
   const [dibsItem, setDibsItem] = useState(null);
   const [paymentItem, setPaymentItem] = useState(null);
 
-  // "Go Live" broadcast modal
-  const [showGoLiveModal, setShowGoLiveModal] = useState(false);
   const [broadcastTitle, setBroadcastTitle] = useState('');
   const [broadcastLocation, setBroadcastLocation] = useState('Bree Taxi Rank, Joburg CBD');
   const [isStartingStream, setIsStartingStream] = useState(false);
@@ -926,7 +924,9 @@ export default function LiveStreamScreen({ navigation }) {
         setBroadcastTitle('');
         setActiveStream(res.stream);
         setMyBroadcastStreamId(res.stream.id);
-        if (res.stream.stream_key) {
+        if (res.stream.rtmp_url) {
+          setRtmpUrl(res.stream.rtmp_url);
+        } else if (res.stream.stream_key) {
           setRtmpUrl(`rtmp://live.mux.com/app/${res.stream.stream_key}`);
         }
         setStreams((prev) => [res.stream, ...prev.filter((s) => s.id !== res.stream.id)]);
@@ -1121,7 +1121,6 @@ export default function LiveStreamScreen({ navigation }) {
           <Text style={styles.btnRefreshStreamsText}>Check for Live Drops</Text>
         </TouchableOpacity>
 
-        {renderGoLiveModal()}
       </View>
     );
   }
@@ -1560,9 +1559,6 @@ export default function LiveStreamScreen({ navigation }) {
         </View>
       </View>
 
-      {/* Render Go Live Modal */}
-      {renderGoLiveModal()}
-
       {/* Render Broadcaster Drop Item Modal */}
       {renderDropItemModal()}
 
@@ -1592,93 +1588,6 @@ export default function LiveStreamScreen({ navigation }) {
       )}
     </View>
   );
-
-  function renderGoLiveModal() {
-    return (
-      <Modal visible={showGoLiveModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalBox}>
-            <View style={styles.modalBoxHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <FontAwesome5 name="broadcast-tower" size={18} color="#EF4444" />
-                <Text style={styles.modalBoxTitle}>Go Live & Sell</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowGoLiveModal(false)}>
-                <FontAwesome5 name="times" size={18} color={Colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.modalBoxSub}>
-              Activate your phone camera to stream your vintage clothing or sneaker bale unboxing live to buyers across South Africa.
-            </Text>
-
-            <View style={styles.modalFormGroup}>
-              <Text style={styles.modalLabel}>Broadcast Title</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="e.g. Grade-A Vintage Carhartt & Windbreaker Bale!"
-                placeholderTextColor={Colors.textDim}
-                value={broadcastTitle}
-                onChangeText={setBroadcastTitle}
-              />
-            </View>
-
-            <View style={styles.modalFormGroup}>
-              <Text style={styles.modalLabel}>Street Location</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="e.g. Bree Taxi Rank, Concourse Level"
-                placeholderTextColor={Colors.textDim}
-                value={broadcastLocation}
-                onChangeText={setBroadcastLocation}
-              />
-            </View>
-
-            {/* Camera facing selection */}
-            <View style={styles.modalFormGroup}>
-              <Text style={styles.modalLabel}>Camera Selection</Text>
-              <View style={styles.cameraToggleRow}>
-                <TouchableOpacity
-                  style={[styles.cameraToggleBtn, cameraFacing === 'back' && styles.cameraToggleBtnActive]}
-                  onPress={() => setCameraFacing('back')}
-                >
-                  <FontAwesome5 name="camera" size={12} color={cameraFacing === 'back' ? '#FFFFFF' : Colors.textMuted} style={{ marginRight: 6 }} />
-                  <Text style={[styles.cameraToggleText, cameraFacing === 'back' && styles.cameraToggleTextActive]}>
-                    Rear Camera (Show Goods)
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.cameraToggleBtn, cameraFacing === 'front' && styles.cameraToggleBtnActive]}
-                  onPress={() => setCameraFacing('front')}
-                >
-                  <FontAwesome5 name="user" size={12} color={cameraFacing === 'front' ? '#FFFFFF' : Colors.textMuted} style={{ marginRight: 6 }} />
-                  <Text style={[styles.cameraToggleText, cameraFacing === 'front' && styles.cameraToggleTextActive]}>
-                    Front (Selfie)
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.btnStartBroadcast, isStartingStream && { opacity: 0.6 }]}
-              onPress={handleStartBroadcast}
-              disabled={isStartingStream}
-              activeOpacity={0.85}
-            >
-              {isStartingStream ? (
-                <ActivityIndicator color="#fff" size="small" style={{ marginRight: 8 }} />
-              ) : (
-                <FontAwesome5 name="video" size={16} color="#fff" style={{ marginRight: 8 }} />
-              )}
-              <Text style={styles.btnStartBroadcastText}>
-                {isStartingStream ? 'Activating Camera...' : 'Turn on Camera & Go Live'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
-  }
 
   function renderDropItemModal() {
     return (
