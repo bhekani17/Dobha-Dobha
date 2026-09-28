@@ -5,6 +5,8 @@ const morgan = require('morgan');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
+require('./db');
+
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const itemRoutes = require('./routes/items');

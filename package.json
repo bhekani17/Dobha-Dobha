@@ -10,15 +10,7 @@
     "mobile:android": "cd mobile && npx expo start --android",
     "mobile:ios": "cd mobile && npx expo start --ios",
     "dev": "node server/server.js",
-    "serve": "node server/server.js",
-    "aws:init": "node server/setup-dynamo.js",
-    "db:init": "node server/setup-dynamo.js",
-    "db:view": "node server/view-db.js",
-    "prisma:generate": "prisma generate --schema=prisma/schema.prisma",
-    "prisma:migrate": "prisma migrate dev --schema=prisma/schema.prisma",
-    "prisma:deploy": "prisma migrate deploy --schema=prisma/schema.prisma",
-    "prisma:studio": "prisma studio --schema=prisma/schema.prisma",
-    "prisma:validate": "prisma validate --schema=prisma/schema.prisma"
+    "serve": "node server/server.js"
   },
   "keywords": [
     "marketplace",
@@ -29,40 +21,21 @@
     "buy-sell",
     "classifieds"
   ],
-  "author": "SKY TRADE Team",
+  "author": "DOBHA DOBHA Team",
   "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/sky-trade/sky-trade.git"
-  },
-  "bugs": {
-    "url": "https://github.com/sky-trade/sky-trade/issues"
-  },
-  "homepage": "https://skytrade.co.za",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.1127.0",
-    "@aws-sdk/client-s3": "^3.1127.0",
-    "@aws-sdk/lib-dynamodb": "^3.1127.0",
-    "@aws-sdk/s3-request-presigner": "^3.1138.0",
-    "@mux/mux-node": "^15.2.0",
-    "@neon/config": "^1.7.2",
-    "@neon/env": "^1.4.3",
-    "@prisma/client": "^5.1.0",
-    "@supabase/server": "^1.6.0",
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.109.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.24.4",
     "morgan": "^1.10.0",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "live-server": "^1.2.2",
-    "prisma": "^5.22.0"
+    "live-server": "^1.2.2"
   },
   "engines": {
     "node": ">=18.0.0"

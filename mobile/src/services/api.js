@@ -195,13 +195,13 @@ export const ApiService = {
     }
   },
 
-  // Auth: Google OAuth callback
-  async googleAuthCallback(code) {
+  // Auth: Google OAuth callback — receives resolved { email, name, googleId }
+  async googleAuthCallback({ email, name, googleId }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code })
+        body: JSON.stringify({ email, name, googleId })
       });
       const data = await res.json();
       if (res.ok && data.token) {
