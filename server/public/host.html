@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dobha Live - Go Live</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>Dobha <span>Live</span> - Host</h1>
+      <a href="/">Watch instead</a>
+    </div>
+
+    <div id="joinView" class="card">
+      <form id="joinForm">
+        <input id="room" placeholder="Stream name (e.g. bale-1)" required />
+        <input id="identity" placeholder="Your seller name" required />
+        <button type="submit">Go live</button>
+        <div id="error" class="error"></div>
+      </form>
+    </div>
+
+    <div id="roomView" class="hidden">
+      <div class="bar">
+        <span class="live">LIVE</span>
+        <strong id="roomName"></strong>
+        <span class="muted" id="viewerCount"></span>
+        <span style="flex:1"></span>
+        <button id="camBtn">Camera off</button>
+        <button id="micBtn">Mute</button>
+        <button id="leaveBtn" class="danger">End stream</button>
+      </div>
+      <div class="stage">
+        <div id="videos"><span class="muted" id="waiting">Starting camera...</span></div>
+        <div id="chat" class="card">
+          <div id="messages"></div>
+          <form id="chatForm">
+            <input id="chatInput" placeholder="Say something" autocomplete="off" />
+            <button type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/livekit-client@2/dist/livekit-client.umd.min.js"></script>
+  <script src="live.js"></script>
+  <script>
+    $('joinForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('error').textContent = '';
+      try {
+        await joinLive({ room: $('room').value.trim(), identity: $('identity').value.trim(), role: 'host' });
+      } catch (err) {
+        $('error').textContent = err.message;
+      }
+    });
+
+    $('camBtn').addEventListener('click', async () => {
+      const on = room.localParticipant.isCameraEnabled;
+      await room.localParticipant.setCameraEnabled(!on);
+      $('camBtn').textContent = on ? 'Camera on' : 'Camera off';
+    });
+
+    $('micBtn').addEventListener('click', async () => {
+      const on = room.localParticipant.isMicrophoneEnabled;
+      await room.localParticipant.setMicrophoneEnabled(!on);
+      $('micBtn').textContent = on ? 'Unmute' : 'Mute';
+    });
+  </script>
+</body>
+</html>
