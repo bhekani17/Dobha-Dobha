@@ -15,7 +15,7 @@ class DobhaLiveApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Dobha Live',
+      title: 'Dobha Dobha Live',
       debugShowCheckedModeBanner: false,
       theme: dobhaTheme(),
       home: const HomeScreen(),
