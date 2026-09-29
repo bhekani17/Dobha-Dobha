@@ -26,9 +26,15 @@ async function joinLive({ room: roomName, identity, role }) {
     .on(RoomEvent.ParticipantConnected, updateCount)
     .on(RoomEvent.ParticipantDisconnected, updateCount)
     .on(RoomEvent.DataReceived, (payload, participant) => {
-      const msg = JSON.parse(decoder.decode(payload));
-      if (msg.type === 'chat') addMessage(participant?.identity || 'someone', msg.text);
+      let msg;
+      try {
+        msg = JSON.parse(decoder.decode(payload));
+      } catch {
+        return; // Ignore payloads that are not our chat format.
+      }
+      if (msg.type === 'chat') addMessage(participant?.name || 'someone', String(msg.text));
     })
+    .on(RoomEvent.AudioPlaybackStatusChanged, updateSoundButton)
     .on(RoomEvent.Disconnected, resetUi);
 
   await room.connect(data.url, data.token);
@@ -37,6 +43,7 @@ async function joinLive({ room: roomName, identity, role }) {
     await room.localParticipant.enableCameraAndMicrophone();
   }
 
+  updateSoundButton();
   $('roomName').textContent = room.name;
   $('joinView').classList.add('hidden');
   $('roomView').classList.remove('hidden');
@@ -50,6 +57,21 @@ function showTrack(track) {
     $('videos').querySelectorAll('video').forEach((v) => v.remove());
   }
   $('videos').appendChild(el);
+}
+
+// Browsers block autoplay with sound until the user taps something on the page.
+function updateSoundButton() {
+  let btn = $('soundBtn');
+  if (!room || room.canPlaybackAudio) {
+    if (btn) btn.remove();
+    return;
+  }
+  if (btn) return;
+  btn = document.createElement('button');
+  btn.id = 'soundBtn';
+  btn.textContent = 'Tap for sound';
+  btn.onclick = () => room.startAudio();
+  $('videos').appendChild(btn);
 }
 
 function updateCount() {
@@ -71,11 +93,16 @@ $('chatForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = $('chatInput').value.trim();
   if (!text || !room) return;
-  await room.localParticipant.publishData(
-    encoder.encode(JSON.stringify({ type: 'chat', text })),
-    { reliable: true }
-  );
-  addMessage(room.localParticipant.identity, text);
+  try {
+    await room.localParticipant.publishData(
+      encoder.encode(JSON.stringify({ type: 'chat', text })),
+      { reliable: true }
+    );
+  } catch {
+    addMessage('', 'Message not sent, check your connection');
+    return;
+  }
+  addMessage(room.localParticipant.name, text);
   $('chatInput').value = '';
 });
 
@@ -83,7 +110,7 @@ $('leaveBtn').addEventListener('click', () => room && room.disconnect());
 
 function resetUi() {
   room = null;
-  $('videos').querySelectorAll('video, audio').forEach((el) => el.remove());
+  $('videos').querySelectorAll('video, audio, #soundBtn').forEach((el) => el.remove());
   $('waiting').classList.remove('hidden');
   $('messages').innerHTML = '';
   $('roomView').classList.add('hidden');

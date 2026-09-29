@@ -1,16 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 /// Base URL of the token server in `server/`.
 ///
 /// Pass `--dart-define=SERVER_URL=http://<your-pc-ip>:3000` when running on a
 /// real phone. Without it, emulators/simulators reach the PC through their
-/// usual loopback aliases.
+/// usual loopback aliases. Release builds must pass the public https URL.
 String defaultServerUrl() {
   const fromEnv = String.fromEnvironment('SERVER_URL');
   if (fromEnv.isNotEmpty) return fromEnv;
+  if (kReleaseMode) {
+    throw StateError('Build with --dart-define=SERVER_URL=https://<your-server>');
+  }
   return Platform.isAndroid ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
 }
 

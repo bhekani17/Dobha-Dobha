@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dobha-live",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // host.html, index.html, live.js, style.css
+  "assets": { "directory": "./public" },
+
+  // LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET are secrets:
+  //   npx wrangler secret put LIVEKIT_API_SECRET
+  // For local dev they come from .dev.vars (copy .dev.vars.example).
+
+  "durable_objects": {
+    "bindings": [{ "name": "CLAIMS", "class_name": "StreamClaims" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["StreamClaims"] }],
+
+  "ratelimits": [
+    { "name": "TOKEN_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }
+  ]
+}
