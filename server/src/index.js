@@ -13,13 +13,14 @@ const CLAIM_MS = 30000;
 // hitting the LiveKit API once per phone.
 let roomsCache = { at: 0, promise: null };
 
+// No defaults: locally they come from .dev.vars, deployed from Worker secrets.
 function config(env) {
-  const url = env.LIVEKIT_URL || 'ws://localhost:7880';
-  const key = env.LIVEKIT_API_KEY || 'devkey';
-  const secret = env.LIVEKIT_API_SECRET || 'secret';
-  const local = LOCAL_RE.test(url);
+  const url = env.LIVEKIT_URL;
+  const key = env.LIVEKIT_API_KEY;
+  const secret = env.LIVEKIT_API_SECRET;
+  const local = Boolean(url) && LOCAL_RE.test(url);
   // The dev key/secret are public knowledge; never sign tokens for a real LiveKit server with them.
-  const ok = local || (key !== 'devkey' && secret !== 'secret');
+  const ok = Boolean(url && key && secret) && (local || (key !== 'devkey' && secret !== 'secret'));
   return { url, key, secret, local, ok };
 }
 
@@ -117,7 +118,7 @@ export default {
   async fetch(request, env) {
     const cfg = config(env);
     if (!cfg.ok) {
-      return json({ error: 'Server not configured: set LIVEKIT_API_KEY and LIVEKIT_API_SECRET' }, 500);
+      return json({ error: 'Server not configured: set LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET' }, 500);
     }
     const { pathname } = new URL(request.url);
     if (request.method === 'GET' && pathname === '/rooms') return rooms(cfg);
