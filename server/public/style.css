@@ -1,0 +1,31 @@
+:root { --bg: #000; --card: #111; --green: #00C264; --text: #fff; --muted: #888; --red: #FF3B3B; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; }
+a { color: var(--green); }
+.wrap { max-width: 960px; margin: 0 auto; padding: 16px; }
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+h1 { font-size: 20px; margin: 0; }
+h1 span { color: var(--green); }
+h2 { font-size: 16px; margin: 16px 0 8px; }
+.card { background: var(--card); border-radius: 12px; padding: 16px; }
+form { display: grid; gap: 10px; }
+input, button { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid #222; background: #000; color: var(--text); }
+button { background: var(--green); color: #000; font-weight: 600; border: 0; cursor: pointer; }
+button.danger { background: var(--red); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+.bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.live { background: var(--red); padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; }
+.muted { color: var(--muted); font-size: 14px; }
+.error { color: var(--red); font-size: 14px; }
+.stage { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 760px) { .stage { grid-template-columns: 2fr 1fr; } }
+#videos { background: var(--card); border-radius: 12px; min-height: 280px; display: grid; place-items: center; overflow: hidden; }
+#videos video { width: 100%; height: 100%; object-fit: cover; display: block; }
+#chat { display: flex; flex-direction: column; height: 420px; }
+#messages { flex: 1; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
+#messages b { color: var(--green); }
+#chatForm { display: flex; gap: 8px; margin-top: 8px; }
+#chatForm input { flex: 1; min-width: 0; }
+#roomList { display: grid; gap: 8px; }
+.roomItem { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hidden { display: none !important; }
