@@ -81,7 +81,7 @@ class _LiveScreenState extends State<LiveScreen> {
   void _onData(DataReceivedEvent e) {
     try {
       final msg = jsonDecode(utf8.decode(e.data));
-      if (msg['type'] == 'chat') _addMessage(e.participant?.identity ?? 'someone', msg['text'] as String);
+      if (msg['type'] == 'chat') _addMessage(e.participant?.name ?? 'someone', msg['text'] as String);
     } catch (_) {
       // Ignore payloads that are not our chat format.
     }
@@ -98,8 +98,13 @@ class _LiveScreenState extends State<LiveScreen> {
     final text = _chatController.text.trim();
     final local = _room.localParticipant;
     if (text.isEmpty || local == null) return;
-    await local.publishData(utf8.encode(jsonEncode({'type': 'chat', 'text': text})), reliable: true);
-    _addMessage(local.identity, text);
+    try {
+      await local.publishData(utf8.encode(jsonEncode({'type': 'chat', 'text': text})), reliable: true);
+    } catch (_) {
+      _addMessage('', 'Message not sent, check your connection');
+      return;
+    }
+    _addMessage(local.name, text);
     _chatController.clear();
   }
 
