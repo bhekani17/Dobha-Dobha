@@ -31,6 +31,38 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     super.dispose();
   }
 
+  void _showSettings() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: DobhaColors.surface,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Edit profile'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                EditProfileScreen.open(context);
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.logout_rounded, color: DobhaColors.red),
+              title: Text('Log out', style: TextStyle(color: DobhaColors.red)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _confirmLogout();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _confirmLogout() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -60,13 +92,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         return Scaffold(
           appBar: AppBar(
             toolbarHeight: 68,
-            title: const Text('Account'),
+            title: const Text('Me'),
             actions: [
               const NotificationBell(),
               const SizedBox(width: 12),
-              AppButton.icon(icon: Icons.edit_outlined, size: 19, padding: 10, onPressed: () => EditProfileScreen.open(context)),
-              const SizedBox(width: 12),
-              AppButton.icon(icon: Icons.logout_rounded, iconColor: DobhaColors.red, size: 19, padding: 10, onPressed: _confirmLogout),
+              AppButton.icon(icon: Icons.settings_outlined, size: 19, padding: 10, onPressed: _showSettings),
               const SizedBox(width: 16),
             ],
           ),
@@ -91,7 +121,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(user.name,
-                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis),
                                   Text(user.handle, style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
@@ -170,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     indicatorSize: TabBarIndicatorSize.tab,
                     labelColor: DobhaColors.green,
                     unselectedLabelColor: DobhaColors.muted,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12.5),
+                    labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
                     tabs: [
                       Tab(text: 'Orders (${orders.length})'),
                       Tab(text: 'Saved (${saved.length})'),
@@ -194,7 +224,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Widget _buildOrdersTab(List<EscrowOrder> orders) {
     if (orders.isEmpty) {
-      return const _Empty(icon: Icons.receipt_long_outlined, text: 'No orders yet. Claim a drop from the feed and it shows up here.');
+      return const _Empty(icon: Icons.receipt_long_outlined, text: 'No orders yet. Buy a piece from Home and it shows up here.');
     }
     return RefreshIndicator(
       color: DobhaColors.green,
@@ -229,10 +259,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(item.title,
-                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
                       Text('${item.condition} · ${item.sellerName}',
                           style: TextStyle(fontSize: 11, color: DobhaColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 13)),
+                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -264,7 +294,7 @@ class _Stat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
         const SizedBox(height: 2),
         Text(label, style: TextStyle(fontSize: 10, color: DobhaColors.muted)),
       ],

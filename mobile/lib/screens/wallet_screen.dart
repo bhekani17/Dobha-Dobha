@@ -33,14 +33,14 @@ class WalletScreen extends StatelessWidget {
             children: [
               Icon(Icons.add_circle_outline_rounded, color: DobhaColors.green, size: 22),
               SizedBox(width: 8),
-              Text('Top Up Wallet', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              Text('Top Up Wallet', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Add funds to claim drops instantly into escrow.',
+              Text('Add money so you can pay for pieces in one tap.',
                   style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
               const SizedBox(height: 16),
               TextField(
@@ -92,7 +92,7 @@ class WalletScreen extends StatelessWidget {
             children: [
               Icon(Icons.account_balance_rounded, color: DobhaColors.cyan, size: 22),
               SizedBox(width: 8),
-              Text('Withdraw', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              Text('Withdraw', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             ],
           ),
           content: Column(
@@ -154,18 +154,15 @@ class WalletScreen extends StatelessWidget {
       listenable: AppState(),
       builder: (context, _) {
         final appState = AppState();
-        final ordersInEscrow = appState.orders.where((o) => o.status != EscrowStatus.payoutReleased).toList();
+        final activeOrders = appState.orders
+            .where((o) => o.status != EscrowStatus.payoutReleased && o.status != EscrowStatus.refunded)
+            .toList();
         final txs = appState.transactions;
 
         return Scaffold(
           appBar: AppBar(
             toolbarHeight: 68,
-            title: Text.rich(
-              TextSpan(children: [
-                TextSpan(text: 'Wallet & '),
-                TextSpan(text: 'Escrow', style: TextStyle(color: DobhaColors.cyan)),
-              ]),
-            ),
+            title: const Text('Orders'),
           ),
           body: RefreshIndicator(
             color: DobhaColors.green,
@@ -174,6 +171,21 @@ class WalletScreen extends StatelessWidget {
             child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
+              if (activeOrders.isEmpty)
+                AppWell(
+                  radius: 18,
+                  padding: const EdgeInsets.all(20),
+                  child: Text(
+                    'No orders in progress. When you buy or sell a piece, you follow it here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: DobhaColors.muted, fontSize: 13, height: 1.4),
+                  ),
+                )
+              else
+                ...activeOrders.map((ord) => EscrowTrackerCard(order: ord)),
+              const SizedBox(height: 28),
+              const Text('Wallet', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+              const SizedBox(height: 12),
               // Main balance
               AppCard(
                 radius: 26,
@@ -181,19 +193,19 @@ class WalletScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Available Balance',
+                    Text('You can spend or withdraw',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: DobhaColors.textSecondary)),
                     const SizedBox(height: 6),
                     Text(
                       'R ${appState.availableBalance.toStringAsFixed(0)}',
-                      style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: DobhaColors.green, letterSpacing: -1),
+                      style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: DobhaColors.green, letterSpacing: -1),
                     ),
                     const SizedBox(height: 18),
                     Row(
                       children: [
                         Expanded(
                           child: _BalanceWell(
-                            label: 'In Escrow',
+                            label: 'On hold for your orders',
                             amount: appState.lockedEscrowFunds,
                             color: DobhaColors.cyan,
                             icon: Icons.lock_outline_rounded,
@@ -203,7 +215,7 @@ class WalletScreen extends StatelessWidget {
                           const SizedBox(width: 12),
                           Expanded(
                             child: _BalanceWell(
-                              label: 'Pending Payouts',
+                              label: 'Coming to you from sales',
                               amount: appState.vendorPendingPayouts,
                               color: DobhaColors.amber,
                               icon: Icons.hourglass_top_rounded,
@@ -242,65 +254,8 @@ class WalletScreen extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // How escrow works
-              AppCard(
-                radius: 24,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.security_rounded, color: DobhaColors.cyan, size: 18),
-                        SizedBox(width: 8),
-                        Text('HOW DOBHA ESCROW PROTECTS YOU',
-                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: DobhaColors.cyan, letterSpacing: 0.5)),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    AppWell(
-                      radius: 16,
-                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _FlowStep(icon: Icons.payment, text: 'Buyer\nPays'),
-                          Icon(Icons.chevron_right, size: 14, color: DobhaColors.muted),
-                          _FlowStep(icon: Icons.shield, text: 'Held in\nEscrow', color: DobhaColors.cyan),
-                          Icon(Icons.chevron_right, size: 14, color: DobhaColors.muted),
-                          _FlowStep(icon: Icons.local_shipping, text: 'Vendor\nShips'),
-                          Icon(Icons.chevron_right, size: 14, color: DobhaColors.muted),
-                          _FlowStep(icon: Icons.verified, text: 'Received\nas Shown', color: DobhaColors.green),
-                          Icon(Icons.chevron_right, size: 14, color: DobhaColors.muted),
-                          _FlowStep(icon: Icons.monetization_on, text: 'Vendor\nPaid', color: DobhaColors.gold),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Your money stays locked in the Dobha vault until you confirm the piece matches what you saw.',
-                      style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary, height: 1.35),
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 28),
-
-              Text('Active Escrow (${ordersInEscrow.length})', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-              const SizedBox(height: 12),
-
-              if (ordersInEscrow.isEmpty)
-                AppWell(
-                  radius: 18,
-                  padding: EdgeInsets.all(20),
-                  child: Center(
-                    child: Text('No funds in escrow right now.', style: TextStyle(color: DobhaColors.muted, fontSize: 13)),
-                  ),
-                )
-              else
-                ...ordersInEscrow.map((ord) => EscrowTrackerCard(order: ord)),
-
-              const SizedBox(height: 28),
-              const Text('Transaction History', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              const Text('History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
               const SizedBox(height: 12),
               if (txs.isEmpty)
                 AppWell(
@@ -348,7 +303,7 @@ class WalletScreen extends StatelessWidget {
             children: [
               Text(
                 '${tx.isCredit ? "+" : "-"}R ${tx.amountZar.toStringAsFixed(0)}',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: tx.isCredit ? DobhaColors.green : DobhaColors.text),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: tx.isCredit ? DobhaColors.green : DobhaColors.text),
               ),
               Text(tx.status, style: TextStyle(fontSize: 10, color: DobhaColors.muted)),
             ],
@@ -384,29 +339,9 @@ class _BalanceWell extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 6),
-          Text('R ${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: color)),
+          Text('R ${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: color)),
         ],
       ),
-    );
-  }
-}
-
-class _FlowStep extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final Color? _color;
-  Color get color => _color ?? DobhaColors.text;
-
-  const _FlowStep({required this.icon, required this.text, this._color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(height: 3),
-        Text(text, textAlign: TextAlign.center, style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: color)),
-      ],
     );
   }
 }

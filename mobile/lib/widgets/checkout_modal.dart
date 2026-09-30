@@ -42,10 +42,10 @@ class _CheckoutModalState extends State<CheckoutModal> {
   ];
 
   final _paymentOptions = [
-    {'name': 'Capitec Pay (Instant)', 'icon': Icons.bolt, 'color': Color(0xFF007A3D)},
-    {'name': 'Ozow Instant EFT', 'icon': Icons.flash_on, 'color': Color(0xFFEF4444)},
-    {'name': 'Debit / Credit Card', 'icon': Icons.credit_card, 'color': Color(0xFF3B82F6)},
-    {'name': 'Dobha In-App Wallet', 'icon': Icons.account_balance_wallet, 'color': DobhaColors.green},
+    {'name': 'Capitec Pay (Instant)', 'icon': Icons.bolt},
+    {'name': 'Ozow Instant EFT', 'icon': Icons.flash_on},
+    {'name': 'Debit / Credit Card', 'icon': Icons.credit_card},
+    {'name': 'Dobha In-App Wallet', 'icon': Icons.account_balance_wallet},
   ];
 
   @override
@@ -67,7 +67,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
     });
 
     try {
-      final order = await AppState().checkout(
+      await AppState().checkout(
         item: widget.item,
         deliveryMethod: _selectedDelivery,
         paymentMethod: _selectedPayment,
@@ -76,7 +76,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
       if (!mounted) return;
       final nav = Navigator.of(context);
       nav.pop(true);
-      _showSuccessDialog(nav.context, order.escrowVaultRef);
+      _showSuccessDialog(nav.context);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -84,15 +84,15 @@ class _CheckoutModalState extends State<CheckoutModal> {
     }
   }
 
-  void _showSuccessDialog(BuildContext context, String vaultRef) {
+  void _showSuccessDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.verified_user_rounded, color: DobhaColors.green, size: 26),
+            Icon(Icons.check_circle_rounded, color: DobhaColors.green, size: 26),
             SizedBox(width: 10),
-            Text('Claimed!', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+            Text("It's yours", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
           ],
         ),
         content: Column(
@@ -100,22 +100,8 @@ class _CheckoutModalState extends State<CheckoutModal> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Your payment is locked in the Dobha escrow vault.',
-              style: TextStyle(color: DobhaColors.textSecondary, fontSize: 14),
-            ),
-            const SizedBox(height: 14),
-            AppWell(
-              radius: 14,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Vault Ref: $vaultRef',
-                      style: TextStyle(fontWeight: FontWeight.w800, color: DobhaColors.cyan, fontSize: 13)),
-                  const SizedBox(height: 4),
-                  Text('The vendor has been notified. They are only paid once you confirm "Received as Shown".',
-                      style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
-                ],
-              ),
+              'The seller has been told to send it. We hold your payment until you tell us it arrived. Follow it in the Orders tab.',
+              style: TextStyle(color: DobhaColors.textSecondary, fontSize: 14, height: 1.4),
             ),
           ],
         ),
@@ -168,8 +154,8 @@ class _CheckoutModalState extends State<CheckoutModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Dobha Claim', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                      Text('Protected by in-app escrow', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+                      Text('Checkout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      Text('The seller is paid only once you have it', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -197,7 +183,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(widget.item.title,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -208,7 +194,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                         ),
                         const SizedBox(height: 4),
                         Text(widget.item.formattedPrice,
-                            style: TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 15)),
+                            style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 15)),
                       ],
                     ),
                   ),
@@ -217,8 +203,8 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             const SizedBox(height: 22),
 
-            Text('Delivery / Collection',
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.textSecondary)),
+            Text('How do you want it?',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.textSecondary)),
             const SizedBox(height: 12),
             ..._deliveryOptions.map((opt) {
               final isSelected = _selectedDelivery == opt['name'];
@@ -245,14 +231,14 @@ class _CheckoutModalState extends State<CheckoutModal> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(opt['name'] as String,
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.text)),
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.text)),
                             Text(opt['sub'] as String,
                                 style: TextStyle(fontSize: 11, color: DobhaColors.muted, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),
                       Text(cost == 0 ? 'FREE' : 'R ${cost.toStringAsFixed(0)}',
-                          style: TextStyle(fontWeight: FontWeight.w900, color: cost == 0 ? DobhaColors.green : DobhaColors.text)),
+                          style: TextStyle(fontWeight: FontWeight.w700, color: cost == 0 ? DobhaColors.green : DobhaColors.text)),
                     ],
                   ),
                 ),
@@ -263,7 +249,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
             TextField(
               controller: _addressCtrl,
               decoration: InputDecoration(
-                labelText: 'Locker / Delivery Address',
+                labelText: 'Delivery address or PUDO locker',
                 hintText: 'e.g. Campus Square PUDO, Auckland Park',
                 prefixIcon: Icon(Icons.location_on_outlined, size: 18, color: DobhaColors.muted),
               ),
@@ -271,14 +257,13 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             const SizedBox(height: 22),
 
-            Text('Pay With', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.textSecondary)),
+            Text('Pay with', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.textSecondary)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
               runSpacing: 12,
               children: _paymentOptions.map((pay) {
                 final isSelected = _selectedPayment == pay['name'];
-                final color = pay['color'] as Color;
                 return AppButton(
                   selected: isSelected,
                   radius: 14,
@@ -287,12 +272,12 @@ class _CheckoutModalState extends State<CheckoutModal> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(pay['icon'] as IconData, size: 16, color: isSelected ? DobhaColors.green : color),
+                      Icon(pay['icon'] as IconData, size: 16, color: isSelected ? DobhaColors.green : DobhaColors.muted),
                       const SizedBox(width: 6),
                       Text(pay['name'] as String,
                           style: TextStyle(
                               fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                               color: isSelected ? DobhaColors.green : DobhaColors.text)),
                     ],
                   ),
@@ -301,24 +286,6 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             const SizedBox(height: 22),
 
-            AppWell(
-              radius: 16,
-              tint: DobhaColors.escrowIndigo,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.shield_outlined, color: DobhaColors.cyan, size: 20),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Funds stay locked until you receive the piece and confirm its condition.',
-                      style: TextStyle(fontSize: 11.5, color: DobhaColors.textSecondary, height: 1.35),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 22),
 
             if (_error != null)
               AppWell(
@@ -334,7 +301,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Total', style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
-                    Text('R ${total.toStringAsFixed(0)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+                    Text('R ${total.toStringAsFixed(0)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
                   ],
                 ),
                 const SizedBox(width: 16),
@@ -347,9 +314,9 @@ class _CheckoutModalState extends State<CheckoutModal> {
                       children: [
                         _isProcessing
                             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                            : const Icon(Icons.lock_rounded, size: 18),
+                            : const Icon(Icons.check_rounded, size: 18),
                         const SizedBox(width: 8),
-                        Text(_isProcessing ? 'Locking...' : 'Lock & Claim'),
+                        Text(_isProcessing ? 'Paying...' : 'Pay R ${total.toStringAsFixed(0)}'),
                       ],
                     ),
                   ),

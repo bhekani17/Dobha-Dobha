@@ -177,7 +177,7 @@ class _AppButtonState extends State<AppButton> {
             borderRadius: widget.circle ? null : BorderRadius.circular(widget.radius),
           ),
           child: DefaultTextStyle.merge(
-            style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 14),
+            style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 14),
             child: IconTheme.merge(
               data: IconThemeData(color: fg),
               child: Center(widthFactor: 1, heightFactor: 1, child: widget.child),
@@ -219,7 +219,7 @@ class AppChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 14, color: fg), const SizedBox(width: 6)],
-          Text(label, style: TextStyle(color: fg, fontSize: 12, fontWeight: selected ? FontWeight.w800 : FontWeight.w600)),
+          Text(label, style: TextStyle(color: fg, fontSize: 12, fontWeight: selected ? FontWeight.w700 : FontWeight.w600)),
         ],
       ),
     );
@@ -238,7 +238,7 @@ class AppTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fg = solid ? Colors.white : color;
+    final fg = solid ? (color.computeLuminance() > 0.35 ? Colors.black : Colors.white) : color;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -249,7 +249,7 @@ class AppTag extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 11, color: fg), const SizedBox(width: 4)],
-          Text(text, style: TextStyle(color: fg, fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+          Text(text, style: TextStyle(color: fg, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
         ],
       ),
     );

@@ -109,14 +109,14 @@ class _StudioScreenState extends State<StudioScreen> {
             AppWell(
               circle: true,
               padding: EdgeInsets.all(22),
-              tint: DobhaColors.red,
-              child: Icon(Icons.sensors_rounded, size: 40, color: DobhaColors.red),
+              tint: DobhaColors.green,
+              child: Icon(Icons.storefront_rounded, size: 40, color: DobhaColors.green),
             ),
             const SizedBox(height: 20),
-            const Text('Sell on Dobha', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const Text('Sell on Dobha', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
             const SizedBox(height: 8),
             Text(
-              'List pieces from your stall, go live to shoppers across SA, and get paid safely through escrow.',
+              'List pieces from your stall, go live to shoppers across SA, and get paid once the buyer has their piece.',
               textAlign: TextAlign.center,
               style: TextStyle(color: DobhaColors.textSecondary, height: 1.4),
             ),
@@ -155,7 +155,7 @@ class _StudioScreenState extends State<StudioScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user.shopName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                      Text(user.shopName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -176,7 +176,7 @@ class _StudioScreenState extends State<StudioScreen> {
             children: [
               Expanded(
                 child: Text('Your Listings (${inventory.where((i) => !i.isClaimed).length} for sale)',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               ),
               AppButton(
                 radius: 12,
@@ -224,7 +224,7 @@ class _StudioScreenState extends State<StudioScreen> {
                             Text(item.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.text)),
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.text)),
                             const SizedBox(height: 2),
                             Text(item.isClaimed ? 'Sold' : (isSelected ? 'Pinned for your next live' : '${item.condition} · Size ${item.size}'),
                                 style: TextStyle(
@@ -234,7 +234,7 @@ class _StudioScreenState extends State<StudioScreen> {
                           ],
                         ),
                       ),
-                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 14)),
+                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 14)),
                       if (!item.isClaimed)
                         IconButton(
                           icon: Icon(Icons.delete_outline_rounded, size: 19, color: DobhaColors.muted),
@@ -247,7 +247,7 @@ class _StudioScreenState extends State<StudioScreen> {
             }),
           const SizedBox(height: 22),
 
-          const Text('Stream Name', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+          const Text('Stream Name', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
           const SizedBox(height: 10),
           TextField(
             controller: _streamTitleCtrl,
@@ -269,7 +269,7 @@ class _StudioScreenState extends State<StudioScreen> {
               children: [
                 Icon(Icons.sensors_rounded, size: 20),
                 SizedBox(width: 8),
-                Text('GO LIVE NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.8)),
+                Text('GO LIVE NOW', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.8)),
               ],
             ),
           ),
@@ -382,7 +382,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Add a video', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const Text('Add a video', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
               Text('Up to 60 seconds. Show the fit, the fabric and any flaws.',
                   style: TextStyle(color: DobhaColors.muted, fontSize: 12.5)),
@@ -476,7 +476,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
             Positioned(
               left: 6,
               bottom: 6,
-              child: AppTag(isCover ? 'COVER' : 'VIDEO', color: isCover ? DobhaColors.green : DobhaColors.red, solid: true),
+              child: AppTag(isCover ? 'COVER' : 'VIDEO', color: isCover ? DobhaColors.green : Colors.black, solid: true),
             ),
           Positioned(
             top: 4,
@@ -541,7 +541,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
         children: [
           Row(
             children: [
-              const Expanded(child: Text('Photos & Videos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
+              const Expanded(child: Text('Photos & Videos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
               Text('${_media.length}/$_maxMedia', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
             ],
           ),

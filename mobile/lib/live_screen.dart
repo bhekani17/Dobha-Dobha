@@ -353,7 +353,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   child: Text(
                     widget.roomName,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
                 ),
               ],
@@ -480,7 +480,7 @@ class _LiveScreenState extends State<LiveScreen> {
                         children: [
                           TextSpan(
                             text: '${m.who}  ',
-                            style: TextStyle(color: DobhaColors.green, fontWeight: FontWeight.w800),
+                            style: TextStyle(color: DobhaColors.green, fontWeight: FontWeight.w700),
                           ),
                           TextSpan(text: m.text),
                         ],

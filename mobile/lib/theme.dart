@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 /// One set of colours per brightness. The app follows the phone's light/dark
 /// setting; [DobhaColors.isDark] is switched by the app root when it changes.
+///
+/// The palette is black, white and green. Red is kept for errors, destructive
+/// actions and the live dot; everything else is a shade of grey.
 class _Palette {
   final Color bg, surface, well, cardElevated, text, textSecondary, muted, border, borderLight;
-  final Color green, red, gold, amber, cyan;
+  final Color green, red;
 
   const _Palette({
     required this.bg,
@@ -18,45 +21,36 @@ class _Palette {
     required this.borderLight,
     required this.green,
     required this.red,
-    required this.gold,
-    required this.amber,
-    required this.cyan,
   });
 }
 
 const _dark = _Palette(
-  bg: Color(0xFF15171B),
-  surface: Color(0xFF22252B),
-  well: Color(0xFF1A1D22),
-  cardElevated: Color(0xFF2B2F36),
-  text: Color(0xFFF2F3F5),
-  textSecondary: Color(0xFFB4B8C0),
-  muted: Color(0xFF7C818B),
-  border: Color(0xFF2A2E35),
-  borderLight: Color(0xFF33373F),
-  green: Color(0xFF00E676),
-  red: Color(0xFFFF4D67),
-  gold: Color(0xFFFFB300),
-  amber: Color(0xFFF59E0B),
-  cyan: Color(0xFF00E5FF),
+  bg: Color(0xFF000000),
+  surface: Color(0xFF121212),
+  well: Color(0xFF0A0A0A),
+  cardElevated: Color(0xFF1F1F1F),
+  text: Color(0xFFFFFFFF),
+  textSecondary: Color(0xFFBDBDBD),
+  muted: Color(0xFF8A8A8A),
+  border: Color(0xFF1F1F1F),
+  borderLight: Color(0xFF2E2E2E),
+  green: Color(0xFF00A93B),
+  red: Color(0xFFFF453A),
 );
 
-// Light accents are deeper so text in them stays readable on white.
+// Green is deeper on white so text in it stays readable.
 const _light = _Palette(
-  bg: Color(0xFFF3F4F6),
-  surface: Color(0xFFFFFFFF),
-  well: Color(0xFFE9EBEF),
-  cardElevated: Color(0xFFE4E7EB),
-  text: Color(0xFF15171B),
-  textSecondary: Color(0xFF4A4F58),
-  muted: Color(0xFF6B7280),
-  border: Color(0xFFE2E4E8),
-  borderLight: Color(0xFFD5D8DD),
+  bg: Color(0xFFFFFFFF),
+  surface: Color(0xFFF4F4F4),
+  well: Color(0xFFEDEDED),
+  cardElevated: Color(0xFFE8E8E8),
+  text: Color(0xFF000000),
+  textSecondary: Color(0xFF3D3D3D),
+  muted: Color(0xFF6B6B6B),
+  border: Color(0xFFE5E5E5),
+  borderLight: Color(0xFFD4D4D4),
   green: Color(0xFF00A650),
-  red: Color(0xFFE5374F),
-  gold: Color(0xFFB7791F),
-  amber: Color(0xFFD97706),
-  cyan: Color(0xFF0891B2),
+  red: Color(0xFFD92D20),
 );
 
 class DobhaColors {
@@ -77,17 +71,12 @@ class DobhaColors {
   static Color get borderLight => _p.borderLight;
 
   static Color get green => _p.green;
-  static const greenDark = Color(0xFF00A34D);
   static Color get red => _p.red;
-  static Color get gold => _p.gold;
-  static Color get amber => _p.amber;
-  static Color get cyan => _p.cyan;
-  static const purple = Color(0xFF8B5CF6);
 
-  // Escrow Trust & Safety palette
-  static const escrowBlue = Color(0xFF3B82F6);
-  static const escrowIndigo = Color(0xFF6366F1);
-  static const escrowSuccess = Color(0xFF10B981);
+  // Older accent names, folded into the black/white/green palette.
+  static Color get gold => _p.green;
+  static Color get amber => _p.textSecondary;
+  static Color get cyan => _p.text;
 
   /// The logo for the current brightness: transparent on dark, black tile on light.
   static String get logoAsset => isDark ? 'assets/images/logo01.png' : 'assets/images/logo.png';
@@ -171,7 +160,7 @@ ThemeData _buildTheme(Brightness brightness) {
       scrolledUnderElevation: 0,
       titleTextStyle: TextStyle(
         fontSize: 19,
-        fontWeight: FontWeight.w800,
+        fontWeight: FontWeight.w700,
         color: DobhaColors.text,
       ),
     ),
@@ -203,5 +192,44 @@ ThemeData _buildTheme(Brightness brightness) {
     ),
     dividerTheme: DividerThemeData(color: DobhaColors.border, thickness: 1),
     tabBarTheme: const TabBarThemeData(dividerColor: Colors.transparent),
+    // One gentle transition everywhere instead of each platform's default.
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: _SmoothPageTransitionsBuilder(),
+        TargetPlatform.iOS: _SmoothPageTransitionsBuilder(),
+        TargetPlatform.windows: _SmoothPageTransitionsBuilder(),
+        TargetPlatform.macOS: _SmoothPageTransitionsBuilder(),
+        TargetPlatform.linux: _SmoothPageTransitionsBuilder(),
+        TargetPlatform.fuchsia: _SmoothPageTransitionsBuilder(),
+      },
+    ),
   );
+}
+
+/// New screens fade in while sliding a short way from the right; the screen underneath
+/// dims and drifts slightly left, so going back feels like the reverse.
+class _SmoothPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _SmoothPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final enter = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    final under = CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeOutCubic, reverseCurve: Curves.easeInCubic);
+    return SlideTransition(
+      position: Tween(begin: Offset.zero, end: const Offset(-0.06, 0)).animate(under),
+      child: FadeTransition(
+        opacity: Tween(begin: 1.0, end: 0.6).animate(under),
+        child: SlideTransition(
+          position: Tween(begin: const Offset(0.08, 0), end: Offset.zero).animate(enter),
+          child: FadeTransition(opacity: enter, child: child),
+        ),
+      ),
+    );
+  }
 }

@@ -74,7 +74,7 @@ class PinnedProductBanner extends StatelessWidget {
                         current.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -88,7 +88,7 @@ class PinnedProductBanner extends StatelessWidget {
                       current.price.startsWith('R') ? current.price : 'R ${current.price}',
                       style: TextStyle(
                         color: isSold ? DobhaColors.muted : DobhaColors.green,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.w700,
                         fontSize: 15,
                         decoration: isSold ? TextDecoration.lineThrough : null,
                       ),
@@ -164,7 +164,7 @@ Future<PinnedItem?> showPinItemModal({required BuildContext context, String? cur
                 children: [
                   Icon(Icons.sell_rounded, color: DobhaColors.green, size: 22),
                   const SizedBox(width: 8),
-                  const Text('Pin an item', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  const Text('Pin an item', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
                   const Spacer(),
                   AppButton.icon(icon: Icons.close, size: 18, padding: 8, onPressed: () => Navigator.of(ctx).pop()),
                 ],

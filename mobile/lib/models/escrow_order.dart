@@ -9,39 +9,39 @@ enum EscrowStatus {
 }
 
 extension EscrowStatusX on EscrowStatus {
-  String get label {
+  /// Short status for the order card, from the viewer's side.
+  String label({required bool isSeller}) {
     switch (this) {
       case EscrowStatus.paymentHeld:
-        return 'Funds in Escrow';
+        return isSeller ? 'Send it' : 'Paid';
       case EscrowStatus.vendorDispatched:
-        return 'In Transit';
+        return 'On its way';
       case EscrowStatus.payoutReleased:
-        return 'Completed';
+        return 'Done';
       case EscrowStatus.disputed:
-        return 'Under Review';
+        return 'Problem reported';
       case EscrowStatus.refunded:
         return 'Refunded';
     }
   }
 
+  /// One sentence on what happens next.
   String description({required bool isSeller}) {
     switch (this) {
       case EscrowStatus.paymentHeld:
         return isSeller
-            ? 'The buyer has paid into escrow. Pack the piece and mark it as dispatched.'
-            : 'Your payment is locked in Dobha Escrow. The vendor is paid only after you receive the piece.';
+            ? 'The buyer has paid. Send the piece, then tap the button below. You get paid once they receive it.'
+            : 'You paid. We hold the money until you have the piece, so you are covered. Waiting for the seller to send it.';
       case EscrowStatus.vendorDispatched:
         return isSeller
-            ? 'On its way. You are paid as soon as the buyer confirms it arrived as shown.'
-            : 'The vendor has sent your piece. Check it on arrival before releasing the funds.';
+            ? 'On its way. You get paid as soon as the buyer confirms it arrived.'
+            : 'On its way to you. Check it when it arrives, then confirm so the seller gets paid.';
       case EscrowStatus.payoutReleased:
-        return 'Confirmed as shown and the vendor has been paid.';
+        return isSeller ? 'The buyer received it and you have been paid.' : 'You received it and the seller has been paid.';
       case EscrowStatus.disputed:
-        return 'Dobha support is reviewing this order. Funds stay frozen until it is resolved.';
+        return 'Dobha support is looking into this. The money stays on hold until it is sorted out.';
       case EscrowStatus.refunded:
-        return isSeller
-            ? 'Dobha support settled this order for the buyer, who has been refunded.'
-            : 'Dobha support settled this order for you. The full amount is back in your wallet.';
+        return isSeller ? 'Dobha support refunded the buyer.' : 'Dobha support refunded you. The money is back in your wallet.';
     }
   }
 
