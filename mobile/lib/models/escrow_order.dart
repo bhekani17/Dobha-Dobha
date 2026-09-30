@@ -79,6 +79,12 @@ class EscrowOrder {
   /// True when the signed-in user is the vendor on this order.
   final bool isSeller;
 
+  /// The buyer's star rating (1-5) once they have left one.
+  final int? reviewRating;
+
+  /// The buyer can rate the seller now (order done, not rated yet).
+  final bool canReview;
+
   const EscrowOrder({
     required this.id,
     required this.item,
@@ -95,6 +101,8 @@ class EscrowOrder {
     required this.trackingNumber,
     required this.buyerName,
     required this.isSeller,
+    this.reviewRating,
+    this.canReview = false,
   });
 
   double get totalZar => amountZar + shippingFeeZar;
@@ -120,6 +128,8 @@ class EscrowOrder {
       trackingNumber: json['trackingNumber'] as String,
       buyerName: json['buyerName'] as String? ?? '',
       isSeller: json['isSeller'] as bool? ?? false,
+      reviewRating: (json['review'] as Map<String, dynamic>?)?['rating'] as int?,
+      canReview: json['canReview'] as bool? ?? false,
     );
   }
 }

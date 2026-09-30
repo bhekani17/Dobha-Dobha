@@ -91,6 +91,14 @@ class _NotificationTile extends StatelessWidget {
     'resolved': (Icons.gavel_rounded, _Tone.amber),
     'removed': (Icons.block_rounded, _Tone.red),
     'comment': (Icons.chat_bubble_rounded, _Tone.muted),
+    'offer': (Icons.local_offer_rounded, _Tone.green),
+    'offer_accepted': (Icons.handshake_rounded, _Tone.green),
+    'offer_countered': (Icons.swap_horiz_rounded, _Tone.green),
+    'offer_declined': (Icons.do_not_disturb_on_outlined, _Tone.muted),
+    'new_listing': (Icons.fiber_new_rounded, _Tone.green),
+    'review': (Icons.star_rounded, _Tone.green),
+    'follow': (Icons.person_add_alt_1_rounded, _Tone.green),
+    'price_drop': (Icons.trending_down_rounded, _Tone.green),
   };
 
   @override

@@ -24,13 +24,18 @@ const txn = (env, userId, t) =>
   ).bind(id('txn'), userId, t.title, t.subtitle, t.amount, t.type, t.status, t.reference, now());
 
 export async function orderJson(env, o, viewerId) {
-  const item = await env.DB.prepare(
-    `SELECT i.*, u.name AS seller_name, u.handle AS seller_handle, u.shop_name, u.stall_location
-     FROM items i JOIN users u ON u.id = i.seller_id WHERE i.id = ?`,
-  )
-    .bind(o.item_id)
-    .first();
+  const [item, review] = await Promise.all([
+    env.DB.prepare(
+      `SELECT i.*, u.name AS seller_name, u.handle AS seller_handle, u.shop_name, u.stall_location
+       FROM items i JOIN users u ON u.id = i.seller_id WHERE i.id = ?`,
+    )
+      .bind(o.item_id)
+      .first(),
+    env.DB.prepare('SELECT rating, text FROM reviews WHERE order_id = ?').bind(o.id).first(),
+  ]);
   return {
+    review: review ? { rating: review.rating, text: review.text } : null,
+    canReview: !review && o.buyer_id === viewerId && o.status === 'payoutReleased',
     id: o.id,
     item: itemJson(item),
     amountZar: zar(o.amount_cents),
@@ -72,23 +77,39 @@ export async function listOrders(request, env) {
   return json({ orders: await Promise.all(results.map((o) => orderJson(env, o, user.id))) });
 }
 
-/** POST /api/orders: claim an item. The item flips to sold atomically, so only one buyer wins. */
-export async function createOrder(request, env) {
-  const user = await requireUser(request, env);
-  const body = await readJson(request);
-  const itemId = str(body, 'itemId', { max: 40 });
+/** Delivery, payment and address from a checkout body, validated. */
+function checkoutDetails(body) {
   const deliveryMethod = str(body, 'deliveryMethod', { max: 60 });
   const paymentMethod = str(body, 'paymentMethod', { max: 60 });
   const address = str(body, 'deliveryAddress', { min: 5, max: 200 });
   if (!(deliveryMethod in DELIVERY)) throw new HttpError(400, 'Unknown delivery method');
   if (!PAYMENT_METHODS.includes(paymentMethod)) throw new HttpError(400, 'Unknown payment method');
+  return { deliveryMethod, paymentMethod, address };
+}
 
+/**
+ * Buys one piece for `user` and returns the new order id. The item flips to sold
+ * atomically, so only one buyer wins. With `offerId`, the buyer's accepted offer
+ * sets the price instead of the listing price.
+ */
+async function placeOrder(env, user, itemId, { deliveryMethod, paymentMethod, address }, offerId = null) {
   const item = await loadItem(env, itemId, user.id);
   if (item.seller_id === user.id) throw new HttpError(400, "You can't buy your own item");
-  if (item.status !== 'available') throw new HttpError(409, 'Someone already claimed this piece');
+  if (item.status !== 'available') throw new HttpError(409, 'Someone already bought this piece');
+
+  let price = item.price_cents;
+  if (offerId) {
+    const offer = await env.DB.prepare(
+      "SELECT * FROM offers WHERE id = ? AND buyer_id = ? AND item_id = ? AND status = 'accepted' AND expires_at > ?",
+    )
+      .bind(offerId, user.id, itemId, now())
+      .first();
+    if (!offer) throw new HttpError(409, 'That offer is no longer valid');
+    price = offer.amount_cents;
+  }
 
   const shipping = DELIVERY[deliveryMethod];
-  const total = item.price_cents + shipping;
+  const total = price + shipping;
 
   // Wallet payments need the balance; other methods are simulated as paid.
   if (paymentMethod === WALLET) {
@@ -105,7 +126,7 @@ export async function createOrder(request, env) {
     if (paymentMethod === WALLET) {
       await env.DB.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(total, user.id).run();
     }
-    throw new HttpError(409, 'Someone already claimed this piece');
+    throw new HttpError(409, 'Someone already bought this piece');
   }
 
   const order = {
@@ -121,9 +142,9 @@ export async function createOrder(request, env) {
       env.DB.prepare(
         `INSERT INTO orders (id, item_id, buyer_id, seller_id, amount_cents, shipping_cents, delivery_method, delivery_address, payment_method, status, vault_ref, tracking, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paymentHeld', ?, ?, ?)`,
-      ).bind(order.id, itemId, user.id, item.seller_id, item.price_cents, shipping, deliveryMethod, address, paymentMethod, order.vault, order.tracking, now()),
+      ).bind(order.id, itemId, user.id, item.seller_id, price, shipping, deliveryMethod, address, paymentMethod, order.vault, order.tracking, now()),
       env.DB.prepare('UPDATE wallets SET locked_cents = locked_cents + ? WHERE user_id = ?').bind(total, user.id),
-      env.DB.prepare('UPDATE wallets SET pending_cents = pending_cents + ? WHERE user_id = ?').bind(item.price_cents, item.seller_id),
+      env.DB.prepare('UPDATE wallets SET pending_cents = pending_cents + ? WHERE user_id = ?').bind(price, item.seller_id),
       txn(env, user.id, {
         title: `Paid for ${item.title}`,
         subtitle: `On hold until you have it (${paymentMethod})`,
@@ -135,10 +156,15 @@ export async function createOrder(request, env) {
       notify(env, item.seller_id, {
         kind: 'sale',
         title: 'You made a sale',
-        body: `${user.name} bought "${item.title}" for ${money(item.price_cents)}. Send it, then tap "I've sent it" in Orders.`,
+        body: `${user.name} bought "${item.title}" for ${money(price)}. Send it, then tap "I've sent it" in Orders.`,
         orderId: order.id,
         itemId,
       }),
+      // Sold pieces leave every cart, and other offers on them are closed.
+      env.DB.prepare('DELETE FROM cart_items WHERE item_id = ?').bind(itemId),
+      env.DB.prepare(
+        "UPDATE offers SET status = CASE WHEN id = ?2 THEN 'used' ELSE 'declined' END, updated_at = ?3 WHERE item_id = ?1 AND status IN ('pending', 'countered', 'accepted')",
+      ).bind(itemId, offerId, now()),
     ]);
   } catch (e) {
     await env.DB.batch([
@@ -149,8 +175,44 @@ export async function createOrder(request, env) {
     ]);
     throw e;
   }
+  return order.id;
+}
 
-  return json({ order: await orderJson(env, await loadOrder(env, order.id), user.id) }, 201);
+/** POST /api/orders { itemId, deliveryMethod, paymentMethod, deliveryAddress, offerId? } */
+export async function createOrder(request, env) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request);
+  const itemId = str(body, 'itemId', { max: 40 });
+  const offerId = typeof body.offerId === 'string' && body.offerId ? body.offerId.slice(0, 40) : null;
+  const orderId = await placeOrder(env, user, itemId, checkoutDetails(body), offerId);
+  return json({ order: await orderJson(env, await loadOrder(env, orderId), user.id) }, 201);
+}
+
+/**
+ * POST /api/cart/checkout { deliveryMethod, paymentMethod, deliveryAddress }: one order per
+ * piece in the cart (each seller sends separately). Pieces that can't be bought stay in the
+ * cart and are listed in `failed`.
+ */
+export async function checkoutCart(request, env) {
+  const user = await requireUser(request, env);
+  const details = checkoutDetails(await readJson(request));
+  const { results } = await env.DB.prepare('SELECT item_id FROM cart_items WHERE user_id = ? ORDER BY created_at')
+    .bind(user.id)
+    .all();
+  if (!results.length) throw new HttpError(400, 'Your cart is empty');
+
+  const orders = [];
+  const failed = [];
+  for (const { item_id: itemId } of results) {
+    try {
+      const orderId = await placeOrder(env, user, itemId, details);
+      orders.push(await orderJson(env, await loadOrder(env, orderId), user.id));
+    } catch (e) {
+      if (!(e instanceof HttpError)) throw e;
+      failed.push({ itemId, error: e.message });
+    }
+  }
+  return json({ orders, failed }, orders.length ? 201 : 200);
 }
 
 /** POST /api/orders/:id/dispatch (seller) { trackingNumber }: required unless collected at the Safe Hub. */

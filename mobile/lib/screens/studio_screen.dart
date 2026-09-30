@@ -235,11 +235,18 @@ class _StudioScreenState extends State<StudioScreen> {
                         ),
                       ),
                       Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 14)),
-                      if (!item.isClaimed)
+                      if (!item.isClaimed) ...[
                         IconButton(
+                          tooltip: 'Edit listing',
+                          icon: Icon(Icons.edit_outlined, size: 19, color: DobhaColors.muted),
+                          onPressed: () => NewListingScreen.open(context, editing: item),
+                        ),
+                        IconButton(
+                          tooltip: 'Remove listing',
                           icon: Icon(Icons.delete_outline_rounded, size: 19, color: DobhaColors.muted),
                           onPressed: () => _remove(item),
                         ),
+                      ],
                     ],
                   ),
                 ),
@@ -279,8 +286,13 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 }
 
+/// Creates a listing, or edits [editing] (details, price and photos) while it is unsold.
 class NewListingScreen extends StatefulWidget {
-  const NewListingScreen({super.key});
+  final ThriftItem? editing;
+  const NewListingScreen({super.key, this.editing});
+
+  static Future<void> open(BuildContext context, {ThriftItem? editing}) =>
+      Navigator.of(context).push(MaterialPageRoute(builder: (_) => NewListingScreen(editing: editing)));
 
   @override
   State<NewListingScreen> createState() => _NewListingScreenState();
@@ -294,7 +306,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
   String _category = ThriftItem.categories.first;
   String _condition = ThriftItem.conditions.first;
   String _size = 'M';
-  final _media = <PendingMedia>[];
+  final _media = <ListingMedia>[];
   bool _busy = false;
   String? _progress;
   String? _error;
@@ -302,6 +314,24 @@ class _NewListingScreenState extends State<NewListingScreen> {
   static const _maxMedia = 10;
   static const _maxVideos = 3;
   static const _maxVideoBytes = 60 * 1024 * 1024;
+
+  bool get _isEdit => widget.editing != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.editing;
+    if (item != null) {
+      _title.text = item.title;
+      _price.text = item.priceZar.toStringAsFixed(item.priceZar % 1 == 0 ? 0 : 2);
+      _description.text = item.description;
+      _caption.text = item.haulCaption;
+      _category = ThriftItem.categories.contains(item.category) ? item.category : ThriftItem.categories.last;
+      _condition = item.condition;
+      _size = item.size;
+      _media.addAll(item.media.map(ListingMedia.existing));
+    }
+  }
 
   @override
   void dispose() {
@@ -336,9 +366,9 @@ class _NewListingScreenState extends State<NewListingScreen> {
       final files = camera
           ? [?await picker.pickImage(source: ImageSource.camera, maxWidth: 1600, imageQuality: 82)]
           : await picker.pickMultiImage(maxWidth: 1600, imageQuality: 82, limit: room > 1 ? room : null);
-      final added = <PendingMedia>[];
+      final added = <ListingMedia>[];
       for (final f in files.take(room)) {
-        added.add(PendingMedia(await f.readAsBytes(), _typeFor(f, video: false)!));
+        added.add(ListingMedia.pending(PendingMedia(await f.readAsBytes(), _typeFor(f, video: false)!)));
       }
       setState(() {
         _media.addAll(added);
@@ -364,7 +394,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
         return setState(() => _error = 'That video is too large (max 60 MB). Try a shorter clip.');
       }
       setState(() {
-        _media.add(PendingMedia(bytes, type));
+        _media.add(ListingMedia.pending(PendingMedia(bytes, type)));
         _error = null;
       });
     } catch (_) {
@@ -427,21 +457,42 @@ class _NewListingScreenState extends State<NewListingScreen> {
       _busy = true;
       _error = null;
     });
+    void progress(int done, int total) {
+      if (mounted && total > 0) {
+        setState(() => _progress = done < total ? 'Uploading ${done + 1} of $total...' : (_isEdit ? 'Saving...' : 'Publishing...'));
+      }
+    }
+
     try {
-      await AppState().createItem(
-        title: _title.text.trim(),
-        priceZar: price,
-        category: _category,
-        condition: _condition,
-        size: _size,
-        description: _description.text.trim(),
-        caption: _caption.text.trim(),
-        media: _media,
-        onProgress: (done, total) {
-          if (mounted && total > 0) setState(() => _progress = done < total ? 'Uploading ${done + 1} of $total...' : 'Publishing...');
-        },
-      );
-      if (mounted) Navigator.of(context).pop();
+      if (_isEdit) {
+        await AppState().updateItem(
+          widget.editing!,
+          title: _title.text.trim(),
+          priceZar: price,
+          category: _category,
+          condition: _condition,
+          size: _size,
+          description: _description.text.trim(),
+          caption: _caption.text.trim(),
+          media: _media,
+          onProgress: progress,
+        );
+      } else {
+        await AppState().createItem(
+          title: _title.text.trim(),
+          priceZar: price,
+          category: _category,
+          condition: _condition,
+          size: _size,
+          description: _description.text.trim(),
+          caption: _caption.text.trim(),
+          media: [for (final m in _media) m.pending!],
+          onProgress: progress,
+        );
+      }
+      if (!mounted) return;
+      if (_isEdit) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing updated')));
+      Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -470,7 +521,9 @@ class _NewListingScreenState extends State<NewListingScreen> {
                     color: Colors.black,
                     child: Center(child: Icon(Icons.play_circle_outline_rounded, color: Colors.white, size: 36)),
                   )
-                : Image.memory(m.bytes, fit: BoxFit.cover),
+                : m.pending != null
+                    ? Image.memory(m.pending!.bytes, fit: BoxFit.cover)
+                    : Image.network(AppState().api.resolve(m.existing!.url), fit: BoxFit.cover),
           ),
           if (isCover || m.isVideo)
             Positioned(
@@ -534,7 +587,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
           ),
         ),
         leadingWidth: 64,
-        title: const Text('New Listing'),
+        title: Text(_isEdit ? 'Edit listing' : 'New Listing'),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
@@ -599,11 +652,12 @@ class _NewListingScreenState extends State<NewListingScreen> {
             children: [
               Expanded(child: _dropdown('Category', _category, ThriftItem.categories, (v) => _category = v)),
               const SizedBox(width: 12),
-              Expanded(child: _dropdown('Size', _size, ThriftItem.sizes, (v) => _size = v)),
+              Expanded(child: _dropdown('Size', _size, {...ThriftItem.sizes, _size}.toList(), (v) => _size = v)),
             ],
           ),
           const SizedBox(height: 14),
-          _dropdown('Condition', _condition, ThriftItem.conditions, (v) => _condition = v),
+          // An older listing may use a condition that is no longer in the list; keep it selectable.
+          _dropdown('Condition', _condition, {...ThriftItem.conditions, _condition}.toList(), (v) => _condition = v),
           const SizedBox(height: 14),
           TextField(
             controller: _caption,
@@ -637,10 +691,10 @@ class _NewListingScreenState extends State<NewListingScreen> {
                     children: [
                       const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.black)),
                       const SizedBox(width: 10),
-                      Text(_progress ?? 'Publishing...', style: const TextStyle(fontSize: 14)),
+                      Text(_progress ?? (_isEdit ? 'Saving...' : 'Publishing...'), style: const TextStyle(fontSize: 14)),
                     ],
                   )
-                : const Text('Publish Listing', style: TextStyle(fontSize: 15)),
+                : Text(_isEdit ? 'Save changes' : 'Publish Listing', style: const TextStyle(fontSize: 15)),
           ),
         ],
       ),

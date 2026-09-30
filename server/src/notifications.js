@@ -2,6 +2,7 @@
 // The app polls the unread count; push (Firebase) can later be sent from notify().
 import { requireUser } from './auth.js';
 import { id, iso, json, now } from './http.js';
+import { unreadMessages } from './social.js';
 
 /** A prepared insert, so callers can put it in the same batch as the change it announces. */
 export function notify(env, userId, { kind, title, body, orderId = null, itemId = null }) {
@@ -32,13 +33,14 @@ export async function listNotifications(request, env) {
   });
 }
 
-/** GET /api/notifications/unread: cheap enough to poll. */
+/** GET /api/notifications/unread: unread notifications and chat messages; cheap enough to poll. */
 export async function unreadCount(request, env) {
   const user = await requireUser(request, env);
-  const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL')
-    .bind(user.id)
-    .first();
-  return json({ unread: row?.n ?? 0 });
+  const [row, messages] = await Promise.all([
+    env.DB.prepare('SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL').bind(user.id).first(),
+    unreadMessages(env, user.id),
+  ]);
+  return json({ unread: row?.n ?? 0, messages });
 }
 
 /** POST /api/notifications/read: marks everything read. */

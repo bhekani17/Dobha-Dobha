@@ -6,6 +6,7 @@ import '../models/user_profile.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/escrow_tracker_badge.dart';
+import '../widgets/offer_card.dart';
 import '../widgets/ui.dart';
 
 class WalletScreen extends StatelessWidget {
@@ -155,8 +156,9 @@ class WalletScreen extends StatelessWidget {
       builder: (context, _) {
         final appState = AppState();
         final activeOrders = appState.orders
-            .where((o) => o.status != EscrowStatus.payoutReleased && o.status != EscrowStatus.refunded)
+            .where((o) => o.canReview || (o.status != EscrowStatus.payoutReleased && o.status != EscrowStatus.refunded))
             .toList();
+        final openOffers = appState.offers.where((o) => o.isOpen).toList();
         final txs = appState.transactions;
 
         return Scaffold(
@@ -167,10 +169,18 @@ class WalletScreen extends StatelessWidget {
           body: RefreshIndicator(
             color: DobhaColors.green,
             backgroundColor: DobhaColors.cardElevated,
-            onRefresh: () => Future.wait([appState.loadWallet(), appState.loadOrders()]),
+            onRefresh: () => Future.wait([appState.loadWallet(), appState.loadOrders(), appState.loadOffers()]),
             child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
+              if (openOffers.isNotEmpty) ...[
+                const Text('Offers', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                const SizedBox(height: 12),
+                ...openOffers.map((o) => OfferCard(offer: o)),
+                const SizedBox(height: 16),
+                const Text('Orders', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                const SizedBox(height: 12),
+              ],
               if (activeOrders.isEmpty)
                 AppWell(
                   radius: 18,

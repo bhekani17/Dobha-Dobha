@@ -2,21 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../api.dart';
+import '../models/social.dart';
 import '../models/thrift_item.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import 'item_photo.dart';
 import 'ui.dart';
 
+/// Checkout for one piece (optionally at an accepted offer's price) or for the whole cart.
 class CheckoutModal extends StatefulWidget {
-  final ThriftItem item;
+  final List<ThriftItem> items;
+  final Offer? offer;
+  final bool fromCart;
 
-  const CheckoutModal({super.key, required this.item});
+  const CheckoutModal({super.key, required this.items, this.offer, this.fromCart = false});
 
-  static Future<bool?> show(BuildContext context, ThriftItem item) {
+  static Future<bool?> show(BuildContext context, ThriftItem item, {Offer? offer}) {
     return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => CheckoutModal(item: item),
+      builder: (ctx) => CheckoutModal(items: [item], offer: offer),
+    );
+  }
+
+  /// Buys every available piece in the cart; each becomes its own order.
+  static Future<bool?> showCart(BuildContext context) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => CheckoutModal(items: AppState().cartAvailable, fromCart: true),
     );
   }
 
@@ -67,16 +81,30 @@ class _CheckoutModalState extends State<CheckoutModal> {
     });
 
     try {
-      await AppState().checkout(
-        item: widget.item,
-        deliveryMethod: _selectedDelivery,
-        paymentMethod: _selectedPayment,
-        deliveryAddress: address,
-      );
+      var failed = <String>[];
+      if (widget.fromCart) {
+        failed = await AppState().checkoutCart(
+          deliveryMethod: _selectedDelivery,
+          paymentMethod: _selectedPayment,
+          deliveryAddress: address,
+        );
+        if (failed.length == widget.items.length) {
+          if (mounted) setState(() => _error = failed.first);
+          return;
+        }
+      } else {
+        await AppState().checkout(
+          item: widget.items.single,
+          deliveryMethod: _selectedDelivery,
+          paymentMethod: _selectedPayment,
+          deliveryAddress: address,
+          offerId: widget.offer?.id,
+        );
+      }
       if (!mounted) return;
       final nav = Navigator.of(context);
       nav.pop(true);
-      _showSuccessDialog(nav.context);
+      _showSuccessDialog(nav.context, failed);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -84,7 +112,8 @@ class _CheckoutModalState extends State<CheckoutModal> {
     }
   }
 
-  void _showSuccessDialog(BuildContext context) {
+  void _showSuccessDialog(BuildContext context, List<String> failed) {
+    final many = widget.items.length > 1;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -92,7 +121,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
           children: [
             Icon(Icons.check_circle_rounded, color: DobhaColors.green, size: 26),
             SizedBox(width: 10),
-            Text("It's yours", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            Text(many ? "They're yours" : "It's yours", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
           ],
         ),
         content: Column(
@@ -100,9 +129,18 @@ class _CheckoutModalState extends State<CheckoutModal> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'The seller has been told to send it. We hold your payment until you tell us it arrived. Follow it in the Orders tab.',
+              many
+                  ? 'Each seller has been told to send their piece. We hold your payment until you tell us each one arrived. Follow them in the Orders tab.'
+                  : 'The seller has been told to send it. We hold your payment until you tell us it arrived. Follow it in the Orders tab.',
               style: TextStyle(color: DobhaColors.textSecondary, fontSize: 14, height: 1.4),
             ),
+            if (failed.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${failed.length} piece${failed.length == 1 ? '' : 's'} could not be bought and stayed in your cart: ${failed.first}',
+                style: TextStyle(color: DobhaColors.red, fontSize: 13, height: 1.4),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -117,7 +155,11 @@ class _CheckoutModalState extends State<CheckoutModal> {
 
   @override
   Widget build(BuildContext context) {
-    final total = widget.item.priceZar + _shippingFee;
+    final items = widget.items;
+    final itemsTotal = widget.offer?.amountZar ?? items.fold<double>(0, (sum, i) => sum + i.priceZar);
+    // Each seller sends their piece separately, so delivery is per piece.
+    final shippingTotal = _shippingFee * items.length;
+    final total = itemsTotal + shippingTotal;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -164,43 +206,59 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             const SizedBox(height: 20),
 
-            // Item snapshot
+            // What is being bought
             AppCard(
               radius: 20,
               padding: const EdgeInsets.all(12),
-              child: Row(
+              child: Column(
                 children: [
-                  AppWell(
-                    width: 58,
-                    height: 58,
-                    radius: 14,
-                    padding: EdgeInsets.zero,
-                    child: Center(child: Icon(Icons.checkroom_rounded, color: DobhaColors.green, size: 28)),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.item.title,
-                            maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Flexible(child: AppTag(widget.item.condition, color: DobhaColors.gold)),
-                            const SizedBox(width: 8),
-                            Text('Size ${widget.item.size}', style: TextStyle(color: DobhaColors.muted, fontSize: 11)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(widget.item.formattedPrice,
-                            style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 15)),
-                      ],
+                  for (final item in items)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: item == items.last ? 0 : 10),
+                      child: Row(
+                        children: [
+                          ItemThumb(item: item, size: 52),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(item.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                                const SizedBox(height: 2),
+                                Text('${item.sellerName} · Size ${item.size}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(widget.offer?.formattedAmount ?? item.formattedPrice,
+                                  style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 15)),
+                              if (widget.offer != null)
+                                Text(item.formattedPrice,
+                                    style: TextStyle(
+                                        fontSize: 12, color: DobhaColors.muted, decoration: TextDecoration.lineThrough)),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
+            if (items.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('Each seller sends their piece separately, so delivery is charged per piece.',
+                    style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
+              ),
             const SizedBox(height: 22),
 
             Text('How do you want it?',
@@ -237,7 +295,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                           ],
                         ),
                       ),
-                      Text(cost == 0 ? 'FREE' : 'R ${cost.toStringAsFixed(0)}',
+                      Text(cost == 0 ? 'FREE' : 'R ${cost.toStringAsFixed(0)}${items.length > 1 ? ' each' : ''}',
                           style: TextStyle(fontWeight: FontWeight.w700, color: cost == 0 ? DobhaColors.green : DobhaColors.text)),
                     ],
                   ),

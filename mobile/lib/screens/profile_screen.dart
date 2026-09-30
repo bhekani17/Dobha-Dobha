@@ -11,7 +11,9 @@ import '../widgets/ui.dart';
 import '../widgets/user_avatar.dart';
 import 'account_sheets.dart';
 import 'edit_profile_screen.dart';
+import 'chat_screens.dart';
 import 'notifications_screen.dart';
+import 'people_screens.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -23,7 +25,6 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   late final TabController _tabController = TabController(length: 2, vsync: this);
 
-  static const _months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   @override
   void dispose() {
@@ -94,6 +95,8 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             toolbarHeight: 68,
             title: const Text('Me'),
             actions: [
+              const MessagesButton(),
+              const SizedBox(width: 12),
               const NotificationBell(),
               const SizedBox(width: 12),
               AppButton.icon(icon: Icons.settings_outlined, size: 19, padding: 10, onPressed: _showSettings),
@@ -162,9 +165,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
+                              _Stat(
+                                label: 'Followers',
+                                value: '${appState.followerCount}',
+                                onTap: () => FollowListScreen.open(context, userId: user.id, name: user.name),
+                              ),
+                              _Stat(
+                                label: 'Following',
+                                value: '${appState.followingCount}',
+                                onTap: () => FollowListScreen.open(context, userId: user.id, name: user.name, following: true),
+                              ),
                               _Stat(label: 'Purchases', value: '${orders.where((o) => !o.isSeller).length}'),
                               _Stat(label: 'Sales', value: '${user.salesCount}'),
-                              _Stat(label: 'Member since', value: '${_months[user.createdAt.month - 1]} ${user.createdAt.year}'),
                             ],
                           ),
                         ),
@@ -287,17 +299,22 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 class _Stat extends StatelessWidget {
   final String label;
   final String value;
+  final VoidCallback? onTap;
 
-  const _Stat({required this.label, required this.value});
+  const _Stat({required this.label, required this.value, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-        const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 10, color: DobhaColors.muted)),
-      ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        children: [
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
+        ],
+      ),
     );
   }
 }
