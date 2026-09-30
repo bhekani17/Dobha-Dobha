@@ -41,7 +41,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
     {'name': 'Downtown Joburg Safe Hub', 'cost': 0.0, 'sub': 'Free pickup at the Braamfontein hub'},
   ];
 
-  final _paymentOptions = const [
+  final _paymentOptions = [
     {'name': 'Capitec Pay (Instant)', 'icon': Icons.bolt, 'color': Color(0xFF007A3D)},
     {'name': 'Ozow Instant EFT', 'icon': Icons.flash_on, 'color': Color(0xFFEF4444)},
     {'name': 'Debit / Credit Card', 'icon': Icons.credit_card, 'color': Color(0xFF3B82F6)},
@@ -88,7 +88,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.verified_user_rounded, color: DobhaColors.green, size: 26),
             SizedBox(width: 10),
@@ -99,7 +99,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Your payment is locked in the Dobha escrow vault.',
               style: TextStyle(color: DobhaColors.textSecondary, fontSize: 14),
             ),
@@ -110,9 +110,9 @@ class _CheckoutModalState extends State<CheckoutModal> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Vault Ref: $vaultRef',
-                      style: const TextStyle(fontWeight: FontWeight.w800, color: DobhaColors.cyan, fontSize: 13)),
+                      style: TextStyle(fontWeight: FontWeight.w800, color: DobhaColors.cyan, fontSize: 13)),
                   const SizedBox(height: 4),
-                  const Text('The vendor has been notified. They are only paid once you confirm "Received as Shown".',
+                  Text('The vendor has been notified. They are only paid once you confirm "Received as Shown".',
                       style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
                 ],
               ),
@@ -157,14 +157,14 @@ class _CheckoutModalState extends State<CheckoutModal> {
 
             Row(
               children: [
-                const AppWell(
+                AppWell(
                   circle: true,
                   padding: EdgeInsets.all(10),
                   tint: DobhaColors.green,
                   child: Icon(Icons.flash_on, color: DobhaColors.green, size: 20),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -184,7 +184,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  const AppWell(
+                  AppWell(
                     width: 58,
                     height: 58,
                     radius: 14,
@@ -203,12 +203,12 @@ class _CheckoutModalState extends State<CheckoutModal> {
                           children: [
                             Flexible(child: AppTag(widget.item.condition, color: DobhaColors.gold)),
                             const SizedBox(width: 8),
-                            Text('Size ${widget.item.size}', style: const TextStyle(color: DobhaColors.muted, fontSize: 11)),
+                            Text('Size ${widget.item.size}', style: TextStyle(color: DobhaColors.muted, fontSize: 11)),
                           ],
                         ),
                         const SizedBox(height: 4),
                         Text(widget.item.formattedPrice,
-                            style: const TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 15)),
+                            style: TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 15)),
                       ],
                     ),
                   ),
@@ -217,7 +217,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             const SizedBox(height: 22),
 
-            const Text('Delivery / Collection',
+            Text('Delivery / Collection',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.textSecondary)),
             const SizedBox(height: 12),
             ..._deliveryOptions.map((opt) {
@@ -245,9 +245,9 @@ class _CheckoutModalState extends State<CheckoutModal> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(opt['name'] as String,
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.text)),
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.text)),
                             Text(opt['sub'] as String,
-                                style: const TextStyle(fontSize: 11, color: DobhaColors.muted, fontWeight: FontWeight.w500)),
+                                style: TextStyle(fontSize: 11, color: DobhaColors.muted, fontWeight: FontWeight.w500)),
                           ],
                         ),
                       ),
@@ -262,7 +262,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
 
             TextField(
               controller: _addressCtrl,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Locker / Delivery Address',
                 hintText: 'e.g. Campus Square PUDO, Auckland Park',
                 prefixIcon: Icon(Icons.location_on_outlined, size: 18, color: DobhaColors.muted),
@@ -271,7 +271,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             const SizedBox(height: 22),
 
-            const Text('Pay With', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.textSecondary)),
+            Text('Pay With', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.textSecondary)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
@@ -301,7 +301,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             const SizedBox(height: 22),
 
-            const AppWell(
+            AppWell(
               radius: 16,
               tint: DobhaColors.escrowIndigo,
               child: Row(
@@ -325,7 +325,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                 radius: 14,
                 tint: DobhaColors.red,
                 margin: const EdgeInsets.only(bottom: 16),
-                child: Text(_error!, style: const TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600)),
+                child: Text(_error!, style: TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600)),
               ),
 
             Row(
@@ -333,7 +333,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Total', style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
+                    Text('Total', style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
                     Text('R ${total.toStringAsFixed(0)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
                   ],
                 ),

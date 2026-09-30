@@ -112,7 +112,7 @@ class AppButton extends StatefulWidget {
     Key? key,
     required IconData icon,
     required VoidCallback? onPressed,
-    Color iconColor = DobhaColors.text,
+    Color? iconColor,
     double size = 22,
     double padding = 12,
     bool selected = false,
@@ -123,7 +123,7 @@ class AppButton extends StatefulWidget {
       circle: true,
       selected: selected,
       padding: EdgeInsets.all(padding),
-      child: Icon(icon, color: iconColor, size: size),
+      child: Icon(icon, color: iconColor ?? DobhaColors.text, size: size),
     );
   }
 
@@ -195,7 +195,8 @@ class AppChip extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final IconData? icon;
-  final Color accent;
+  final Color? _accent;
+  Color get accent => _accent ?? DobhaColors.green;
 
   const AppChip({
     super.key,
@@ -203,7 +204,7 @@ class AppChip extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.icon,
-    this.accent = DobhaColors.green,
+    this._accent,
   });
 
   @override
@@ -228,11 +229,12 @@ class AppChip extends StatelessWidget {
 /// Small label, e.g. condition, status or a LIVE tag.
 class AppTag extends StatelessWidget {
   final String text;
-  final Color color;
+  final Color? _color;
   final IconData? icon;
   final bool solid;
+  Color get color => _color ?? DobhaColors.textSecondary;
 
-  const AppTag(this.text, {super.key, this.color = DobhaColors.textSecondary, this.icon, this.solid = false});
+  const AppTag(this.text, {super.key, this._color, this.icon, this.solid = false});
 
   @override
   Widget build(BuildContext context) {

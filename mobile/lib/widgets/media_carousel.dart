@@ -52,7 +52,7 @@ class _MediaCarouselState extends State<MediaCarousel> {
                     errorBuilder: (_, _, _) => ItemPhoto(item: widget.item, iconSize: 96),
                     loadingBuilder: (context, child, progress) => progress == null
                         ? child
-                        : const ColoredBox(
+                        : ColoredBox(
                             color: DobhaColors.well,
                             child: Center(child: CircularProgressIndicator(color: DobhaColors.green, strokeWidth: 2)),
                           ),
@@ -155,13 +155,13 @@ class _VideoPageState extends State<_VideoPage> {
   @override
   Widget build(BuildContext context) {
     if (_failed) {
-      return const ColoredBox(
+      return ColoredBox(
         color: DobhaColors.well,
         child: Center(child: Text('Video unavailable', style: TextStyle(color: DobhaColors.muted))),
       );
     }
     if (!_ready) {
-      return const ColoredBox(
+      return ColoredBox(
         color: Colors.black,
         child: Center(child: CircularProgressIndicator(color: DobhaColors.green, strokeWidth: 2)),
       );

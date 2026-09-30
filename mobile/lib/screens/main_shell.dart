@@ -19,7 +19,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  static const _tabs = [
+  static final _tabs = [
     _Tab(Icons.flash_on_outlined, Icons.flash_on, 'Dobha', DobhaColors.green),
     _Tab(Icons.explore_outlined, Icons.explore, 'Explore', DobhaColors.green),
     _Tab(Icons.sensors_rounded, Icons.sensors_rounded, 'Go Live', DobhaColors.red),
@@ -43,10 +43,14 @@ class _MainShellState extends State<MainShell> {
         return Scaffold(
           body: IndexedStack(
             index: _currentIndex,
-            children: _screens,
+            // Hidden tabs keep their state but stop animating, so feed videos pause
+            // and entrance animations wait until their tab is shown.
+            children: [
+              for (var i = 0; i < _screens.length; i++) TickerMode(enabled: i == _currentIndex, child: _screens[i]),
+            ],
           ),
           bottomNavigationBar: Container(
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: DobhaColors.surface,
               border: Border(top: BorderSide(color: DobhaColors.border)),
             ),

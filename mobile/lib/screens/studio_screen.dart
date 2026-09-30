@@ -106,7 +106,7 @@ class _StudioScreenState extends State<StudioScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const AppWell(
+            AppWell(
               circle: true,
               padding: EdgeInsets.all(22),
               tint: DobhaColors.red,
@@ -115,7 +115,7 @@ class _StudioScreenState extends State<StudioScreen> {
             const SizedBox(height: 20),
             const Text('Sell on Dobha', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'List pieces from your stall, go live to shoppers across SA, and get paid safely through escrow.',
               textAlign: TextAlign.center,
               style: TextStyle(color: DobhaColors.textSecondary, height: 1.4),
@@ -144,7 +144,7 @@ class _StudioScreenState extends State<StudioScreen> {
             radius: 24,
             child: Row(
               children: [
-                const AppWell(
+                AppWell(
                   circle: true,
                   padding: EdgeInsets.all(14),
                   tint: DobhaColors.green,
@@ -159,9 +159,9 @@ class _StudioScreenState extends State<StudioScreen> {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          const Icon(Icons.location_on_outlined, size: 13, color: DobhaColors.muted),
+                          Icon(Icons.location_on_outlined, size: 13, color: DobhaColors.muted),
                           const SizedBox(width: 3),
-                          Flexible(child: Text(user.stallLocation, style: const TextStyle(fontSize: 12, color: DobhaColors.textSecondary))),
+                          Flexible(child: Text(user.stallLocation, style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary))),
                         ],
                       ),
                     ],
@@ -182,7 +182,7 @@ class _StudioScreenState extends State<StudioScreen> {
                 radius: 12,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NewListingScreen())),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.add, size: 16, color: DobhaColors.green),
@@ -194,11 +194,11 @@ class _StudioScreenState extends State<StudioScreen> {
             ],
           ),
           const SizedBox(height: 4),
-          const Text('Tap a listing to pin it when you go live.', style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
+          Text('Tap a listing to pin it when you go live.', style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
           const SizedBox(height: 14),
 
           if (inventory.isEmpty)
-            const AppWell(
+            AppWell(
               radius: 18,
               padding: EdgeInsets.all(18),
               child: Text('No listings yet. Add your first piece with "New Listing".', style: TextStyle(color: DobhaColors.muted, fontSize: 13)),
@@ -224,7 +224,7 @@ class _StudioScreenState extends State<StudioScreen> {
                             Text(item.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.text)),
+                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: DobhaColors.text)),
                             const SizedBox(height: 2),
                             Text(item.isClaimed ? 'Sold' : (isSelected ? 'Pinned for your next live' : '${item.condition} · Size ${item.size}'),
                                 style: TextStyle(
@@ -234,10 +234,10 @@ class _StudioScreenState extends State<StudioScreen> {
                           ],
                         ),
                       ),
-                      Text(item.formattedPrice, style: const TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 14)),
+                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 14)),
                       if (!item.isClaimed)
                         IconButton(
-                          icon: const Icon(Icons.delete_outline_rounded, size: 19, color: DobhaColors.muted),
+                          icon: Icon(Icons.delete_outline_rounded, size: 19, color: DobhaColors.muted),
                           onPressed: () => _remove(item),
                         ),
                     ],
@@ -384,7 +384,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
             children: [
               const Text('Add a video', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              const Text('Up to 60 seconds. Show the fit, the fabric and any flaws.',
+              Text('Up to 60 seconds. Show the fit, the fabric and any flaws.',
                   style: TextStyle(color: DobhaColors.muted, fontSize: 12.5)),
               const SizedBox(height: 16),
               AppButton(
@@ -542,15 +542,15 @@ class _NewListingScreenState extends State<NewListingScreen> {
           Row(
             children: [
               const Expanded(child: Text('Photos & Videos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
-              Text('${_media.length}/$_maxMedia', style: const TextStyle(color: DobhaColors.muted, fontSize: 12)),
+              Text('${_media.length}/$_maxMedia', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
             ],
           ),
           const SizedBox(height: 4),
-          const Text('The first photo is the cover. Add up to 3 short videos.',
+          Text('The first photo is the cover. Add up to 3 short videos.',
               style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
           const SizedBox(height: 12),
           if (_media.isEmpty)
-            const AppWell(
+            AppWell(
               padding: EdgeInsets.symmetric(vertical: 34),
               child: Center(
                 child: Column(
@@ -625,7 +625,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
               radius: 14,
               tint: DobhaColors.red,
               margin: const EdgeInsets.only(bottom: 14),
-              child: Text(_error!, style: const TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600)),
+              child: Text(_error!, style: TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600)),
             ),
           AppButton(
             color: DobhaColors.green,

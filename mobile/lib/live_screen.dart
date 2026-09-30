@@ -346,7 +346,7 @@ class _LiveScreenState extends State<LiveScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const AppTag('LIVE', color: DobhaColors.red, icon: Icons.fiber_manual_record, solid: true),
+                AppTag('LIVE', color: DobhaColors.red, icon: Icons.fiber_manual_record, solid: true),
                 const SizedBox(width: 8),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 150),
@@ -401,7 +401,7 @@ class _LiveScreenState extends State<LiveScreen> {
             const SizedBox(height: 14),
             Text(
               _connecting ? 'Connecting...' : (widget.host ? 'Starting camera...' : 'Waiting for host...'),
-              style: const TextStyle(color: DobhaColors.muted, fontWeight: FontWeight.w600),
+              style: TextStyle(color: DobhaColors.muted, fontWeight: FontWeight.w600),
             ),
           ],
         ),
@@ -470,7 +470,7 @@ class _LiveScreenState extends State<LiveScreen> {
                         Flexible(
                           child: Text(
                             m.text,
-                            style: const TextStyle(color: DobhaColors.green, fontSize: 13, fontWeight: FontWeight.w700),
+                            style: TextStyle(color: DobhaColors.green, fontSize: 13, fontWeight: FontWeight.w700),
                           ),
                         ),
                       ],
@@ -480,7 +480,7 @@ class _LiveScreenState extends State<LiveScreen> {
                         children: [
                           TextSpan(
                             text: '${m.who}  ',
-                            style: const TextStyle(color: DobhaColors.green, fontWeight: FontWeight.w800),
+                            style: TextStyle(color: DobhaColors.green, fontWeight: FontWeight.w800),
                           ),
                           TextSpan(text: m.text),
                         ],
@@ -608,7 +608,7 @@ class _ErrorView extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: DobhaColors.red),
+              style: TextStyle(color: DobhaColors.red),
             ),
             const SizedBox(height: 16),
             FilledButton(onPressed: onBack, child: const Text('Back')),

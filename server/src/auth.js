@@ -51,6 +51,9 @@ export function publicUser(u, stats = {}) {
     role: u.role,
     shopName: u.shop_name,
     stallLocation: u.stall_location,
+    avatarUrl: u.avatar_key ? `/media/${u.avatar_key}` : null,
+    bio: u.bio ?? '',
+    location: u.location ?? '',
     createdAt: new Date(u.created_at).toISOString(),
     salesCount: stats.salesCount ?? 0,
   };
@@ -145,6 +148,28 @@ export async function me(request, env) {
   return json({ user: await withStats(env, await requireUser(request, env)) });
 }
 
+const AVATAR_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+
+/** PUT /api/me/avatar: raw image body. DELETE /api/me/avatar removes it. */
+export async function setAvatar(request, env) {
+  const user = await requireUser(request, env);
+  let key = null;
+  if (request.method === 'PUT') {
+    const type = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+    const ext = AVATAR_TYPES[type];
+    if (!ext) throw new HttpError(415, 'Profile pictures must be JPEG, PNG or WebP');
+    const length = Number(request.headers.get('content-length'));
+    if (!length) throw new HttpError(411, 'Upload size is missing');
+    if (length > AVATAR_MAX_BYTES) throw new HttpError(413, 'Picture is too large (max 5 MB)');
+    key = `avatars/${user.id}/${crypto.randomUUID()}.${ext}`;
+    await env.PHOTOS.put(key, request.body, { httpMetadata: { contentType: type } });
+  }
+  await env.DB.prepare('UPDATE users SET avatar_key = ? WHERE id = ?').bind(key, user.id).run();
+  if (user.avatar_key) await env.PHOTOS.delete(user.avatar_key);
+  return json({ user: await withStats(env, { ...user, avatar_key: key }) });
+}
+
 /** PATCH /api/me: profile fields, and switching to vendor (needs a shop name and stall). */
 export async function updateMe(request, env) {
   const user = await requireUser(request, env);
@@ -153,6 +178,8 @@ export async function updateMe(request, env) {
 
   if ('name' in body) next.name = str(body, 'name', { min: 2, max: 40 });
   if ('phone' in body) next.phone = str(body, 'phone', { max: 20, optional: true });
+  if ('bio' in body) next.bio = str(body, 'bio', { max: 160, optional: true });
+  if ('location' in body) next.location = str(body, 'location', { max: 60, optional: true });
   if ('shopName' in body) next.shop_name = str(body, 'shopName', { min: 2, max: 50, optional: true });
   if ('stallLocation' in body) next.stall_location = str(body, 'stallLocation', { min: 2, max: 100, optional: true });
   if ('role' in body) {
@@ -163,8 +190,10 @@ export async function updateMe(request, env) {
     throw new HttpError(400, 'Add your shop name and stall location to start selling');
   }
 
-  await env.DB.prepare('UPDATE users SET name = ?, phone = ?, role = ?, shop_name = ?, stall_location = ? WHERE id = ?')
-    .bind(next.name, next.phone, next.role, next.shop_name, next.stall_location, user.id)
+  await env.DB.prepare(
+    'UPDATE users SET name = ?, phone = ?, role = ?, shop_name = ?, stall_location = ?, bio = ?, location = ? WHERE id = ?',
+  )
+    .bind(next.name, next.phone, next.role, next.shop_name, next.stall_location, next.bio ?? '', next.location ?? '', user.id)
     .run();
   return json({ user: await withStats(env, next) });
 }

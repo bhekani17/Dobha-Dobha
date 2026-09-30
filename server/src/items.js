@@ -17,7 +17,7 @@ const MAX_VIDEOS = 3;
 
 // Everything an item card needs, with per-viewer liked/saved flags (? = viewer id).
 const ITEM_SELECT = `
-  SELECT i.*, u.name AS seller_name, u.handle AS seller_handle, u.shop_name, u.stall_location,
+  SELECT i.*, u.name AS seller_name, u.handle AS seller_handle, u.shop_name, u.stall_location, u.avatar_key AS seller_avatar_key,
     (SELECT COUNT(*) FROM likes l WHERE l.item_id = i.id) AS likes_count,
     (SELECT COUNT(*) FROM comments c WHERE c.item_id = i.id) AS comments_count,
     EXISTS (SELECT 1 FROM likes l WHERE l.item_id = i.id AND l.user_id = ?1) AS is_liked,
@@ -52,6 +52,7 @@ export function itemJson(r) {
     sellerName: r.shop_name || r.seller_name,
     sellerHandle: `@${r.seller_handle}`,
     sellerLocation: r.stall_location,
+    sellerAvatarUrl: r.seller_avatar_key ? mediaUrl(r.seller_avatar_key) : null,
     likesCount: r.likes_count ?? 0,
     commentsCount: r.comments_count ?? 0,
     isLiked: Boolean(r.is_liked),
@@ -203,7 +204,7 @@ export async function uploadMedia(request, env) {
  * are never reused. Supports Range requests, which video players rely on.
  */
 export async function serveMedia(request, env, key) {
-  if (!key.startsWith('items/') || key.includes('..')) throw new HttpError(404, 'Not found');
+  if (!/^(items|avatars)\//.test(key) || key.includes('..')) throw new HttpError(404, 'Not found');
   // bytes=start-end, bytes=start- or bytes=-suffix (single ranges only).
   const m = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get('range') || '');
   let range;

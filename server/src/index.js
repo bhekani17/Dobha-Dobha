@@ -18,6 +18,8 @@ const ROUTES = [
   ['POST', '/api/auth/logout', auth.logout],
   ['GET', '/api/me', auth.me],
   ['PATCH', '/api/me', auth.updateMe],
+  ['PUT', '/api/me/avatar', auth.setAvatar],
+  ['DELETE', '/api/me/avatar', auth.setAvatar],
 
   ['GET', '/api/items', items.listItems],
   ['POST', '/api/items', items.createItem],
@@ -70,7 +72,7 @@ export default {
         status: 204,
         headers: {
           'access-control-allow-origin': origin,
-          'access-control-allow-methods': 'GET, POST, PATCH, DELETE',
+          'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE',
           'access-control-allow-headers': 'authorization, content-type, range',
           'access-control-max-age': '600',
         },

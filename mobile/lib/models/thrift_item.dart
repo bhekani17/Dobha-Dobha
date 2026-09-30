@@ -32,6 +32,7 @@ class ThriftItem {
   final String sellerName;
   final String sellerHandle;
   final String sellerLocation;
+  final String? sellerAvatarUrl;
   final int likesCount;
   final int commentsCount;
   final bool isLiked;
@@ -55,6 +56,7 @@ class ThriftItem {
     required this.sellerName,
     required this.sellerHandle,
     required this.sellerLocation,
+    this.sellerAvatarUrl,
     this.likesCount = 0,
     this.commentsCount = 0,
     this.isLiked = false,
@@ -82,6 +84,7 @@ class ThriftItem {
         sellerName: json['sellerName'] as String,
         sellerHandle: json['sellerHandle'] as String,
         sellerLocation: json['sellerLocation'] as String? ?? '',
+        sellerAvatarUrl: json['sellerAvatarUrl'] as String?,
         likesCount: json['likesCount'] as int? ?? 0,
         commentsCount: json['commentsCount'] as int? ?? 0,
         isLiked: json['isLiked'] as bool? ?? false,

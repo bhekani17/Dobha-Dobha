@@ -42,7 +42,7 @@ class EscrowTrackerCard extends StatelessWidget {
               Expanded(
                 child: Text('#${order.id}',
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: DobhaColors.muted, fontSize: 12, fontWeight: FontWeight.w600)),
+                    style: TextStyle(color: DobhaColors.muted, fontSize: 12, fontWeight: FontWeight.w600)),
               ),
               AppTag(status.label, color: _statusColor(status)),
             ],
@@ -62,18 +62,18 @@ class EscrowTrackerCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${order.item.formattedPrice} + R ${order.shippingFeeZar.toStringAsFixed(0)} shipping (${order.deliveryMethod})',
-                      style: const TextStyle(fontSize: 12, color: DobhaColors.muted),
+                      style: TextStyle(fontSize: 12, color: DobhaColors.muted),
                     ),
                     Text(
                       isVendorView ? 'Buyer: ${order.buyerName} · ${order.deliveryAddress}' : 'Tracking: ${order.trackingNumber}',
-                      style: const TextStyle(fontSize: 11, color: DobhaColors.textSecondary),
+                      style: TextStyle(fontSize: 11, color: DobhaColors.textSecondary),
                     ),
-                    Text('Escrow ref ${order.escrowVaultRef}', style: const TextStyle(fontSize: 10.5, color: DobhaColors.muted)),
+                    Text('Escrow ref ${order.escrowVaultRef}', style: TextStyle(fontSize: 10.5, color: DobhaColors.muted)),
                   ],
                 ),
               ),
               Text('R ${order.totalZar.toStringAsFixed(0)}',
-                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: DobhaColors.green)),
+                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: DobhaColors.green)),
             ],
           ),
           const SizedBox(height: 18),
@@ -85,7 +85,7 @@ class EscrowTrackerCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          Text(status.description(isSeller: isVendorView), style: const TextStyle(fontSize: 11.5, color: DobhaColors.textSecondary, height: 1.35)),
+          Text(status.description(isSeller: isVendorView), style: TextStyle(fontSize: 11.5, color: DobhaColors.textSecondary, height: 1.35)),
           const SizedBox(height: 14),
           _buildActionRow(context, order),
         ],
@@ -141,7 +141,7 @@ class EscrowTrackerCard extends StatelessWidget {
               child: Center(
                 child: isDone
                     ? const Icon(Icons.check, size: 14, color: Colors.black)
-                    : Text('${step + 1}', style: const TextStyle(fontSize: 10, color: DobhaColors.muted, fontWeight: FontWeight.bold)),
+                    : Text('${step + 1}', style: TextStyle(fontSize: 10, color: DobhaColors.muted, fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 6),
@@ -165,7 +165,7 @@ class EscrowTrackerCard extends StatelessWidget {
 
     if (order.status == EscrowStatus.paymentHeld) {
       if (!isVendorView) {
-        return const _Notice(icon: Icons.hourglass_top_rounded, text: 'Waiting for the vendor to dispatch', color: DobhaColors.cyan);
+        return _Notice(icon: Icons.hourglass_top_rounded, text: 'Waiting for the vendor to dispatch', color: DobhaColors.cyan);
       }
       return AppButton(
         onPressed: () {
@@ -181,7 +181,7 @@ class EscrowTrackerCard extends StatelessWidget {
 
     if (order.status == EscrowStatus.vendorDispatched) {
       if (isVendorView) {
-        return const _Notice(icon: Icons.local_shipping_outlined, text: 'In transit, waiting for buyer confirmation', color: DobhaColors.amber);
+        return _Notice(icon: Icons.local_shipping_outlined, text: 'In transit, waiting for buyer confirmation', color: DobhaColors.amber);
       }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -201,7 +201,7 @@ class EscrowTrackerCard extends StatelessWidget {
           Center(
             child: TextButton(
               onPressed: () => _confirmDispute(context, order),
-              child: const Text('Report a problem', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+              child: Text('Report a problem', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
             ),
           ),
         ],
@@ -209,11 +209,11 @@ class EscrowTrackerCard extends StatelessWidget {
     }
 
     if (order.status == EscrowStatus.disputed) {
-      return const _Notice(icon: Icons.support_agent_rounded, text: 'Dobha support is reviewing this order', color: DobhaColors.red);
+      return _Notice(icon: Icons.support_agent_rounded, text: 'Dobha support is reviewing this order', color: DobhaColors.red);
     }
 
     if (order.status == EscrowStatus.payoutReleased) {
-      return const _Notice(icon: Icons.check_circle_rounded, text: 'Settled and vendor paid in full', color: DobhaColors.green);
+      return _Notice(icon: Icons.check_circle_rounded, text: 'Settled and vendor paid in full', color: DobhaColors.green);
     }
 
     return const SizedBox.shrink();
@@ -244,7 +244,7 @@ class EscrowTrackerCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.thumb_up_alt_rounded, color: DobhaColors.green, size: 22),
             SizedBox(width: 10),
@@ -261,7 +261,7 @@ class EscrowTrackerCard extends StatelessWidget {
               radius: 14,
               child: Text(
                 'Confirming releases R ${order.amountZar.toStringAsFixed(0)} from escrow to ${order.item.sellerName}. This cannot be undone.',
-                style: const TextStyle(fontSize: 12, color: DobhaColors.textSecondary),
+                style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary),
               ),
             ),
           ],

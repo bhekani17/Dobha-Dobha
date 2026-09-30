@@ -51,7 +51,7 @@ class _FormSheetState extends State<_FormSheet> {
             Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
             if (widget.subtitle != null) ...[
               const SizedBox(height: 6),
-              Text(widget.subtitle!, style: const TextStyle(color: DobhaColors.textSecondary, height: 1.35)),
+              Text(widget.subtitle!, style: TextStyle(color: DobhaColors.textSecondary, height: 1.35)),
             ],
             const SizedBox(height: 18),
             for (final (label, ctrl, type) in widget.fields)
@@ -69,7 +69,7 @@ class _FormSheetState extends State<_FormSheet> {
                 radius: 14,
                 tint: DobhaColors.red,
                 margin: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: const TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600)),
+                child: Text(_error!, style: TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600)),
               ),
             const SizedBox(height: 6),
             AppButton(
@@ -120,32 +120,3 @@ Future<void> switchToShopper(BuildContext context) async {
   }
 }
 
-Future<void> showEditProfileSheet(BuildContext context) async {
-  final user = AppState().user;
-  final name = TextEditingController(text: user.name);
-  final phone = TextEditingController(text: user.phone);
-  final shop = TextEditingController(text: user.shopName);
-  final stall = TextEditingController(text: user.stallLocation);
-  await showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    builder: (_) => _FormSheet(
-      title: 'Edit profile',
-      fields: [
-        ('Full name', name, TextInputType.text),
-        ('Phone', phone, TextInputType.phone),
-        if (user.isVendor) ...[
-          ('Shop name', shop, TextInputType.text),
-          ('Stall location', stall, TextInputType.text),
-        ],
-      ],
-      action: 'Save',
-      onSubmit: () => AppState().updateProfile(
-        name: name.text.trim(),
-        phone: phone.text.trim(),
-        shopName: user.isVendor ? shop.text.trim() : null,
-        stallLocation: user.isVendor ? stall.text.trim() : null,
-      ),
-    ),
-  );
-}

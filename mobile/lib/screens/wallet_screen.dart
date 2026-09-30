@@ -29,7 +29,7 @@ class WalletScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
               Icon(Icons.add_circle_outline_rounded, color: DobhaColors.green, size: 22),
               SizedBox(width: 8),
@@ -40,7 +40,7 @@ class WalletScreen extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Add funds to claim drops instantly into escrow.',
+              Text('Add funds to claim drops instantly into escrow.',
                   style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
               const SizedBox(height: 16),
               TextField(
@@ -88,7 +88,7 @@ class WalletScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: const Row(
+          title: Row(
             children: [
               Icon(Icons.account_balance_rounded, color: DobhaColors.cyan, size: 22),
               SizedBox(width: 8),
@@ -101,7 +101,7 @@ class WalletScreen extends StatelessWidget {
             children: [
               Text(
                 'Available: R ${AppState().availableBalance.toStringAsFixed(0)}',
-                style: const TextStyle(fontSize: 12, color: DobhaColors.green, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 12, color: DobhaColors.green, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
               TextField(
@@ -160,7 +160,7 @@ class WalletScreen extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(
             toolbarHeight: 68,
-            title: const Text.rich(
+            title: Text.rich(
               TextSpan(children: [
                 TextSpan(text: 'Wallet & '),
                 TextSpan(text: 'Escrow', style: TextStyle(color: DobhaColors.cyan)),
@@ -181,12 +181,12 @@ class WalletScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Available Balance',
+                    Text('Available Balance',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: DobhaColors.textSecondary)),
                     const SizedBox(height: 6),
                     Text(
                       'R ${appState.availableBalance.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: DobhaColors.green, letterSpacing: -1),
+                      style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: DobhaColors.green, letterSpacing: -1),
                     ),
                     const SizedBox(height: 18),
                     Row(
@@ -248,7 +248,7 @@ class WalletScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                    Row(
                       children: [
                         Icon(Icons.security_rounded, color: DobhaColors.cyan, size: 18),
                         SizedBox(width: 8),
@@ -257,7 +257,7 @@ class WalletScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 14),
-                    const AppWell(
+                    AppWell(
                       radius: 16,
                       padding: EdgeInsets.symmetric(vertical: 12, horizontal: 8),
                       child: Row(
@@ -276,7 +276,7 @@ class WalletScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       'Your money stays locked in the Dobha vault until you confirm the piece matches what you saw.',
                       style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary, height: 1.35),
                     ),
@@ -289,7 +289,7 @@ class WalletScreen extends StatelessWidget {
               const SizedBox(height: 12),
 
               if (ordersInEscrow.isEmpty)
-                const AppWell(
+                AppWell(
                   radius: 18,
                   padding: EdgeInsets.all(20),
                   child: Center(
@@ -303,7 +303,7 @@ class WalletScreen extends StatelessWidget {
               const Text('Transaction History', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               const SizedBox(height: 12),
               if (txs.isEmpty)
-                const AppWell(
+                AppWell(
                   radius: 18,
                   padding: EdgeInsets.all(20),
                   child: Center(child: Text('No transactions yet.', style: TextStyle(color: DobhaColors.muted, fontSize: 13))),
@@ -339,7 +339,7 @@ class WalletScreen extends StatelessWidget {
               children: [
                 Text(tx.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 Text(tx.subtitle,
-                    style: const TextStyle(fontSize: 11, color: DobhaColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    style: TextStyle(fontSize: 11, color: DobhaColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -350,7 +350,7 @@ class WalletScreen extends StatelessWidget {
                 '${tx.isCredit ? "+" : "-"}R ${tx.amountZar.toStringAsFixed(0)}',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: tx.isCredit ? DobhaColors.green : DobhaColors.text),
               ),
-              Text(tx.status, style: const TextStyle(fontSize: 10, color: DobhaColors.muted)),
+              Text(tx.status, style: TextStyle(fontSize: 10, color: DobhaColors.muted)),
             ],
           ),
         ],
@@ -379,7 +379,7 @@ class _BalanceWell extends StatelessWidget {
               Icon(icon, size: 14, color: color),
               const SizedBox(width: 6),
               Flexible(
-                child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: DobhaColors.textSecondary)),
+                child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: DobhaColors.textSecondary)),
               ),
             ],
           ),
@@ -394,9 +394,10 @@ class _BalanceWell extends StatelessWidget {
 class _FlowStep extends StatelessWidget {
   final IconData icon;
   final String text;
-  final Color color;
+  final Color? _color;
+  Color get color => _color ?? DobhaColors.text;
 
-  const _FlowStep({required this.icon, required this.text, this.color = DobhaColors.text});
+  const _FlowStep({required this.icon, required this.text, this._color});
 
   @override
   Widget build(BuildContext context) {

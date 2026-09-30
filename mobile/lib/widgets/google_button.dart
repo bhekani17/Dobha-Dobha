@@ -42,7 +42,7 @@ class _GoogleSignInSectionState extends State<GoogleSignInSection> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (widget.dividerAbove)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 18),
             child: Row(
               children: [
@@ -56,7 +56,7 @@ class _GoogleSignInSectionState extends State<GoogleSignInSection> {
           valueListenable: GoogleAuth.busy,
           builder: (context, busy, _) {
             if (busy) {
-              return const Center(
+              return Center(
                 child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator(color: DobhaColors.green)),
               );
             }

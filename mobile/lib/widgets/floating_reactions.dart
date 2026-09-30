@@ -5,13 +5,18 @@ import '../theme.dart';
 
 /// Reaction kinds sent over the data channel. Rendered as icons, never emoji.
 enum Reaction {
-  heart(Icons.favorite_rounded, DobhaColors.red),
-  fire(Icons.local_fire_department_rounded, DobhaColors.amber),
-  celebrate(Icons.celebration_rounded, DobhaColors.green);
+  heart(Icons.favorite_rounded),
+  fire(Icons.local_fire_department_rounded),
+  celebrate(Icons.celebration_rounded);
 
   final IconData icon;
-  final Color color;
-  const Reaction(this.icon, this.color);
+  const Reaction(this.icon);
+
+  Color get color => switch (this) {
+        Reaction.heart => DobhaColors.red,
+        Reaction.fire => DobhaColors.amber,
+        Reaction.celebrate => DobhaColors.green,
+      };
 
   static Reaction fromName(String? name) =>
       Reaction.values.firstWhere((r) => r.name == name, orElse: () => Reaction.heart);

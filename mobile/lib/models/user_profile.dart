@@ -54,6 +54,9 @@ class UserProfile {
   final UserRole role;
   final String shopName;
   final String stallLocation;
+  final String? avatarUrl;
+  final String bio;
+  final String location;
   final DateTime createdAt;
   final int salesCount;
 
@@ -66,6 +69,9 @@ class UserProfile {
     required this.role,
     required this.shopName,
     required this.stallLocation,
+    this.avatarUrl,
+    this.bio = '',
+    this.location = '',
     required this.createdAt,
     this.salesCount = 0,
   });
@@ -88,6 +94,9 @@ class UserProfile {
         role: json['role'] == 'vendor' ? UserRole.vendor : UserRole.shopper,
         shopName: json['shopName'] as String? ?? '',
         stallLocation: json['stallLocation'] as String? ?? '',
+        avatarUrl: json['avatarUrl'] as String?,
+        bio: json['bio'] as String? ?? '',
+        location: json['location'] as String? ?? '',
         createdAt: DateTime.parse(json['createdAt'] as String),
         salesCount: json['salesCount'] as int? ?? 0,
       );
