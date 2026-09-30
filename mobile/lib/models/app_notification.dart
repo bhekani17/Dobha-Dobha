@@ -1,5 +1,3 @@
-import 'thrift_item.dart';
-
 /// Something that happened to the user's orders or listings (a sale, a dispatch, a payout...).
 class AppNotification {
   final String id;
@@ -31,20 +29,5 @@ class AppNotification {
         itemId: json['itemId'] as String?,
         read: json['read'] as bool? ?? false,
         createdAt: DateTime.parse(json['createdAt'] as String),
-      );
-}
-
-/// A listing other users reported, as admins see it.
-class ReportedItem {
-  final ThriftItem item;
-  final int reports;
-  final List<String> reasons;
-
-  const ReportedItem(this.item, this.reports, this.reasons);
-
-  factory ReportedItem.fromJson(Map<String, dynamic> json) => ReportedItem(
-        ThriftItem.fromJson(json),
-        json['reports'] as int? ?? 0,
-        (json['reportReasons'] as List? ?? const []).cast<String>(),
       );
 }

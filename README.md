@@ -72,8 +72,9 @@ What the server enforces:
   Confirming pays the seller the price minus a 5% Dobha fee.
 - Couriers need the real tracking number when the seller dispatches; Safe Hub collections don't.
 - A disputed order stays frozen until an admin refunds the buyer or pays the seller. Admins are
-  the accounts listed in `ADMIN_EMAILS` in `server/wrangler.jsonc`; they get an Admin screen
-  (shield button on the Account tab) with open disputes and reported listings.
+  the accounts listed in `ADMIN_EMAILS` in `server/wrangler.jsonc`. The admin website is
+  `/admin` on the Worker (source: `mobile/web/admin/index.html`, copied into the web build); it
+  lists open disputes and reported listings. The phone app has no admin screens.
 - Sales, dispatches, payouts, disputes and comments create in-app notifications. The app polls
   for them every 30 seconds and when it comes back to the foreground (no push notifications yet).
 - A daily cron deletes expired sessions and uploads that were never attached to a listing.

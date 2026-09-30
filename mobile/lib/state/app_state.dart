@@ -68,7 +68,6 @@ class AppState extends ChangeNotifier {
   double get lockedEscrowFunds => _locked;
   double get vendorPendingPayouts => _pending;
   ThriftItem? get livePinnedItem => _livePinnedItem;
-  bool get isAdmin => _user?.isAdmin ?? false;
   List<ThriftItem> get searchResults => List.unmodifiable(_searchResults);
   List<AppNotification> get notifications => List.unmodifiable(_notifications);
   int get unreadNotifications => _unread;
@@ -500,33 +499,6 @@ class AppState extends ChangeNotifier {
   Future<void> withdrawFunds(double amountZar, String bank, String account) async {
     _applyWallet(await _call(() => _api.post('/api/wallet/withdraw', {'amountZar': amountZar, 'bank': bank, 'account': account})));
     notifyListeners();
-  }
-
-  // ---- Admin ----
-
-  Future<List<EscrowOrder>> loadDisputes() async {
-    final res = await _call(() => _api.get('/api/admin/disputes'));
-    return (res['orders'] as List).map((o) => EscrowOrder.fromJson(o as Map<String, dynamic>)).toList();
-  }
-
-  /// Settles a dispute: [refund] gives the buyer their money back, otherwise the seller is paid.
-  Future<void> resolveDispute(String orderId, {required bool refund}) async {
-    await _call(() => _api.post('/api/orders/$orderId/resolve', {'outcome': refund ? 'refund' : 'release'}));
-  }
-
-  Future<List<ReportedItem>> loadReports() async {
-    final res = await _call(() => _api.get('/api/admin/reports'));
-    return (res['items'] as List).map((i) => ReportedItem.fromJson(i as Map<String, dynamic>)).toList();
-  }
-
-  /// Takes a reported listing down ([remove]) or clears its reports.
-  Future<void> moderateItem(String itemId, {required bool remove}) async {
-    await _call(() => _api.post('/api/admin/items/$itemId/${remove ? 'remove' : 'dismiss'}'));
-    if (remove) {
-      _feed = _feed.where((i) => i.id != itemId).toList();
-      _searchResults = _searchResults.where((i) => i.id != itemId).toList();
-      notifyListeners();
-    }
   }
 }
 
