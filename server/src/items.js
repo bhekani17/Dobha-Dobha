@@ -1,10 +1,19 @@
-// Listings, photos, likes, saves and comments.
+// Listings, their photos and videos, likes, saves and comments.
 import { requireUser } from './auth.js';
 import { HttpError, id, iso, json, now, rands, readJson, str, zar } from './http.js';
 
 const CATEGORIES = ['Jackets', 'Denim', 'Sneakers', 'Workwear', 'Vintage Tees', 'Knitwear', 'Other'];
-const PHOTO_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-const PHOTO_MAX_BYTES = 5 * 1024 * 1024;
+const MEDIA_TYPES = {
+  'image/jpeg': ['image', 'jpg'],
+  'image/png': ['image', 'png'],
+  'image/webp': ['image', 'webp'],
+  'video/mp4': ['video', 'mp4'],
+  'video/quicktime': ['video', 'mov'],
+  'video/webm': ['video', 'webm'],
+};
+const MAX_BYTES = { image: 8 * 1024 * 1024, video: 60 * 1024 * 1024 };
+const MAX_MEDIA = 10;
+const MAX_VIDEOS = 3;
 
 // Everything an item card needs, with per-viewer liked/saved flags (? = viewer id).
 const ITEM_SELECT = `
@@ -12,10 +21,20 @@ const ITEM_SELECT = `
     (SELECT COUNT(*) FROM likes l WHERE l.item_id = i.id) AS likes_count,
     (SELECT COUNT(*) FROM comments c WHERE c.item_id = i.id) AS comments_count,
     EXISTS (SELECT 1 FROM likes l WHERE l.item_id = i.id AND l.user_id = ?1) AS is_liked,
-    EXISTS (SELECT 1 FROM saves s WHERE s.item_id = i.id AND s.user_id = ?1) AS is_saved
+    EXISTS (SELECT 1 FROM saves s WHERE s.item_id = i.id AND s.user_id = ?1) AS is_saved,
+    (SELECT json_group_array(json_object('kind', m.kind, 'key', m.media_key))
+       FROM (SELECT kind, media_key FROM item_media WHERE item_id = i.id ORDER BY position) m) AS media_json
   FROM items i JOIN users u ON u.id = i.seller_id`;
 
+const mediaUrl = (key) => `/media/${key}`;
+
 export function itemJson(r) {
+  // Rows loaded without the media subquery (e.g. inside orders) fall back to the cover photo.
+  const media = r.media_json
+    ? JSON.parse(r.media_json).map((m) => ({ kind: m.kind, url: mediaUrl(m.key) }))
+    : r.photo_key
+      ? [{ kind: 'image', url: mediaUrl(r.photo_key) }]
+      : [];
   return {
     id: r.id,
     title: r.title,
@@ -26,7 +45,9 @@ export function itemJson(r) {
     condition: r.condition,
     size: r.size,
     category: r.category,
-    photoUrl: r.photo_key ? `/photos/${r.photo_key}` : null,
+    // Cover image for thumbnails; `media` is the full ordered gallery.
+    photoUrl: r.photo_key ? mediaUrl(r.photo_key) : null,
+    media,
     sellerId: r.seller_id,
     sellerName: r.shop_name || r.seller_name,
     sellerHandle: `@${r.seller_handle}`,
@@ -89,6 +110,24 @@ export async function savedItems(request, env) {
   return json({ items: results.map(itemJson) });
 }
 
+/**
+ * The listing's gallery from `media: [{ key }]` (or a legacy single `photoKey`).
+ * Keys must be this vendor's uploads; the kind comes from the key's extension.
+ */
+function parseMedia(body, userId) {
+  const raw = Array.isArray(body.media) ? body.media : typeof body.photoKey === 'string' ? [{ key: body.photoKey }] : [];
+  if (raw.length > MAX_MEDIA) throw new HttpError(400, `Add at most ${MAX_MEDIA} photos and videos`);
+  const exts = Object.fromEntries(Object.values(MEDIA_TYPES).map(([kind, ext]) => [ext, kind]));
+  const media = raw.map((m) => {
+    const key = typeof m?.key === 'string' ? m.key : '';
+    const kind = exts[key.split('.').pop()];
+    if (!key.startsWith(`items/${userId}/`) || key.includes('..') || !kind) throw new HttpError(400, 'Invalid photo or video');
+    return { key, kind };
+  });
+  if (media.filter((m) => m.kind === 'video').length > MAX_VIDEOS) throw new HttpError(400, `Add at most ${MAX_VIDEOS} videos`);
+  return media;
+}
+
 /** POST /api/items (vendors only) */
 export async function createItem(request, env) {
   const user = await requireUser(request, env);
@@ -97,9 +136,8 @@ export async function createItem(request, env) {
 
   const category = str(body, 'category', { max: 30 });
   if (!CATEGORIES.includes(category)) throw new HttpError(400, 'Unknown category');
-  const photoKey = typeof body.photoKey === 'string' ? body.photoKey : null;
-  // Only accept photos this vendor uploaded.
-  if (photoKey && !photoKey.startsWith(`items/${user.id}/`)) throw new HttpError(400, 'Invalid photo');
+  const media = parseMedia(body, user.id);
+  const cover = media.find((m) => m.kind === 'image')?.key ?? null;
 
   const item = {
     id: id('itm'),
@@ -112,12 +150,21 @@ export async function createItem(request, env) {
     size: str(body, 'size', { max: 20 }),
   };
 
-  await env.DB.prepare(
-    `INSERT INTO items (id, seller_id, title, description, caption, price_cents, original_price_cents, condition, size, category, photo_key, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  )
-    .bind(item.id, user.id, item.title, item.description, item.caption, item.price, item.original, item.condition, item.size, category, photoKey, now())
-    .run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO items (id, seller_id, title, description, caption, price_cents, original_price_cents, condition, size, category, photo_key, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(item.id, user.id, item.title, item.description, item.caption, item.price, item.original, item.condition, item.size, category, cover, now()),
+    ...media.map((m, position) =>
+      env.DB.prepare('INSERT INTO item_media (id, item_id, kind, media_key, position) VALUES (?, ?, ?, ?, ?)').bind(
+        id('med'),
+        item.id,
+        m.kind,
+        m.key,
+        position,
+      ),
+    ),
+  ]);
 
   return json({ item: itemJson(await loadItem(env, item.id, user.id)) }, 201);
 }
@@ -132,36 +179,58 @@ export async function removeItem(request, env, itemId) {
   return json({ ok: true });
 }
 
-/** POST /api/uploads: raw image body -> R2 key to attach to an item. */
-export async function uploadPhoto(request, env) {
+/** POST /api/uploads: raw photo or video body -> R2 key to attach to an item. */
+export async function uploadMedia(request, env) {
   const user = await requireUser(request, env);
-  if (user.role !== 'vendor') throw new HttpError(403, 'Switch to vendor mode to upload photos');
-  const type = (request.headers.get('content-type') || '').split(';')[0].trim();
-  const ext = PHOTO_TYPES[type];
-  if (!ext) throw new HttpError(415, 'Photos must be JPEG, PNG or WebP');
-  if (Number(request.headers.get('content-length')) > PHOTO_MAX_BYTES) throw new HttpError(413, 'Photo is too large (max 5 MB)');
+  if (user.role !== 'vendor') throw new HttpError(403, 'Switch to vendor mode to upload photos and videos');
+  const type = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  const [kind, ext] = MEDIA_TYPES[type] || [];
+  if (!kind) throw new HttpError(415, 'Use JPEG, PNG or WebP photos and MP4, MOV or WebM videos');
 
-  const bytes = await request.arrayBuffer();
-  if (!bytes.byteLength) throw new HttpError(400, 'Empty photo');
-  if (bytes.byteLength > PHOTO_MAX_BYTES) throw new HttpError(413, 'Photo is too large (max 5 MB)');
+  const length = Number(request.headers.get('content-length'));
+  const limitMb = MAX_BYTES[kind] / 1024 / 1024;
+  if (!length) throw new HttpError(411, 'Upload size is missing');
+  if (length > MAX_BYTES[kind]) throw new HttpError(413, `That ${kind} is too large (max ${limitMb} MB)`);
 
+  // Stream the body into R2 rather than buffering a whole video in memory.
   const key = `items/${user.id}/${crypto.randomUUID()}.${ext}`;
-  await env.PHOTOS.put(key, bytes, { httpMetadata: { contentType: type } });
-  return json({ key, url: `/photos/${key}` }, 201);
+  await env.PHOTOS.put(key, request.body, { httpMetadata: { contentType: type } });
+  return json({ key, kind, url: mediaUrl(key) }, 201);
 }
 
-/** GET /photos/:key: public, immutable (keys are never reused). */
-export async function servePhoto(env, key) {
-  if (!key.startsWith('items/')) throw new HttpError(404, 'Not found');
-  const obj = await env.PHOTOS.get(key);
+/**
+ * GET /media/:key (and legacy /photos/:key): public and immutable, since keys
+ * are never reused. Supports Range requests, which video players rely on.
+ */
+export async function serveMedia(request, env, key) {
+  if (!key.startsWith('items/') || key.includes('..')) throw new HttpError(404, 'Not found');
+  // bytes=start-end, bytes=start- or bytes=-suffix (single ranges only).
+  const m = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get('range') || '');
+  let range;
+  if (m && m[1]) range = m[2] ? { offset: +m[1], length: +m[2] - +m[1] + 1 } : { offset: +m[1] };
+  else if (m && m[2]) range = { suffix: +m[2] };
+  const obj = await env.PHOTOS.get(key, range ? { range } : undefined);
   if (!obj) throw new HttpError(404, 'Not found');
-  return new Response(obj.body, {
-    headers: {
-      'content-type': obj.httpMetadata?.contentType || 'application/octet-stream',
-      'cache-control': 'public, max-age=31536000, immutable',
-      etag: obj.httpEtag,
-    },
+
+  const headers = new Headers({
+    'content-type': obj.httpMetadata?.contentType || 'application/octet-stream',
+    'cache-control': 'public, max-age=31536000, immutable',
+    'accept-ranges': 'bytes',
+    etag: obj.httpEtag,
   });
+  if (range) {
+    const size = obj.size;
+    const offset = range.suffix !== undefined ? Math.max(size - range.suffix, 0) : range.offset;
+    if (offset >= size) {
+      return new Response(null, { status: 416, headers: { 'content-range': `bytes */${size}` } });
+    }
+    const length = Math.min(range.length ?? size - offset, size - offset);
+    headers.set('content-range', `bytes ${offset}-${offset + length - 1}/${size}`);
+    headers.set('content-length', String(length));
+    return new Response(obj.body, { status: 206, headers });
+  }
+  headers.set('content-length', String(obj.size));
+  return new Response(obj.body, { headers });
 }
 
 async function toggle(request, env, itemId, table) {
