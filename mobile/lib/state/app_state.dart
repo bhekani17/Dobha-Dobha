@@ -30,9 +30,8 @@ class AppState extends ChangeNotifier {
   static const _tokenKey = 'auth_token';
   static const _pollEvery = Duration(seconds: 30);
 
-  Api _api = Api(defaultServerUrl());
+  final Api _api = Api(defaultServerUrl());
   Api get api => _api;
-  String get serverUrl => _api.baseUrl;
 
   bool _restored = false;
   UserProfile? _user;
@@ -189,10 +188,6 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void setServerUrl(String url) {
-    _api = Api(url, token: _api.token);
-    notifyListeners();
-  }
 
   // ---- Notifications ----
 

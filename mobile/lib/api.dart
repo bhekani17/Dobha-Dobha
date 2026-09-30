@@ -1,22 +1,13 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// Base URL of the Dobha server (`server/`).
-///
-/// Pass `--dart-define=SERVER_URL=https://<your-worker>` for phone builds.
-/// On web the Worker serves the app and the API from one origin.
-String defaultServerUrl() {
-  const fromEnv = String.fromEnvironment('SERVER_URL');
-  if (fromEnv.isNotEmpty) return fromEnv;
-  if (kIsWeb) return Uri.base.origin;
-  if (kReleaseMode) {
-    throw StateError('Build with --dart-define=SERVER_URL=https://<your-server>');
-  }
-  return Platform.isAndroid ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
-}
+/// The live Dobha server (the Cloudflare Worker in `server/`).
+const liveServerUrl = 'https://dobha-live.ndlovubhekani17.workers.dev';
+
+/// On web the Worker serves the app and the API from one origin; phones use [liveServerUrl].
+String defaultServerUrl() => kIsWeb ? Uri.base.origin : liveServerUrl;
 
 /// A failed request, with the server's message ready to show to the user.
 class ApiException implements Exception {

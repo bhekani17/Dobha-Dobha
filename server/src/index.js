@@ -58,10 +58,6 @@ const ROUTES = [
   ['GET', '/api/token', live.token],
 ].map(([method, pattern, handler]) => [method, new RegExp(`^${pattern.replaceAll(':id', '([\\w-]+)')}$`), handler]);
 
-// The deployed web app is same-origin; this only lets `flutter run -d chrome`
-// (served from localhost) call a deployed Worker during development.
-const DEV_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
-
 async function handle(request, env) {
   const { pathname } = new URL(request.url);
   const media = /^\/(media|photos)\/(.+)$/.exec(pathname);
@@ -77,20 +73,6 @@ async function handle(request, env) {
 
 export default {
   async fetch(request, env) {
-    const origin = request.headers.get('origin');
-    const devOrigin = origin && DEV_ORIGIN_RE.test(origin);
-    if (request.method === 'OPTIONS' && devOrigin) {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          'access-control-allow-origin': origin,
-          'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE',
-          'access-control-allow-headers': 'authorization, content-type, range',
-          'access-control-max-age': '600',
-        },
-      });
-    }
-
     let res;
     try {
       res = await handle(request, env);
@@ -101,10 +83,6 @@ export default {
         console.error(e);
         res = json({ error: 'Something went wrong, please try again' }, 500);
       }
-    }
-    if (devOrigin) {
-      res = new Response(res.body, res);
-      res.headers.set('access-control-allow-origin', origin);
     }
     return res;
   },

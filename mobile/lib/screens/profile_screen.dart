@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/escrow_order.dart';
@@ -47,28 +46,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     if (ok == true) await AppState().logout();
   }
 
-  void _showServerSettings() {
-    final appState = AppState();
-    final ctrl = TextEditingController(text: appState.serverUrl);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Server URL (debug)'),
-        content: TextField(controller: ctrl, decoration: const InputDecoration(hintText: 'https://dobha-live.example.workers.dev')),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              appState.setServerUrl(ctrl.text.trim());
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -85,10 +62,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             toolbarHeight: 68,
             title: const Text('Account'),
             actions: [
-              if (kDebugMode) ...[
-                AppButton.icon(icon: Icons.dns_outlined, size: 19, padding: 10, onPressed: _showServerSettings),
-                const SizedBox(width: 12),
-              ],
               const NotificationBell(),
               const SizedBox(width: 12),
               AppButton.icon(icon: Icons.edit_outlined, size: 19, padding: 10, onPressed: () => EditProfileScreen.open(context)),
