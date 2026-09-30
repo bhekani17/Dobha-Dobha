@@ -68,6 +68,8 @@
 	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Dobha Live uses your camera so buyers can see your items when you go live.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Dobha uses your photos so you can add pictures of items you sell.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Dobha Live uses your microphone so buyers can hear you when you go live.</string>
 	<key>NSLocalNetworkUsageDescription</key>
@@ -80,6 +82,21 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
+	</array>
+	<key>GIDClientID</key>
+	<string>787923055628-gm7j2ss8g15o30drcdmls7ugsh2t22vq.apps.googleusercontent.com</string>
+	<key>GIDServerClientID</key>
+	<string>787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.787923055628-gm7j2ss8g15o30drcdmls7ugsh2t22vq</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

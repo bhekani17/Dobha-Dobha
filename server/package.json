@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "start": "wrangler dev --ip 0.0.0.0 --port 3000",
-    "deploy": "wrangler deploy",
-    "livekit": "%LOCALAPPDATA%\\livekit\\livekit-server.exe --dev --bind 0.0.0.0"
+    "build:web": "cd ../mobile && flutter build web --release --dart-define-from-file=config/google.json",
+    "deploy": "npm run build:web && wrangler deploy",
+    "livekit": "%LOCALAPPDATA%\\livekit\\livekit-server.exe --dev --bind 0.0.0.0",
+    "db:migrate": "wrangler d1 migrations apply dobha --remote",
+    "db:migrate:local": "wrangler d1 migrations apply dobha --local"
   },
   "dependencies": {
     "livekit-server-sdk": "^2.7.0"

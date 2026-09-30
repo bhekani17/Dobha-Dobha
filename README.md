@@ -1,23 +1,39 @@
-# Dobha Dobha Live
+# Dobha Dobha
 
 ```
 Dobha-Dobha/
-  server/       Cloudflare Worker: LiveKit token server (+ web host/viewer pages in public/)
-  mobile/       Flutter app (Android + iOS)
+  server/       Cloudflare Worker: the API (accounts, listings, orders, wallet, live tokens),
+                item photos, and host for the Flutter web build
+  mobile/       Flutter app (Android, iOS, web)
 ```
+
+## What's real and what's simulated
+
+Everything is stored on the server: accounts, listings and photos, likes, saves, comments,
+orders and their escrow status, wallet balances and transaction history.
+
+Only **payments** are simulated. Paying with Capitec Pay, Ozow or a card succeeds instantly
+without contacting a provider, top-ups add money that was never charged, and withdrawals never
+reach a bank. Wallet payments do check and deduct the stored balance. Replace the simulated
+parts in `server/src/orders.js` when a payment provider is connected.
 
 ## Run locally
 
 1. LiveKit (terminal 1): `cd server` then `npm run livekit`
-2. Token server (terminal 2): `cd server`, copy `.dev.vars.example` to `.dev.vars`, then `npm start`,
-   which serves http://localhost:3000
+2. Server (terminal 2), from `server/`:
+   - copy `.dev.vars.example` to `.dev.vars`
+   - `npm run db:migrate:local` (once, and after adding a migration)
+   - `npm run build:web` (once; `npm start` serves the web app from `mobile/build/web`)
+   - `npm start`, which serves http://localhost:3000
 3. App: `cd mobile` then `flutter run --dart-define=SERVER_URL=http://<your-pc-ip>:3000`
+   (or F5 in VS Code with the "Dobha (local server)" configuration)
 
 The phone must be on the same Wi-Fi as the PC. Find the PC's IP with `ipconfig`.
 
-## Going online (many users)
+## Going online
 
-Video goes through LiveKit Cloud; the Worker only hands out tokens and the live list.
+Video goes through LiveKit Cloud. Data lives in Cloudflare D1 (`dobha`) and photos in R2
+(`dobha-photos`); both are bound in `server/wrangler.jsonc`.
 
 1. LiveKit Cloud: create a project at https://cloud.livekit.io and copy its URL, API key and secret.
 2. Set them as Worker secrets (once), from `server/`:
@@ -26,14 +42,33 @@ Video goes through LiveKit Cloud; the Worker only hands out tokens and the live 
    npx wrangler secret put LIVEKIT_API_KEY
    npx wrangler secret put LIVEKIT_API_SECRET
    ```
-3. Deploy: `npm run deploy`. Until the secrets are set, the Worker answers
-   "Server not configured" instead of signing tokens with the public dev keys.
-4. Build the app against it:
+3. Apply database migrations: `npm run db:migrate`
+4. Deploy: `npm run deploy` (builds the Flutter web app, then deploys it with the Worker).
+5. Build the phone app against it:
    `flutter build apk --release --dart-define=SERVER_URL=https://dobha-live.<your-subdomain>.workers.dev`
+   The web app needs no SERVER_URL: it is served by the Worker and calls it on the same origin.
 
-What the server enforces (there are no accounts yet):
-- A stream name can only have one host; a second "Go live" with the same name is refused
-  (a Durable Object holds the lock, so this works across every Cloudflare location).
-- Viewers can only join streams that are live.
-- Names can repeat; each person gets a unique LiveKit identity, so nobody gets kicked out.
-- `/rooms` is cached for 3s and `/token` is rate limited per IP (60/min).
+## API
+
+All routes are under `/api` and, apart from register and login, need `Authorization: Bearer <token>`.
+
+| Area | Routes |
+|---|---|
+| Accounts | `POST auth/register`, `POST auth/login`, `POST auth/logout`, `GET me`, `PATCH me` |
+| Listings | `GET items`, `GET items/:id`, `GET items/mine`, `POST items`, `DELETE items/:id`, `POST uploads` |
+| Social | `POST items/:id/like`, `POST items/:id/save`, `GET saved`, `GET/POST items/:id/comments` |
+| Orders | `GET orders`, `POST orders`, `POST orders/:id/dispatch`, `.../confirm`, `.../dispute` |
+| Wallet | `GET wallet`, `POST wallet/topup`, `POST wallet/withdraw` |
+| Live | `GET rooms`, `GET token?room=&role=host\|viewer` |
+
+Photos are served publicly from `/photos/<key>`.
+
+What the server enforces:
+- Passwords are hashed with PBKDF2; sessions are random tokens stored only as hashes and expire after 60 days.
+  Login and register are rate limited per IP (10/min).
+- Only vendors (with a shop name and stall) can list items, upload photos or go live.
+- An item can only be claimed once; the claim and the stock change happen atomically.
+- Only the seller can mark an order dispatched; only the buyer can confirm or dispute it.
+  Confirming pays the seller the price minus a 5% Dobha fee.
+- A stream name can only have one host (a Durable Object holds the lock across every Cloudflare
+  location), and viewers can only join streams that are live.

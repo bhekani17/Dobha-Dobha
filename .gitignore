@@ -9,3 +9,7 @@ Thumbs.db
 # JVM crash logs (Gradle)
 hs_err_pid*.log
 replay_pid*.log
+
+# Google OAuth credential downloads (contain client secrets)
+client_secret_*.json
+client_*.apps.googleusercontent.com.plist

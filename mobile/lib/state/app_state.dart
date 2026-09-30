@@ -1,282 +1,310 @@
-import 'dart:math';
+
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
+import '../google_auth.dart';
 import '../models/escrow_order.dart';
 import '../models/thrift_item.dart';
 import '../models/user_profile.dart';
 
+/// App-wide state backed by the Dobha server. Screens listen to this and call
+/// its methods; failures surface as [ApiException]s with user-facing messages.
 class AppState extends ChangeNotifier {
   static final AppState _instance = AppState._internal();
   factory AppState() => _instance;
+  AppState._internal();
 
-  AppState._internal() {
-    _initMockData();
-  }
+  static const _tokenKey = 'auth_token';
 
-  // Current User
-  UserProfile _user = const UserProfile(
-    id: 'usr-joburg-01',
-    name: 'Thabo Mokoena',
-    phone: '+27 82 555 9182',
-    handle: '@thabothrifts',
-    role: UserRole.shopper,
-    avatarInitials: 'TM',
-    location: 'Braamfontein, JHB',
-    vendorShopName: 'Braam Bale Vault 🇿🇦',
-    vendorStallLocation: 'Corner Juta & De Beer St, Stall #12',
-    vendorBadge: 'Bale Boss 👑',
-    rating: 4.95,
-    totalSalesCount: 142,
-    totalSalesZar: 48900.0,
-    isVerifiedVendor: true,
-  );
+  Api _api = Api(defaultServerUrl());
+  Api get api => _api;
+  String get serverUrl => _api.baseUrl;
 
-  // Escrow & Wallet Balances (ZAR)
-  double _availableBalance = 950.0;
-  double _lockedEscrowFunds = 420.0;
-  double _vendorPendingPayouts = 1850.0;
+  bool _restored = false;
+  UserProfile? _user;
 
-  // Server API
-  String _serverUrl = defaultServerUrl();
-  Api get api => Api(_serverUrl);
-
-  // Lists
-  List<ThriftItem> _feedItems = [];
-  List<ThriftItem> _vendorInventory = [];
+  List<ThriftItem> _feed = [];
+  bool _feedLoading = false;
+  String? _feedError;
+  List<ThriftItem> _myItems = [];
+  List<ThriftItem> _saved = [];
   List<EscrowOrder> _orders = [];
   List<WalletTransaction> _transactions = [];
-  List<String> _savedItemIds = [];
+  double _available = 0, _locked = 0, _pending = 0;
 
-  // Active Pinned Item for Live Selling
+  // Item a vendor chose to pin when they next go live (device-local).
   ThriftItem? _livePinnedItem;
-  int _countdownSeconds = 60;
 
-  // Getters
-  UserProfile get user => _user;
-  bool get isVendor => _user.role == UserRole.vendor;
-  double get availableBalance => _availableBalance;
-  double get lockedEscrowFunds => _lockedEscrowFunds;
-  double get vendorPendingPayouts => _vendorPendingPayouts;
-  String get serverUrl => _serverUrl;
-  List<ThriftItem> get feedItems => List.unmodifiable(_feedItems);
-  List<ThriftItem> get vendorInventory => List.unmodifiable(_vendorInventory);
+  bool get restored => _restored;
+  bool get isLoggedIn => _user != null;
+  UserProfile get user => _user!;
+  bool get isVendor => _user?.isVendor ?? false;
+  List<ThriftItem> get feedItems => List.unmodifiable(_feed);
+  bool get feedLoading => _feedLoading;
+  String? get feedError => _feedError;
+  List<ThriftItem> get vendorInventory => List.unmodifiable(_myItems);
+  List<ThriftItem> get savedItems => List.unmodifiable(_saved);
   List<EscrowOrder> get orders => List.unmodifiable(_orders);
   List<WalletTransaction> get transactions => List.unmodifiable(_transactions);
-  List<String> get savedItemIds => List.unmodifiable(_savedItemIds);
+  double get availableBalance => _available;
+  double get lockedEscrowFunds => _locked;
+  double get vendorPendingPayouts => _pending;
   ThriftItem? get livePinnedItem => _livePinnedItem;
-  int get countdownSeconds => _countdownSeconds;
 
-  void setServerUrl(String url) {
-    _serverUrl = url;
+  // ---- Session ----
+
+  /// Restores a saved login. Called once by the splash screen.
+  Future<void> restoreSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_tokenKey);
+      if (token != null) {
+        _api.token = token;
+        final res = await _api.get('/api/me');
+        _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
+        refreshAll();
+      }
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) await _clearSession();
+      // Offline: stay signed out for now; the user can retry from the welcome screen.
+    } catch (e) {
+      // Never leave the app stuck on the splash screen.
+      debugPrint('Session restore failed: $e');
+    }
+    _restored = true;
     notifyListeners();
   }
 
-  void toggleRole() {
-    final nextRole = _user.role == UserRole.shopper ? UserRole.vendor : UserRole.shopper;
-    _user = _user.copyWith(role: nextRole);
+  Future<void> register({
+    required String name,
+    required String handle,
+    required String email,
+    required String password,
+    String phone = '',
+  }) async {
+    final res = await _api.post('/api/auth/register', {
+      'name': name,
+      'handle': handle,
+      'email': email,
+      'password': password,
+      'phone': phone,
+    });
+    await _startSession(res as Map<String, dynamic>);
+  }
+
+  Future<void> login({required String email, required String password}) async {
+    final res = await _api.post('/api/auth/login', {'email': email, 'password': password});
+    await _startSession(res as Map<String, dynamic>);
+  }
+
+  /// Exchanges a verified Google ID token for a Dobha session.
+  Future<void> loginWithGoogle(String idToken) async {
+    final res = await _api.post('/api/auth/google', {'idToken': idToken});
+    await _startSession(res as Map<String, dynamic>);
+  }
+
+  Future<void> logout() async {
+    try {
+      await _api.post('/api/auth/logout');
+    } catch (_) {
+      // Signing out locally is what matters.
+    }
+    await GoogleAuth.signOut();
+    await _clearSession();
     notifyListeners();
   }
 
-  void updateUserProfile({
-    String? name,
-    String? phone,
-    String? vendorShopName,
-    String? vendorStallLocation,
-  }) {
-    _user = _user.copyWith(
-      name: name,
-      phone: phone,
-      vendorShopName: vendorShopName,
-      vendorStallLocation: vendorStallLocation,
-    );
+  Future<void> _startSession(Map<String, dynamic> res) async {
+    final token = res['token'] as String;
+    _api.token = token;
+    _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_tokenKey, token);
     notifyListeners();
+    refreshAll();
   }
 
-  void toggleLike(String itemId) {
-    final index = _feedItems.indexWhere((it) => it.id == itemId);
-    if (index != -1) {
-      final item = _feedItems[index];
-      final newLiked = !item.isLiked;
-      _feedItems[index] = item.copyWith(
-        isLiked: newLiked,
-        likesCount: newLiked ? item.likesCount + 1 : max(0, item.likesCount - 1),
-      );
-      notifyListeners();
-    }
+  Future<void> _clearSession() async {
+    _api.token = null;
+    _user = null;
+    _feed = [];
+    _myItems = [];
+    _saved = [];
+    _orders = [];
+    _transactions = [];
+    _available = _locked = _pending = 0;
+    _livePinnedItem = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
   }
 
-  void toggleSave(String itemId) {
-    if (_savedItemIds.contains(itemId)) {
-      _savedItemIds.remove(itemId);
-    } else {
-      _savedItemIds.add(itemId);
-    }
-    final index = _feedItems.indexWhere((it) => it.id == itemId);
-    if (index != -1) {
-      final item = _feedItems[index];
-      _feedItems[index] = item.copyWith(isSaved: _savedItemIds.contains(itemId));
-    }
-    notifyListeners();
-  }
-
-  // Instant Claim & Escrow Checkout
-  EscrowOrder claimAndCheckoutItem({
-    required ThriftItem item,
-    required String deliveryMethod,
-    required String paymentMethod,
-    required String deliveryAddress,
-    double shippingFeeZar = 50.0,
-  }) {
-    final orderId = 'DB-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-    final vaultRef = 'ESC-ZAR-${Random().nextInt(900000) + 100000}';
-    final trackingNo = 'PUDO-ZA-${Random().nextInt(89999) + 10000}';
-
-    final order = EscrowOrder(
-      id: orderId,
-      item: item,
-      amountZar: item.priceZar,
-      shippingFeeZar: shippingFeeZar,
-      status: EscrowStatus.paymentHeld,
-      deliveryMethod: deliveryMethod,
-      paymentMethod: paymentMethod,
-      createdAt: DateTime.now(),
-      escrowVaultRef: vaultRef,
-      trackingNumber: trackingNo,
-      deliveryAddress: deliveryAddress,
-    );
-
-    _orders.insert(0, order);
-
-    // Mark item claimed in feed & inventory
-    final feedIndex = _feedItems.indexWhere((i) => i.id == item.id);
-    if (feedIndex != -1) {
-      _feedItems[feedIndex] = _feedItems[feedIndex].copyWith(
-        isClaimed: true,
-        claimedBy: _user.name,
-      );
-    }
-
-    // Escrow Accounting: lock buyer funds in escrow vault
-    _lockedEscrowFunds += (item.priceZar + shippingFeeZar);
-    
-    _transactions.insert(
-      0,
-      WalletTransaction(
-        id: 'TX-${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Escrow Lock: ${item.title}',
-        subtitle: 'Protected payment held until condition confirmed ($vaultRef)',
-        amountZar: item.priceZar + shippingFeeZar,
-        type: TransactionType.escrowHold,
-        date: DateTime.now(),
-        status: 'Secured in Escrow 🔒',
-        reference: vaultRef,
-      ),
-    );
-
-    notifyListeners();
-    return order;
-  }
-
-  // Escrow State Machine Progression
-  void markOrderDispatched(String orderId) {
-    final index = _orders.indexWhere((o) => o.id == orderId);
-    if (index != -1 && _orders[index].status == EscrowStatus.paymentHeld) {
-      _orders[index] = _orders[index].copyWith(
-        status: EscrowStatus.vendorDispatched,
-        dispatchedAt: DateTime.now(),
-      );
-      notifyListeners();
-    }
-  }
-
-  // Core Escrow Guarantee: Buyer Confirms "Received as Shown" -> Releases Escrow Funds to Vendor
-  void confirmReceivedAndReleaseEscrow(String orderId) {
-    final index = _orders.indexWhere((o) => o.id == orderId);
-    if (index != -1) {
-      final order = _orders[index];
-      if (order.status != EscrowStatus.payoutReleased) {
-        _orders[index] = order.copyWith(
-          status: EscrowStatus.payoutReleased,
-          confirmedAt: DateTime.now(),
-        );
-
-        // Deduct from locked escrow funds
-        _lockedEscrowFunds = max(0, _lockedEscrowFunds - order.totalZar);
-
-        // Disburse funds to vendor wallet
-        _vendorPendingPayouts += order.amountZar;
-        _availableBalance += order.amountZar * 0.95; // Mock 5% Dobha platform commission
-
-        _transactions.insert(
-          0,
-          WalletTransaction(
-            id: 'TX-REL-${DateTime.now().millisecondsSinceEpoch}',
-            title: 'Escrow Released: ${order.item.title}',
-            subtitle: 'Shopper verified "Received as Shown" — Funds paid out',
-            amountZar: order.amountZar,
-            type: TransactionType.escrowRelease,
-            date: DateTime.now(),
-            status: 'Released to Vendor 💰',
-            reference: order.escrowVaultRef,
-          ),
-        );
-
+  /// Runs a request; an expired session signs the user out.
+  Future<T> _call<T>(Future<T> Function() request) async {
+    try {
+      return await request();
+    } on ApiException catch (e) {
+      if (e.isUnauthorized && _user != null) {
+        await _clearSession();
         notifyListeners();
       }
+      rethrow;
     }
   }
 
-  // Top Up Wallet (Simulate Capitec Pay / Ozow EFT)
-  void topUpWallet(double amountZar, String method) {
-    _availableBalance += amountZar;
-    _transactions.insert(
-      0,
-      WalletTransaction(
-        id: 'TX-TOP-${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Instant Top-Up ($method)',
-        subtitle: 'Funds added to Dobha Spending Wallet',
-        amountZar: amountZar,
-        type: TransactionType.topup,
-        date: DateTime.now(),
-        status: 'Completed ✅',
-        reference: 'TOP-${Random().nextInt(90000) + 10000}',
-      ),
-    );
+  void setServerUrl(String url) {
+    _api = Api(url, token: _api.token);
     notifyListeners();
   }
 
-  // Cash Out / Payout to South African Bank
-  bool withdrawFunds(double amountZar, String bankName, String accountNumber) {
-    if (amountZar > _availableBalance) return false;
-    _availableBalance -= amountZar;
-    _transactions.insert(
-      0,
-      WalletTransaction(
-        id: 'TX-WDR-${DateTime.now().millisecondsSinceEpoch}',
-        title: 'Withdrawal to $bankName',
-        subtitle: 'Account ending in ${accountNumber.length > 4 ? accountNumber.substring(accountNumber.length - 4) : accountNumber}',
-        amountZar: amountZar,
-        type: TransactionType.withdrawal,
-        date: DateTime.now(),
-        status: 'Completed 🏦',
-        reference: 'WDR-${Random().nextInt(90000) + 10000}',
-      ),
-    );
-    notifyListeners();
-    return true;
+  // ---- Loading ----
+
+  Future<void> refreshAll() async {
+    await Future.wait([
+      loadFeed(),
+      loadOrders(),
+      loadWallet(),
+      loadSaved(),
+      if (isVendor) loadMyItems(),
+    ].map((f) => f.catchError((_) {})));
   }
 
-  // Vendor Inventory Management
-  void addInventoryItem(ThriftItem item) {
-    _vendorInventory.insert(0, item);
-    _feedItems.insert(0, item);
+  Future<void> loadFeed() async {
+    _feedLoading = true;
+    _feedError = null;
+    notifyListeners();
+    try {
+      final res = await _call(() => _api.get('/api/items'));
+      _feed = _items(res);
+    } on ApiException catch (e) {
+      _feedError = e.message;
+    } finally {
+      _feedLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadMyItems() async {
+    _myItems = _items(await _call(() => _api.get('/api/items/mine')));
     notifyListeners();
   }
 
-  void pinItemToLive(ThriftItem item, {int durationSeconds = 60}) {
+  Future<void> loadSaved() async {
+    _saved = _items(await _call(() => _api.get('/api/saved')));
+    notifyListeners();
+  }
+
+  Future<void> loadOrders() async {
+    final res = await _call(() => _api.get('/api/orders'));
+    _orders = (res['orders'] as List).map((o) => EscrowOrder.fromJson(o as Map<String, dynamic>)).toList();
+    notifyListeners();
+  }
+
+  Future<void> loadWallet() async {
+    _applyWallet(await _call(() => _api.get('/api/wallet')));
+    notifyListeners();
+  }
+
+  List<ThriftItem> _items(dynamic res) =>
+      (res['items'] as List).map((i) => ThriftItem.fromJson(i as Map<String, dynamic>)).toList();
+
+  void _applyWallet(dynamic res) {
+    _available = (res['availableZar'] as num).toDouble();
+    _locked = (res['lockedZar'] as num).toDouble();
+    _pending = (res['pendingZar'] as num).toDouble();
+    _transactions =
+        (res['transactions'] as List).map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>)).toList();
+  }
+
+  // ---- Profile ----
+
+  Future<void> updateProfile({String? name, String? phone, String? shopName, String? stallLocation, UserRole? role}) async {
+    final res = await _call(() => _api.patch('/api/me', {
+          'name': ?name,
+          'phone': ?phone,
+          'shopName': ?shopName,
+          'stallLocation': ?stallLocation,
+          if (role != null) 'role': role.name,
+        }));
+    final wasVendor = isVendor;
+    _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
+    notifyListeners();
+    if (isVendor && !wasVendor) await loadMyItems();
+  }
+
+  // ---- Items ----
+
+  Future<void> toggleLike(String itemId) => _toggle(itemId, 'like');
+  Future<void> toggleSave(String itemId) async {
+    await _toggle(itemId, 'save');
+    await loadSaved();
+  }
+
+  Future<void> _toggle(String itemId, String action) async {
+    final res = await _call(() => _api.post('/api/items/$itemId/$action'));
+    _replaceItem(ThriftItem.fromJson(res['item'] as Map<String, dynamic>));
+  }
+
+  void _replaceItem(ThriftItem item) {
+    List<ThriftItem> swap(List<ThriftItem> list) => [for (final i in list) i.id == item.id ? item : i];
+    _feed = swap(_feed);
+    _myItems = swap(_myItems);
+    _saved = swap(_saved);
+    notifyListeners();
+  }
+
+  Future<ThriftItem> createItem({
+    required String title,
+    required double priceZar,
+    required String condition,
+    required String size,
+    required String category,
+    String description = '',
+    String caption = '',
+    Uint8List? photo,
+    String photoType = 'image/jpeg',
+  }) async {
+    String? photoKey;
+    if (photo != null) photoKey = await _call(() => _api.uploadPhoto(photo, photoType));
+    final res = await _call(() => _api.post('/api/items', {
+          'title': title,
+          'priceZar': priceZar,
+          'condition': condition,
+          'size': size,
+          'category': category,
+          'description': description,
+          'caption': caption,
+          'photoKey': ?photoKey,
+        }));
+    final item = ThriftItem.fromJson(res['item'] as Map<String, dynamic>);
+    _myItems = [item, ..._myItems];
+    _feed = [item, ..._feed];
+    notifyListeners();
+    return item;
+  }
+
+  Future<void> removeItem(String itemId) async {
+    await _call(() => _api.delete('/api/items/$itemId'));
+    _myItems = _myItems.where((i) => i.id != itemId).toList();
+    _feed = _feed.where((i) => i.id != itemId).toList();
+    if (_livePinnedItem?.id == itemId) _livePinnedItem = null;
+    notifyListeners();
+  }
+
+  Future<List<ItemComment>> comments(String itemId) async {
+    final res = await _call(() => _api.get('/api/items/$itemId/comments'));
+    return (res['comments'] as List).map((c) => ItemComment.fromJson(c as Map<String, dynamic>)).toList();
+  }
+
+  Future<ItemComment> addComment(String itemId, String text) async {
+    final res = await _call(() => _api.post('/api/items/$itemId/comments', {'text': text}));
+    final item = [..._feed, ..._saved].where((i) => i.id == itemId).firstOrNull;
+    if (item != null) _replaceItem(item.copyWithComments(item.commentsCount + 1));
+    return ItemComment.fromJson(res['comment'] as Map<String, dynamic>);
+  }
+
+  void pinItemToLive(ThriftItem item) {
     _livePinnedItem = item;
-    _countdownSeconds = durationSeconds;
     notifyListeners();
   }
 
@@ -285,229 +313,77 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _initMockData() {
-    // Curated high-energy Joburg street thrift drops
-    _feedItems = [
-      const ThriftItem(
-        id: 'item-01',
-        title: 'Carhartt Detroit Duck Jacket (J97 MOS)',
-        priceZar: 680.0,
-        originalPriceZar: 1800.0,
-        condition: 'Grade A Vintage',
-        size: 'L',
-        category: 'Jackets',
-        sellerId: 'v-bree-01',
-        sellerName: 'Braam Bale Vault',
-        sellerHandle: '@braambale',
-        sellerLocation: 'Small Street Mall, CBD JHB',
-        sellerBadge: 'Bale Boss 👑',
-        description: 'Authentic 90s moss green Carhartt Detroit. Perfect street patina with blanket lining intact. Sourced straight from the fresh Grade-A morning bales.',
-        tags: ['#Carhartt', '#DetroitJacket', '#Workwear', '#JoburgVintage'],
-        likesCount: 248,
-        viewsCount: 1890,
-        isLiked: false,
-        isSaved: false,
-        gradientColorsHex: ['#2C1B18', '#6A4029'],
-        haulCaption: 'Digging through bale #04 this morning in Downtown Joburg. Look at this grail piece! 📦🔥',
-        conditionDetail: 'Zero tears, pristine corduroy collar, heavyweight duck canvas.',
-      ),
-      const ThriftItem(
-        id: 'item-02',
-        title: '1996 Nike Center Swoosh Windbreaker',
-        priceZar: 380.0,
-        originalPriceZar: 950.0,
-        condition: '90s Deadstock',
-        size: 'XL',
-        category: 'Jackets',
-        sellerId: 'v-mabo-02',
-        sellerName: 'Downtown Stash Co.',
-        sellerHandle: '@downtownstash',
-        sellerLocation: 'Maboneng Precinct, JHB',
-        sellerBadge: 'Top Curator ✨',
-        description: 'Crisp 90s nylon shell with embroidered mini swoosh dead center. Elastic waistband and cuffs super snappy. Rare colourway.',
-        tags: ['#NikeVintage', '#CenterSwoosh', '#90sStreetwear'],
-        likesCount: 412,
-        viewsCount: 3100,
-        isLiked: true,
-        isSaved: true,
-        gradientColorsHex: ['#0B1B3D', '#1D4ED8'],
-        haulCaption: 'Fresh drop from our Friday morning bale unboxing in Bree Street! ⚡',
-        conditionDetail: 'Near mint condition, original zipper puller intact.',
-      ),
-      const ThriftItem(
-        id: 'item-03',
-        title: 'Vintage Levi\'s 501 Big E Raw Wash',
-        priceZar: 420.0,
-        originalPriceZar: 1200.0,
-        condition: 'Grade A Vintage',
-        size: '32W x 32L',
-        category: 'Denim',
-        sellerId: 'v-small-03',
-        sellerName: 'Kasi Vintage Plug',
-        sellerHandle: '@kasivintage',
-        sellerLocation: 'Bree Street Taxi Rank Stalls',
-        sellerBadge: 'Vintage Plug 🔌',
-        description: 'Classic straight-leg 501s with natural honeycomb fades and whiskering. Sturdy 14oz redline selvedge feel.',
-        tags: ['#Levis501', '#BigEDenim', '#RawDenim'],
-        likesCount: 195,
-        viewsCount: 1420,
-        isLiked: false,
-        isSaved: false,
-        gradientColorsHex: ['#172554', '#1E3A8A'],
-        haulCaption: 'You know finding clean 501s downtown is pure art. Claim before it vanishes! 👖✨',
-        conditionDetail: 'No crotch blowout, natural honeycombs on knees.',
-      ),
-      const ThriftItem(
-        id: 'item-04',
-        title: 'Ralph Lauren Polo Sport Arctic Fleece',
-        priceZar: 450.0,
-        originalPriceZar: 1100.0,
-        condition: 'Lightly Worn',
-        size: 'M',
-        category: 'Knitwear',
-        sellerId: 'v-braam-04',
-        sellerName: 'Joburg Thrift Guild',
-        sellerHandle: '@joburgthriftguild',
-        sellerLocation: 'Braamfontein 73 Juta',
-        sellerBadge: 'Verified Vendor 🛡️',
-        description: 'Heavyweight deep-pile fleece with signature USA flag patch on chest. Super warm for highveld winters.',
-        tags: ['#PoloSport', '#VintageRalph', '#StreetFleece'],
-        likesCount: 334,
-        viewsCount: 2200,
-        isLiked: false,
-        isSaved: true,
-        gradientColorsHex: ['#18181B', '#3F3F46'],
-        haulCaption: 'Fleece season check! Grabbed this beauty at the Park Station drop.',
-        conditionDetail: 'Thick pile fleece, no pilling, zippers butter smooth.',
-      ),
-      const ThriftItem(
-        id: 'item-05',
-        title: 'Stüssy 8-Ball International Pigment Tee',
-        priceZar: 290.0,
-        originalPriceZar: 650.0,
-        condition: '90s Deadstock',
-        size: 'L',
-        category: 'Vintage Tees',
-        sellerId: 'v-bree-01',
-        sellerName: 'Braam Bale Vault',
-        sellerHandle: '@braambale',
-        sellerLocation: 'Small Street Mall, CBD JHB',
-        sellerBadge: 'Bale Boss 👑',
-        description: 'Single stitch faded pigment black Stüssy tee with iconic 8-ball graphic on back. Sits relaxed and boxy.',
-        tags: ['#Stussy', '#8BallTee', '#SingleStitch'],
-        likesCount: 520,
-        viewsCount: 4500,
-        isLiked: true,
-        isSaved: false,
-        gradientColorsHex: ['#27272A', '#09090B'],
-        haulCaption: 'Single stitch vintage grail right out the pile. Who wants it first? 🎱',
-        conditionDetail: 'Subtle sun-faded wash, zero graphic cracking.',
-      ),
-    ];
+  // ---- Orders & wallet (payments simulated server-side) ----
 
-    // Vendor inventory
-    _vendorInventory = [
-      _feedItems[0],
-      _feedItems[4],
-      const ThriftItem(
-        id: 'item-06',
-        title: 'Dickies 874 Skater Work Pants (Navy)',
-        priceZar: 320.0,
-        condition: 'Grade A Vintage',
-        size: '34W',
-        category: 'Workwear',
-        sellerId: 'usr-joburg-01',
-        sellerName: 'Braam Bale Vault',
-        sellerHandle: '@braambale',
-        sellerLocation: 'Corner Juta & De Beer St',
-        sellerBadge: 'Bale Boss 👑',
-        description: 'Boxy cut Dickies 874, already broken in so none of that stiff cardboard feeling.',
-        tags: ['#Dickies874', '#Skatewear'],
-        likesCount: 88,
-        gradientColorsHex: ['#0F172A', '#1E293B'],
-      ),
-    ];
-
-    // Seed realistic Escrow Orders representing the full lifecycle
-    _orders = [
-      EscrowOrder(
-        id: 'DB-89214',
-        item: _feedItems[1], // Nike Windbreaker
-        amountZar: 380.0,
-        shippingFeeZar: 50.0,
-        status: EscrowStatus.vendorDispatched,
-        deliveryMethod: 'PUDO Locker-to-Locker',
-        paymentMethod: 'Capitec Pay (Instant)',
-        createdAt: DateTime.now().subtract(const Duration(days: 1, hours: 4)),
-        dispatchedAt: DateTime.now().subtract(const Duration(hours: 6)),
-        escrowVaultRef: 'ESC-ZAR-741920',
-        trackingNumber: 'PUDO-ZA-99412',
-        deliveryAddress: 'Campus Square PUDO Locker, Auckland Park, JHB',
-      ),
-      EscrowOrder(
-        id: 'DB-67310',
-        item: _feedItems[0], // Carhartt Jacket
-        amountZar: 680.0,
-        shippingFeeZar: 60.0,
-        status: EscrowStatus.paymentHeld,
-        deliveryMethod: 'Courier Guy Door-to-Door',
-        paymentMethod: 'Ozow Instant EFT',
-        createdAt: DateTime.now().subtract(const Duration(hours: 3)),
-        escrowVaultRef: 'ESC-ZAR-883104',
-        trackingNumber: 'TCG-ZA-51209',
-        deliveryAddress: '24 Biccard St, Braamfontein, Johannesburg',
-      ),
-      EscrowOrder(
-        id: 'DB-41908',
-        item: _feedItems[2], // Levis 501
-        amountZar: 420.0,
-        shippingFeeZar: 0.0,
-        status: EscrowStatus.payoutReleased,
-        deliveryMethod: 'Downtown Hub Pickup (Free)',
-        paymentMethod: 'Dobha Wallet',
-        createdAt: DateTime.now().subtract(const Duration(days: 4)),
-        dispatchedAt: DateTime.now().subtract(const Duration(days: 3)),
-        confirmedAt: DateTime.now().subtract(const Duration(days: 2)),
-        escrowVaultRef: 'ESC-ZAR-339218',
-        trackingNumber: 'HUB-MABONENG-04',
-        deliveryAddress: 'Maboneng Main Street Security Desk Hub',
-      ),
-    ];
-
-    // Seed transaction history
-    _transactions = [
-      WalletTransaction(
-        id: 'TX-1004',
-        title: 'Escrow Lock: Carhartt Detroit Jacket',
-        subtitle: 'Protected payment held in vault (ESC-ZAR-883104)',
-        amountZar: 740.0,
-        type: TransactionType.escrowHold,
-        date: DateTime.now().subtract(const Duration(hours: 3)),
-        status: 'Secured in Escrow 🔒',
-        reference: 'ESC-ZAR-883104',
-      ),
-      WalletTransaction(
-        id: 'TX-1003',
-        title: 'Escrow Released: Vintage Levi\'s 501',
-        subtitle: 'Buyer confirmed condition — Payout credited',
-        amountZar: 420.0,
-        type: TransactionType.escrowRelease,
-        date: DateTime.now().subtract(const Duration(days: 2)),
-        status: 'Released to Vendor 💰',
-        reference: 'ESC-ZAR-339218',
-      ),
-      WalletTransaction(
-        id: 'TX-1002',
-        title: 'Instant Top-Up (Capitec Pay)',
-        subtitle: 'Wallet deposit for instant claims',
-        amountZar: 500.0,
-        type: TransactionType.topup,
-        date: DateTime.now().subtract(const Duration(days: 5)),
-        status: 'Completed ✅',
-        reference: 'CAP-PAY-98124',
-      ),
-    ];
-
-    _savedItemIds = ['item-02', 'item-04'];
+  Future<EscrowOrder> checkout({
+    required ThriftItem item,
+    required String deliveryMethod,
+    required String paymentMethod,
+    required String deliveryAddress,
+  }) async {
+    final res = await _call(() => _api.post('/api/orders', {
+          'itemId': item.id,
+          'deliveryMethod': deliveryMethod,
+          'paymentMethod': paymentMethod,
+          'deliveryAddress': deliveryAddress,
+        }));
+    final order = EscrowOrder.fromJson(res['order'] as Map<String, dynamic>);
+    _orders = [order, ..._orders];
+    _feed = _feed.where((i) => i.id != item.id).toList();
+    notifyListeners();
+    loadWallet().catchError((_) {});
+    return order;
   }
+
+  Future<void> dispatchOrder(String orderId) => _orderAction(orderId, 'dispatch');
+  Future<void> confirmOrder(String orderId) => _orderAction(orderId, 'confirm');
+  Future<void> disputeOrder(String orderId) => _orderAction(orderId, 'dispute');
+
+  Future<void> _orderAction(String orderId, String action) async {
+    final res = await _call(() => _api.post('/api/orders/$orderId/$action'));
+    final order = EscrowOrder.fromJson(res['order'] as Map<String, dynamic>);
+    _orders = [for (final o in _orders) o.id == orderId ? order : o];
+    notifyListeners();
+    await loadWallet().catchError((_) {});
+    if (action == 'confirm') {
+      final me = await _call(() => _api.get('/api/me'));
+      _user = UserProfile.fromJson(me['user'] as Map<String, dynamic>);
+      notifyListeners();
+    }
+  }
+
+  Future<void> topUpWallet(double amountZar, String method) async {
+    _applyWallet(await _call(() => _api.post('/api/wallet/topup', {'amountZar': amountZar, 'method': method})));
+    notifyListeners();
+  }
+
+  Future<void> withdrawFunds(double amountZar, String bank, String account) async {
+    _applyWallet(await _call(() => _api.post('/api/wallet/withdraw', {'amountZar': amountZar, 'bank': bank, 'account': account})));
+    notifyListeners();
+  }
+}
+
+extension on ThriftItem {
+  ThriftItem copyWithComments(int count) => ThriftItem(
+        id: id,
+        title: title,
+        description: description,
+        haulCaption: haulCaption,
+        priceZar: priceZar,
+        originalPriceZar: originalPriceZar,
+        condition: condition,
+        size: size,
+        category: category,
+        photoUrl: photoUrl,
+        sellerId: sellerId,
+        sellerName: sellerName,
+        sellerHandle: sellerHandle,
+        sellerLocation: sellerLocation,
+        likesCount: likesCount,
+        commentsCount: count,
+        isLiked: isLiked,
+        isSaved: isSaved,
+        isClaimed: isClaimed,
+        createdAt: createdAt,
+      );
 }

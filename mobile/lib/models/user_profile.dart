@@ -4,9 +4,8 @@ enum UserRole {
 }
 
 enum TransactionType {
-  escrowDeposit,
-  escrowRelease,
   escrowHold,
+  escrowRelease,
   withdrawal,
   topup,
 }
@@ -18,7 +17,7 @@ class WalletTransaction {
   final double amountZar;
   final TransactionType type;
   final DateTime date;
-  final String status; // "Secured in Escrow", "Released to Vendor", "Completed"
+  final String status;
   final String reference;
 
   const WalletTransaction({
@@ -32,77 +31,64 @@ class WalletTransaction {
     required this.reference,
   });
 
-  bool get isCredit =>
-      type == TransactionType.escrowRelease ||
-      type == TransactionType.topup;
+  bool get isCredit => type == TransactionType.escrowRelease || type == TransactionType.topup;
+
+  factory WalletTransaction.fromJson(Map<String, dynamic> json) => WalletTransaction(
+        id: json['id'] as String,
+        title: json['title'] as String,
+        subtitle: json['subtitle'] as String? ?? '',
+        amountZar: (json['amountZar'] as num).toDouble(),
+        type: TransactionType.values.firstWhere((t) => t.name == json['type'], orElse: () => TransactionType.topup),
+        date: DateTime.parse(json['date'] as String),
+        status: json['status'] as String? ?? '',
+        reference: json['reference'] as String? ?? '',
+      );
 }
 
 class UserProfile {
   final String id;
+  final String email;
   final String name;
-  final String phone;
   final String handle;
+  final String phone;
   final UserRole role;
-  final String avatarInitials;
-  final String location;
-  
-  // Vendor-specific fields
-  final String vendorShopName;
-  final String vendorStallLocation;
-  final String vendorBadge;
-  final double rating;
-  final int totalSalesCount;
-  final double totalSalesZar;
-  final bool isVerifiedVendor;
+  final String shopName;
+  final String stallLocation;
+  final DateTime createdAt;
+  final int salesCount;
 
   const UserProfile({
     required this.id,
+    required this.email,
     required this.name,
-    required this.phone,
     required this.handle,
+    required this.phone,
     required this.role,
-    this.avatarInitials = 'DB',
-    this.location = 'Johannesburg, GP',
-    this.vendorShopName = 'Bale Vault Downtown',
-    this.vendorStallLocation = 'Small Street Mall, Unit 4B, Joburg CBD',
-    this.vendorBadge = 'Bale Boss 👑',
-    this.rating = 4.9,
-    this.totalSalesCount = 86,
-    this.totalSalesZar = 34500.0,
-    this.isVerifiedVendor = true,
+    required this.shopName,
+    required this.stallLocation,
+    required this.createdAt,
+    this.salesCount = 0,
   });
 
-  UserProfile copyWith({
-    String? id,
-    String? name,
-    String? phone,
-    String? handle,
-    UserRole? role,
-    String? avatarInitials,
-    String? location,
-    String? vendorShopName,
-    String? vendorStallLocation,
-    String? vendorBadge,
-    double? rating,
-    int? totalSalesCount,
-    double? totalSalesZar,
-    bool? isVerifiedVendor,
-  }) {
-    return UserProfile(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      phone: phone ?? this.phone,
-      handle: handle ?? this.handle,
-      role: role ?? this.role,
-      avatarInitials: avatarInitials ?? this.avatarInitials,
-      location: location ?? this.location,
-      vendorShopName: vendorShopName ?? this.vendorShopName,
-      vendorStallLocation: vendorStallLocation ?? this.vendorStallLocation,
-      vendorBadge: vendorBadge ?? this.vendorBadge,
-      rating: rating ?? this.rating,
-      totalSalesCount: totalSalesCount ?? this.totalSalesCount,
-      totalSalesZar: totalSalesZar ?? this.totalSalesZar,
-      isVerifiedVendor: isVerifiedVendor ?? this.isVerifiedVendor,
-    );
+  bool get isVendor => role == UserRole.vendor;
+
+  String get initials {
+    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.substring(0, parts.first.length.clamp(1, 2)).toUpperCase();
+    return (parts.first[0] + parts.last[0]).toUpperCase();
   }
+
+  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
+        id: json['id'] as String,
+        email: json['email'] as String? ?? '',
+        name: json['name'] as String,
+        handle: json['handle'] as String,
+        phone: json['phone'] as String? ?? '',
+        role: json['role'] == 'vendor' ? UserRole.vendor : UserRole.shopper,
+        shopName: json['shopName'] as String? ?? '',
+        stallLocation: json['stallLocation'] as String? ?? '',
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        salesCount: json['salesCount'] as int? ?? 0,
+      );
 }
