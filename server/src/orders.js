@@ -103,26 +103,38 @@ export async function createOrder(request, env) {
   }
 
   const order = {
-    id: `DB-${Date.now().toString(36).toUpperCase()}${rand(1000)}`,
+    id: `DB-${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
     vault: `ESC-ZAR-${100000 + rand(900000)}`,
     tracking: deliveryMethod === 'Downtown Joburg Safe Hub' ? 'Collect at hub' : `PUDO-ZA-${10000 + rand(90000)}`,
   };
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO orders (id, item_id, buyer_id, seller_id, amount_cents, shipping_cents, delivery_method, delivery_address, payment_method, status, vault_ref, tracking, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paymentHeld', ?, ?, ?)`,
-    ).bind(order.id, itemId, user.id, item.seller_id, item.price_cents, shipping, deliveryMethod, address, paymentMethod, order.vault, order.tracking, now()),
-    env.DB.prepare('UPDATE wallets SET locked_cents = locked_cents + ? WHERE user_id = ?').bind(total, user.id),
-    env.DB.prepare('UPDATE wallets SET pending_cents = pending_cents + ? WHERE user_id = ?').bind(item.price_cents, item.seller_id),
-    txn(env, user.id, {
-      title: `Escrow: ${item.title}`,
-      subtitle: `Held until you confirm (${paymentMethod})`,
-      amount: total,
-      type: 'escrowHold',
-      status: 'Held in escrow',
-      reference: order.vault,
-    }),
-  ]);
+  // The batch is one transaction; if it fails, undo the claim and the wallet charge above
+  // so the item isn't left sold with no order.
+  try {
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO orders (id, item_id, buyer_id, seller_id, amount_cents, shipping_cents, delivery_method, delivery_address, payment_method, status, vault_ref, tracking, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paymentHeld', ?, ?, ?)`,
+      ).bind(order.id, itemId, user.id, item.seller_id, item.price_cents, shipping, deliveryMethod, address, paymentMethod, order.vault, order.tracking, now()),
+      env.DB.prepare('UPDATE wallets SET locked_cents = locked_cents + ? WHERE user_id = ?').bind(total, user.id),
+      env.DB.prepare('UPDATE wallets SET pending_cents = pending_cents + ? WHERE user_id = ?').bind(item.price_cents, item.seller_id),
+      txn(env, user.id, {
+        title: `Escrow: ${item.title}`,
+        subtitle: `Held until you confirm (${paymentMethod})`,
+        amount: total,
+        type: 'escrowHold',
+        status: 'Held in escrow',
+        reference: order.vault,
+      }),
+    ]);
+  } catch (e) {
+    await env.DB.batch([
+      env.DB.prepare("UPDATE items SET status = 'available', buyer_id = NULL WHERE id = ? AND buyer_id = ?").bind(itemId, user.id),
+      ...(paymentMethod === WALLET
+        ? [env.DB.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(total, user.id)]
+        : []),
+    ]);
+    throw e;
+  }
 
   return json({ order: await orderJson(env, await loadOrder(env, order.id), user.id) }, 201);
 }
