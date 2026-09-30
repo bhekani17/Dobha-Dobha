@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dobha Live - Go Live</title>
+  <title>Dobha Live - Host</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -32,13 +32,52 @@
         <button id="micBtn">Mute</button>
         <button id="leaveBtn" class="danger">End stream</button>
       </div>
+
+      <!-- Host Pin Item Bar -->
+      <div class="card" style="margin-bottom: 12px; padding: 12px;">
+        <form id="pinForm" class="pin-form-grid" onsubmit="return false">
+          <input id="pinTitle" placeholder="Item name (e.g. Nike Vintage)" required />
+          <input id="pinPrice" placeholder="Price (e.g. 150)" required />
+          <select id="pinSize">
+            <option value="S">Size S</option>
+            <option value="M" selected>Size M</option>
+            <option value="L">Size L</option>
+            <option value="XL">Size XL</option>
+            <option value="Free Size">Free Size</option>
+          </select>
+          <div style="display:flex; gap:6px;">
+            <button type="button" id="pinBtn">Pin Item</button>
+            <button type="button" id="unpinBtn" class="secondary">Unpin</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Pinned Item Preview Banner -->
+      <div id="pinnedBanner" class="product-banner hidden">
+        <div class="product-info">
+          <div class="product-title">
+            <span id="productTitle">Item Title</span>
+            <span id="productSize" class="product-size">M</span>
+          </div>
+          <div>
+            <span id="productPrice" class="product-price">R 0</span>
+            <span id="soldTag" class="sold-tag"></span>
+          </div>
+        </div>
+        <button id="claimBtn" class="dobha-btn">Mark Sold</button>
+      </div>
+
       <div class="stage">
-        <div id="videos"><span class="muted" id="waiting">Starting camera...</span></div>
+        <div id="videos">
+          <span class="muted" id="waiting">Starting camera...</span>
+          <div id="reactionsOverlay" class="reactions-overlay"></div>
+        </div>
         <div id="chat" class="card">
           <div id="messages"></div>
           <form id="chatForm">
             <input id="chatInput" placeholder="Say something" autocomplete="off" />
             <button type="submit">Send</button>
+            <button type="button" id="heartBtn" class="heart-btn" title="Send Love">❤️</button>
           </form>
         </div>
       </div>
@@ -68,6 +107,30 @@
       const on = room.localParticipant.isMicrophoneEnabled;
       await room.localParticipant.setMicrophoneEnabled(!on);
       $('micBtn').textContent = on ? 'Unmute' : 'Mute';
+    });
+
+    $('pinBtn').addEventListener('click', () => {
+      const title = $('pinTitle').value.trim();
+      const price = $('pinPrice').value.trim();
+      const size = $('pinSize').value;
+      if (!title || !price) return;
+      currentPinnedItem = {
+        id: Date.now().toString(),
+        title,
+        price: price.startsWith('R') ? price : 'R ' + price,
+        size,
+        status: 'available',
+      };
+      renderPinnedItem();
+      broadcastData({ type: 'pin_item', item: currentPinnedItem });
+      addSystemMessage(`📢 You pinned: ${title} (${currentPinnedItem.price})`);
+    });
+
+    $('unpinBtn').addEventListener('click', () => {
+      currentPinnedItem = null;
+      renderPinnedItem();
+      broadcastData({ type: 'unpin_item' });
+      addSystemMessage('Item unpinned');
     });
   </script>
 </body>

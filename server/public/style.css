@@ -9,9 +9,10 @@ h1 span { color: var(--green); }
 h2 { font-size: 16px; margin: 16px 0 8px; }
 .card { background: var(--card); border-radius: 12px; padding: 16px; }
 form { display: grid; gap: 10px; }
-input, button { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid #222; background: #000; color: var(--text); }
+input, select, button { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid #222; background: #000; color: var(--text); }
 button { background: var(--green); color: #000; font-weight: 600; border: 0; cursor: pointer; }
 button.danger { background: var(--red); color: #fff; }
+button.secondary { background: #222; color: #fff; border: 1px solid #333; }
 button:disabled { opacity: .5; cursor: default; }
 .bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .live { background: var(--red); padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; }
@@ -19,14 +20,109 @@ button:disabled { opacity: .5; cursor: default; }
 .error { color: var(--red); font-size: 14px; }
 .stage { display: grid; grid-template-columns: 1fr; gap: 12px; }
 @media (min-width: 760px) { .stage { grid-template-columns: 2fr 1fr; } }
-#videos { background: var(--card); border-radius: 12px; min-height: 280px; display: grid; place-items: center; overflow: hidden; position: relative; }
+#videos { background: var(--card); border-radius: 12px; min-height: 340px; display: grid; place-items: center; overflow: hidden; position: relative; }
 #videos video { width: 100%; height: 100%; object-fit: cover; display: block; }
-#soundBtn { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); }
+#soundBtn { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); z-index: 10; }
 #chat { display: flex; flex-direction: column; height: 420px; }
 #messages { flex: 1; overflow-y: auto; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
 #messages b { color: var(--green); }
+#messages .sys-msg { background: rgba(0, 194, 100, 0.12); padding: 4px 8px; border-radius: 6px; color: var(--green); font-size: 13px; font-weight: 600; }
 #chatForm { display: flex; gap: 8px; margin-top: 8px; }
 #chatForm input { flex: 1; min-width: 0; }
+.heart-btn { background: rgba(255, 59, 59, 0.15); border: 1px solid rgba(255, 59, 59, 0.3); font-size: 18px; padding: 8px 12px; border-radius: 50%; }
 #roomList { display: grid; gap: 8px; }
 .roomItem { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .hidden { display: none !important; }
+
+/* Pinned Item Banner */
+.product-banner {
+  background: #161616;
+  border: 1px solid rgba(0, 194, 100, 0.4);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.product-banner.sold {
+  border-color: rgba(255, 193, 7, 0.4);
+}
+.product-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.product-title {
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.product-size {
+  font-size: 11px;
+  background: #222;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--muted);
+}
+.product-price {
+  color: var(--green);
+  font-weight: 800;
+  font-size: 15px;
+}
+.product-banner.sold .product-price {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.sold-tag {
+  color: #ffc107;
+  font-size: 12px;
+  font-weight: 700;
+  margin-left: 8px;
+}
+.dobha-btn {
+  background: var(--green);
+  color: #000;
+  font-weight: 800;
+  padding: 8px 16px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Floating Reactions */
+.reactions-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100px;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+.floating-particle {
+  position: absolute;
+  bottom: 20px;
+  font-size: 28px;
+  animation: floatUp 2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+@keyframes floatUp {
+  0% { transform: translateY(0) scale(0.8); opacity: 1; }
+  100% { transform: translateY(-300px) scale(1.4); opacity: 0; }
+}
+
+/* Host pin form */
+.pin-form-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr auto;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+@media (max-width: 600px) {
+  .pin-form-grid { grid-template-columns: 1fr; }
+}
