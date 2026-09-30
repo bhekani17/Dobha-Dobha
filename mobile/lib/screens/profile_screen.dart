@@ -9,7 +9,9 @@ import '../widgets/checkout_modal.dart';
 import '../widgets/escrow_tracker_badge.dart';
 import '../widgets/item_photo.dart';
 import '../widgets/ui.dart';
+import '../widgets/user_avatar.dart';
 import 'account_sheets.dart';
+import 'edit_profile_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -86,7 +88,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 AppButton.icon(icon: Icons.dns_outlined, size: 19, padding: 10, onPressed: _showServerSettings),
                 const SizedBox(width: 12),
               ],
-              AppButton.icon(icon: Icons.edit_outlined, size: 19, padding: 10, onPressed: () => showEditProfileSheet(context)),
+              AppButton.icon(icon: Icons.edit_outlined, size: 19, padding: 10, onPressed: () => EditProfileScreen.open(context)),
               const SizedBox(width: 12),
               AppButton.icon(icon: Icons.logout_rounded, iconColor: DobhaColors.red, size: 19, padding: 10, onPressed: _confirmLogout),
               const SizedBox(width: 16),
@@ -103,20 +105,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       children: [
                         Row(
                           children: [
-                            Container(
-                              width: 70,
-                              height: 70,
-                              padding: const EdgeInsets.all(6),
-                              decoration: Surfaces.card(circle: true),
-                              child: AppWell(
-                                circle: true,
-                                padding: EdgeInsets.zero,
-                                tint: DobhaColors.green,
-                                child: Center(
-                                  child: Text(user.initials,
-                                      style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: DobhaColors.green)),
-                                ),
-                              ),
+                            GestureDetector(
+                              onTap: () => EditProfileScreen.open(context),
+                              child: UserAvatar(url: user.avatarUrl, name: user.name, size: 72),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -127,16 +118,36 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                       style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis),
-                                  Text(user.handle, style: const TextStyle(fontSize: 12, color: DobhaColors.muted)),
+                                  Text(user.handle, style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
                                   const SizedBox(height: 2),
-                                  Text(user.email,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(fontSize: 11, color: DobhaColors.textSecondary)),
+                                  if (user.location.isNotEmpty)
+                                    Row(
+                                      children: [
+                                        Icon(Icons.location_on_outlined, size: 12, color: DobhaColors.textSecondary),
+                                        const SizedBox(width: 2),
+                                        Flexible(
+                                          child: Text(user.location,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(fontSize: 11.5, color: DobhaColors.textSecondary)),
+                                        ),
+                                      ],
+                                    ),
                                 ],
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 14),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: user.bio.isNotEmpty
+                              ? Text(user.bio, style: const TextStyle(fontSize: 13, height: 1.4))
+                              : GestureDetector(
+                                  onTap: () => EditProfileScreen.open(context),
+                                  child: Text('Add a bio so buyers and sellers know you',
+                                      style: TextStyle(fontSize: 13, color: DobhaColors.green, fontWeight: FontWeight.w600)),
+                                ),
                         ),
                         const SizedBox(height: 18),
                         AppWell(
@@ -157,7 +168,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             Expanded(
                               child: Text(
                                 user.isVendor ? 'Selling as ${user.shopName}' : 'Want to sell your own pieces?',
-                                style: const TextStyle(fontSize: 12.5, color: DobhaColors.textSecondary, fontWeight: FontWeight.w600),
+                                style: TextStyle(fontSize: 12.5, color: DobhaColors.textSecondary, fontWeight: FontWeight.w600),
                               ),
                             ),
                             AppButton(
@@ -244,14 +255,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                       Text(item.title,
                           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
                       Text('${item.condition} · ${item.sellerName}',
-                          style: const TextStyle(fontSize: 11, color: DobhaColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text(item.formattedPrice, style: const TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 13)),
+                          style: TextStyle(fontSize: 11, color: DobhaColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 13)),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
                 item.isClaimed
-                    ? const AppTag('SOLD', color: DobhaColors.amber)
+                    ? AppTag('SOLD', color: DobhaColors.amber)
                     : AppButton(
                         color: DobhaColors.green,
                         radius: 12,
@@ -279,7 +290,7 @@ class _Stat extends StatelessWidget {
       children: [
         Text(value, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
         const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 10, color: DobhaColors.muted)),
+        Text(label, style: TextStyle(fontSize: 10, color: DobhaColors.muted)),
       ],
     );
   }
@@ -301,7 +312,7 @@ class _Empty extends StatelessWidget {
           children: [
             AppWell(circle: true, padding: const EdgeInsets.all(18), child: Icon(icon, size: 34, color: DobhaColors.muted)),
             const SizedBox(height: 14),
-            Text(text, textAlign: TextAlign.center, style: const TextStyle(color: DobhaColors.muted)),
+            Text(text, textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted)),
           ],
         ),
       ),

@@ -70,7 +70,17 @@ class AppState extends ChangeNotifier {
       final token = prefs.getString(_tokenKey);
       if (token != null) {
         _api.token = token;
-        final res = await _api.get('/api/me');
+        // A blip (bad signal, server hiccup) shouldn't look like being logged out: retry before giving up.
+        dynamic res;
+        for (var attempt = 1;; attempt++) {
+          try {
+            res = await _api.get('/api/me');
+            break;
+          } on ApiException catch (e) {
+            if (e.isUnauthorized || attempt == 3) rethrow;
+            await Future.delayed(Duration(milliseconds: 600 * attempt));
+          }
+        }
         _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
         refreshAll();
       }
@@ -227,10 +237,20 @@ class AppState extends ChangeNotifier {
 
   // ---- Profile ----
 
-  Future<void> updateProfile({String? name, String? phone, String? shopName, String? stallLocation, UserRole? role}) async {
+  Future<void> updateProfile({
+    String? name,
+    String? phone,
+    String? bio,
+    String? location,
+    String? shopName,
+    String? stallLocation,
+    UserRole? role,
+  }) async {
     final res = await _call(() => _api.patch('/api/me', {
           'name': ?name,
           'phone': ?phone,
+          'bio': ?bio,
+          'location': ?location,
           'shopName': ?shopName,
           'stallLocation': ?stallLocation,
           if (role != null) 'role': role.name,
@@ -239,6 +259,16 @@ class AppState extends ChangeNotifier {
     _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
     notifyListeners();
     if (isVendor && !wasVendor) await loadMyItems();
+  }
+
+  /// Replaces the profile picture, or removes it when [bytes] is null.
+  Future<void> setAvatar(Uint8List? bytes, {String contentType = 'image/jpeg'}) async {
+    final res = await _call(() =>
+        bytes == null ? _api.delete('/api/me/avatar') : _api.putBytes('/api/me/avatar', bytes, contentType));
+    _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
+    notifyListeners();
+    // Listings embed the seller's picture.
+    if (isVendor) refreshAll();
   }
 
   // ---- Items ----
@@ -394,6 +424,7 @@ extension on ThriftItem {
         sellerName: sellerName,
         sellerHandle: sellerHandle,
         sellerLocation: sellerLocation,
+        sellerAvatarUrl: sellerAvatarUrl,
         likesCount: likesCount,
         commentsCount: count,
         isLiked: isLiked,

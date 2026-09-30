@@ -31,8 +31,12 @@
 
   <title>Dobha Dobha</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#15171B">
-  <style>html, body { background: #15171B; margin: 0; }</style>
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#15171B">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F4F6">
+  <style>
+    html, body { background: #F3F4F6; margin: 0; }
+    @media (prefers-color-scheme: dark) { html, body { background: #15171B; } }
+  </style>
 </head>
 <body>
   <!--

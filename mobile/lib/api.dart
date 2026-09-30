@@ -56,6 +56,10 @@ class Api {
   Future<dynamic> patch(String path, Object body) => _send('PATCH', path, body: body);
   Future<dynamic> delete(String path) => _send('DELETE', path);
 
+  /// PUT raw bytes (e.g. a profile picture).
+  Future<dynamic> putBytes(String path, Uint8List bytes, String contentType) =>
+      _send('PUT', path, raw: bytes, contentType: contentType, timeout: const Duration(minutes: 2));
+
   /// Uploads a photo or video and returns the storage key to attach to an item.
   Future<String> uploadMedia(Uint8List bytes, String contentType) async {
     final res = await _send('POST', '/api/uploads',

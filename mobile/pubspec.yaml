@@ -64,6 +64,12 @@ flutter:
   # the material Icons class.
   uses-material-design: true
 
+  # logo.png: original (black tile), used in light mode and for app icons.
+  # logo01.png: transparent, used in dark mode. The .svg sources stay unbundled.
+  assets:
+    - assets/images/logo.png
+    - assets/images/logo01.png
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg

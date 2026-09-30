@@ -6,19 +6,58 @@ import 'state/app_state.dart';
 import 'theme.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  DobhaColors.isDark = binding.platformDispatcher.platformBrightness == Brightness.dark;
   runApp(const DobhaLiveApp());
 }
 
-class DobhaLiveApp extends StatelessWidget {
+/// Follows the phone's light/dark setting.
+class DobhaLiveApp extends StatefulWidget {
   const DobhaLiveApp({super.key});
+
+  @override
+  State<DobhaLiveApp> createState() => _DobhaLiveAppState();
+}
+
+class _DobhaLiveAppState extends State<DobhaLiveApp> with WidgetsBindingObserver {
+  final _light = dobhaTheme(Brightness.light);
+  final _dark = dobhaTheme(Brightness.dark);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    final dark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+    if (dark == DobhaColors.isDark) return;
+    DobhaColors.isDark = dark;
+    // Screens read DobhaColors directly, so rebuild everything in place (routes and state are kept).
+    void rebuild(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(rebuild);
+    }
+
+    (context as Element).visitChildren(rebuild);
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Dobha Dobha',
       debugShowCheckedModeBanner: false,
-      theme: dobhaTheme(),
+      theme: _light,
+      darkTheme: _dark,
+      themeMode: DobhaColors.isDark ? ThemeMode.dark : ThemeMode.light,
       home: const AuthGate(),
     );
   }

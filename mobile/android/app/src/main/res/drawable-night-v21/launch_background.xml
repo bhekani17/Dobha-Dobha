@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Launch screen: theme background with the logo for this mode (drawable-night = dark). -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item><color android:color="#FFF3F4F6" /></item>
+    <item><color android:color="#FF15171B" /></item>
     <item>
         <bitmap android:gravity="center" android:src="@drawable/launch_logo" />
     </item>

@@ -7,39 +7,23 @@ import '../widgets/google_button.dart';
 import '../widgets/ui.dart';
 
 /// Brand mark used on the splash and welcome screens.
+/// The brand logo for the current theme: transparent on dark, the original
+/// black tile on light (clipped to its rounded corners).
 class DobhaLogo extends StatelessWidget {
   final double size;
   const DobhaLogo({super.key, this.size = 120});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      padding: EdgeInsets.all(size * 0.12),
-      decoration: Surfaces.card(circle: true),
-      child: AppWell(
-        circle: true,
-        tint: DobhaColors.green,
-        padding: EdgeInsets.zero,
-        child: Icon(Icons.flash_on_rounded, size: size * 0.42, color: DobhaColors.green),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * 0.2),
+      child: Image.asset(
+        DobhaColors.logoAsset,
+        width: size,
+        height: size,
+        filterQuality: FilterQuality.high,
+        semanticLabel: 'Dobha-Dobha',
       ),
-    );
-  }
-}
-
-class Wordmark extends StatelessWidget {
-  final double fontSize;
-  const Wordmark({super.key, this.fontSize = 30});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text.rich(
-      TextSpan(children: [
-        const TextSpan(text: 'DOBHA '),
-        TextSpan(text: 'DOBHA', style: TextStyle(color: DobhaColors.green, fontSize: fontSize)),
-      ]),
-      style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w900, letterSpacing: 2),
     );
   }
 }
@@ -70,12 +54,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           children: [
             ScaleTransition(
               scale: Tween(begin: 0.94, end: 1.04).animate(CurvedAnimation(parent: _pulse, curve: Curves.easeInOut)),
-              child: const DobhaLogo(size: 132),
+              child: const DobhaLogo(size: 200),
             ),
-            const SizedBox(height: 36),
-            const Wordmark(),
-            const SizedBox(height: 10),
-            const Text('Joburg street thrift, live.',
+            const SizedBox(height: 24),
+            Text('Joburg street thrift, live.',
                 style: TextStyle(color: DobhaColors.muted, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
           ],
         ),
@@ -97,19 +79,17 @@ class WelcomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              const Center(child: DobhaLogo(size: 110)),
-              const SizedBox(height: 30),
-              const Center(child: Wordmark(fontSize: 28)),
-              const SizedBox(height: 12),
-              const Text(
+              const Center(child: DobhaLogo(size: 170)),
+              const SizedBox(height: 22),
+              Text(
                 'Dig through downtown bales from your phone. Watch sellers live, claim pieces instantly, and pay safely through escrow.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: DobhaColors.textSecondary, height: 1.45, fontSize: 14),
               ),
               const SizedBox(height: 30),
-              const _Feature(icon: Icons.sensors_rounded, color: DobhaColors.red, text: 'Live drops from Joburg stalls'),
-              const _Feature(icon: Icons.flash_on_rounded, color: DobhaColors.green, text: 'Claim a piece in one tap'),
-              const _Feature(icon: Icons.shield_rounded, color: DobhaColors.cyan, text: 'Escrow holds your money until it arrives'),
+              _Feature(icon: Icons.sensors_rounded, color: DobhaColors.red, text: 'Live drops from Joburg stalls'),
+              _Feature(icon: Icons.flash_on_rounded, color: DobhaColors.green, text: 'Claim a piece in one tap'),
+              _Feature(icon: Icons.shield_rounded, color: DobhaColors.cyan, text: 'Escrow holds your money until it arrives'),
               const Spacer(),
               AppButton(
                 color: DobhaColors.green,
@@ -189,7 +169,7 @@ class _AuthForm extends StatelessWidget {
             const SizedBox(height: 28),
             Text(title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900)),
             const SizedBox(height: 6),
-            Text(subtitle, style: const TextStyle(color: DobhaColors.muted, fontSize: 14)),
+            Text(subtitle, style: TextStyle(color: DobhaColors.muted, fontSize: 14)),
             const SizedBox(height: 28),
             for (final f in fields) Padding(padding: const EdgeInsets.only(bottom: 14), child: f),
             if (error != null)
@@ -199,9 +179,9 @@ class _AuthForm extends StatelessWidget {
                 margin: const EdgeInsets.only(bottom: 14),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded, color: DobhaColors.red, size: 18),
+                    Icon(Icons.error_outline_rounded, color: DobhaColors.red, size: 18),
                     const SizedBox(width: 10),
-                    Expanded(child: Text(error!, style: const TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600))),
+                    Expanded(child: Text(error!, style: TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600))),
                   ],
                 ),
               ),

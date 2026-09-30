@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/checkout_modal.dart';
 import '../widgets/media_carousel.dart';
+import '../widgets/user_avatar.dart';
 import '../widgets/ui.dart';
 
 class FeedScreen extends StatefulWidget {
@@ -49,7 +50,7 @@ class _FeedScreenState extends State<FeedScreen> {
                     padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                     child: Row(
                       children: [
-                        const OverlayPanel(
+                        OverlayPanel(
                           radius: 20,
                           padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                           child: Row(
@@ -85,7 +86,7 @@ class _FeedScreenState extends State<FeedScreen> {
       return ColoredBox(
         color: DobhaColors.bg,
         child: state.feedLoading
-            ? const Center(child: CircularProgressIndicator(color: DobhaColors.green))
+            ? Center(child: CircularProgressIndicator(color: DobhaColors.green))
             : _FeedMessage(
                 icon: state.feedError != null ? Icons.wifi_off_rounded : Icons.checkroom_rounded,
                 title: state.feedError != null ? 'Could not load drops' : 'No drops yet',
@@ -133,7 +134,7 @@ class _FeedMessage extends StatelessWidget {
             const SizedBox(height: 18),
             Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
-            Text(text, textAlign: TextAlign.center, style: const TextStyle(color: DobhaColors.muted, height: 1.4)),
+            Text(text, textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted, height: 1.4)),
             const SizedBox(height: 20),
             AppButton(onPressed: onRetry, child: const Text('Refresh')),
           ],
@@ -147,7 +148,10 @@ class _ReelItemCard extends StatefulWidget {
   final ThriftItem item;
   final bool active;
 
-  const _ReelItemCard({required this.item, required this.active});
+  /// Set when opened from a grid tile, so the photo flies in from the tile.
+  final String? heroTag;
+
+  const _ReelItemCard({required this.item, required this.active, this.heroTag});
 
   @override
   State<_ReelItemCard> createState() => _ReelItemCardState();
@@ -183,7 +187,12 @@ class _ReelItemCardState extends State<_ReelItemCard> {
       fit: StackFit.expand,
       children: [
         // Photos and videos fill the whole page; swipe sideways between them, double tap to like.
-        GestureDetector(onDoubleTap: _onDoubleTap, child: MediaCarousel(item: item, active: widget.active)),
+        GestureDetector(
+          onDoubleTap: _onDoubleTap,
+          child: widget.heroTag == null
+              ? MediaCarousel(item: item, active: widget.active)
+              : Hero(tag: widget.heroTag!, child: MediaCarousel(item: item, active: widget.active)),
+        ),
         if (_showHeartAnim)
           IgnorePointer(
             child: Center(
@@ -192,13 +201,14 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                 duration: const Duration(milliseconds: 400),
                 builder: (context, scale, child) => Transform.scale(
                   scale: scale,
-                  child: const Icon(Icons.favorite, color: DobhaColors.red, size: 110),
+                  child: Icon(Icons.favorite, color: DobhaColors.red, size: 110),
                 ),
               ),
             ),
           ),
         SafeArea(
-          bottom: false,
+          // In the feed the nav bar sits below; full-screen detail needs the bottom inset.
+          bottom: widget.heroTag != null,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: Row(
@@ -220,14 +230,9 @@ class _ReelItemCardState extends State<_ReelItemCard> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 48,
-          height: 48,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(color: DobhaColors.green, shape: BoxShape.circle),
-          child: Text(
-            item.sellerName.substring(0, item.sellerName.length.clamp(1, 2)).toUpperCase(),
-            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14, color: Colors.black),
-          ),
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(color: DobhaColors.green, shape: BoxShape.circle),
+          child: UserAvatar(url: item.sellerAvatarUrl, name: item.sellerName, size: 46),
         ),
         const SizedBox(height: 18),
         _SidebarAction(
@@ -324,7 +329,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(item.formattedPrice,
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: DobhaColors.green, letterSpacing: -0.5)),
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: DobhaColors.green, letterSpacing: -0.5)),
                   if (item.originalPriceZar != null)
                     Text(item.formattedOriginalPrice,
                         style: TextStyle(
@@ -356,6 +361,59 @@ class _ReelItemCardState extends State<_ReelItemCard> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// One listing full screen, opened from a grid (Explore). Stays in sync with
+/// likes and saves made here or elsewhere.
+class ItemDetailScreen extends StatelessWidget {
+  final ThriftItem item;
+  const ItemDetailScreen({super.key, required this.item});
+
+  static Future<void> open(BuildContext context, ThriftItem item) {
+    return Navigator.of(context).push(PageRouteBuilder(
+      transitionDuration: const Duration(milliseconds: 320),
+      reverseTransitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (_, _, _) => ItemDetailScreen(item: item),
+      transitionsBuilder: (_, animation, _, child) => FadeTransition(opacity: animation, child: child),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppState(),
+      builder: (context, _) {
+        final state = AppState();
+        final latest = [...state.feedItems, ...state.savedItems, ...state.vendorInventory]
+                .where((i) => i.id == item.id)
+                .firstOrNull ??
+            item;
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              _ReelItemCard(item: latest, active: true, heroTag: 'item-${item.id}'),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: OverlayIconButton(
+                      icon: Icons.arrow_back_rounded,
+                      size: 22,
+                      tooltip: 'Back',
+                      onTap: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -441,12 +499,12 @@ class _CommentsSheetState extends State<CommentsSheet> {
                       padding: const EdgeInsets.all(24),
                       child: Center(
                         child: _error != null
-                            ? Text(_error!, style: const TextStyle(color: DobhaColors.muted))
-                            : const CircularProgressIndicator(color: DobhaColors.green),
+                            ? Text(_error!, style: TextStyle(color: DobhaColors.muted))
+                            : CircularProgressIndicator(color: DobhaColors.green),
                       ),
                     )
                   : comments.isEmpty
-                      ? const Padding(
+                      ? Padding(
                           padding: EdgeInsets.all(24),
                           child: Text('No comments yet. Ask the seller about fit or condition.',
                               textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted)),
@@ -462,8 +520,8 @@ class _CommentsSheetState extends State<CommentsSheet> {
                 hintText: 'Ask the seller about fit or condition...',
                 suffixIcon: IconButton(
                   icon: _sending
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: DobhaColors.green))
-                      : const Icon(Icons.send_rounded, color: DobhaColors.green),
+                      ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: DobhaColors.green))
+                      : Icon(Icons.send_rounded, color: DobhaColors.green),
                   onPressed: _send,
                 ),
               ),
@@ -494,7 +552,7 @@ class _Comment extends StatelessWidget {
             padding: EdgeInsets.zero,
             child: Center(
               child: Text(comment.name.isEmpty ? '?' : comment.name[0].toUpperCase(),
-                  style: const TextStyle(fontWeight: FontWeight.w800, color: DobhaColors.green)),
+                  style: TextStyle(fontWeight: FontWeight.w800, color: DobhaColors.green)),
             ),
           ),
           const SizedBox(width: 12),
@@ -504,7 +562,7 @@ class _Comment extends StatelessWidget {
               children: [
                 Text(comment.handle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
                 const SizedBox(height: 2),
-                Text(comment.text, style: const TextStyle(color: DobhaColors.textSecondary, fontSize: 13)),
+                Text(comment.text, style: TextStyle(color: DobhaColors.textSecondary, fontSize: 13)),
               ],
             ),
           ),
