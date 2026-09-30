@@ -5,7 +5,11 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../live_screen.dart';
 import 'feed_screen.dart';
+import '../models/social.dart';
+import '../widgets/user_avatar.dart';
+import 'cart_screen.dart';
 import 'notifications_screen.dart';
+import 'seller_screen.dart';
 import '../models/thrift_item.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
@@ -34,6 +38,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _searching = false;
   String? _searchError;
   int _searchSeq = 0;
+  List<PersonRow> _people = const [];
 
   final _categories = ['All', ...ThriftItem.categories];
   final _locations = ['All Joburg', 'Small Street', 'Braamfontein', 'Maboneng', 'Bree Street'];
@@ -72,11 +77,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _searchError = null;
     });
     try {
-      await AppState().search(
-        query: _searchQuery,
-        category: _selectedCategory == 'All' ? null : _selectedCategory,
-        location: _selectedLocation == 'All Joburg' ? null : _selectedLocation,
-      );
+      final results = await Future.wait([
+        AppState().search(
+          query: _searchQuery,
+          category: _selectedCategory == 'All' ? null : _selectedCategory,
+          location: _selectedLocation == 'All Joburg' ? null : _selectedLocation,
+        ),
+        // People whose name or @handle matches, so shoppers can find each other to follow.
+        AppState().searchPeople(_searchQuery),
+      ]);
+      if (mounted && seq == _searchSeq) _people = results[1] as List<PersonRow>;
     } on ApiException catch (e) {
       if (seq == _searchSeq) _searchError = e.message;
     }
@@ -140,7 +150,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           appBar: AppBar(
             toolbarHeight: 68,
             title: const Text('Explore'),
-            actions: [const NotificationBell(), const SizedBox(width: 16)],
+            actions: [const CartButton(), const SizedBox(width: 12), const NotificationBell(), const SizedBox(width: 16)],
           ),
           body: RefreshIndicator(
             color: DobhaColors.green,
@@ -161,7 +171,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                               textInputAction: TextInputAction.search,
                               onSubmitted: (_) => _search(),
                               decoration: InputDecoration(
-                                hintText: 'Search pieces, brands or sellers',
+                                hintText: 'Search pieces, brands or people',
                                 prefixIcon: Icon(Icons.search_rounded, color: DobhaColors.muted),
                                 suffixIcon: _searchQuery.isNotEmpty
                                     ? IconButton(
@@ -204,6 +214,43 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           ),
                         ),
                       ),
+                      if (_people.isNotEmpty && _searchQuery.length >= 2) ...[
+                        const SizedBox(height: 18),
+                        const Text('People', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 96,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _people.length,
+                            separatorBuilder: (_, _) => const SizedBox(width: 14),
+                            itemBuilder: (context, i) {
+                              final p = _people[i];
+                              return GestureDetector(
+                                onTap: () => SellerScreen.open(context, p.id),
+                                child: SizedBox(
+                                  width: 72,
+                                  child: Column(
+                                    children: [
+                                      UserAvatar(url: p.avatarUrl, name: p.name, size: 56),
+                                      const SizedBox(height: 6),
+                                      Text(p.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                                      Text(p.handle,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontSize: 10.5, color: DobhaColors.muted)),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                       // Live streams only take space when someone is live.
                       if (_liveRooms.isNotEmpty) ...[
                         const SizedBox(height: 18),

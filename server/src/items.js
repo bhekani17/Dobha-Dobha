@@ -17,12 +17,15 @@ const MAX_MEDIA = 10;
 const MAX_VIDEOS = 3;
 
 // Everything an item card needs, with per-viewer liked/saved flags (? = viewer id).
-const ITEM_SELECT = `
+export const ITEM_SELECT = `
   SELECT i.*, u.name AS seller_name, u.handle AS seller_handle, u.shop_name, u.stall_location, u.avatar_key AS seller_avatar_key,
     (SELECT COUNT(*) FROM likes l WHERE l.item_id = i.id) AS likes_count,
     (SELECT COUNT(*) FROM comments c WHERE c.item_id = i.id) AS comments_count,
     EXISTS (SELECT 1 FROM likes l WHERE l.item_id = i.id AND l.user_id = ?1) AS is_liked,
     EXISTS (SELECT 1 FROM saves s WHERE s.item_id = i.id AND s.user_id = ?1) AS is_saved,
+    EXISTS (SELECT 1 FROM cart_items ci WHERE ci.item_id = i.id AND ci.user_id = ?1) AS in_cart,
+    (SELECT ROUND(AVG(rv.rating), 1) FROM reviews rv WHERE rv.seller_id = i.seller_id) AS seller_rating,
+    (SELECT COUNT(*) FROM reviews rv WHERE rv.seller_id = i.seller_id) AS seller_reviews,
     (SELECT json_group_array(json_object('kind', m.kind, 'key', m.media_key))
        FROM (SELECT kind, media_key FROM item_media WHERE item_id = i.id ORDER BY position) m) AS media_json
   FROM items i JOIN users u ON u.id = i.seller_id`;
@@ -58,6 +61,9 @@ export function itemJson(r) {
     commentsCount: r.comments_count ?? 0,
     isLiked: Boolean(r.is_liked),
     isSaved: Boolean(r.is_saved),
+    inCart: Boolean(r.in_cart),
+    sellerRating: r.seller_rating ?? null,
+    sellerReviewCount: r.seller_reviews ?? 0,
     isClaimed: r.status === 'sold',
     createdAt: iso(r.created_at),
   };
@@ -182,6 +188,16 @@ export async function createItem(request, env) {
       `INSERT INTO items (id, seller_id, title, description, caption, price_cents, original_price_cents, condition, size, category, photo_key, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(item.id, user.id, item.title, item.description, item.caption, item.price, item.original, item.condition, item.size, category, cover, now()),
+    env.DB.prepare(
+      `INSERT INTO notifications (id, user_id, kind, title, body, item_id, created_at)
+       SELECT 'ntf_' || lower(hex(randomblob(10))), follower_id, 'new_listing', ?, ?, ?, ? FROM follows WHERE seller_id = ?`,
+    ).bind(
+      `New from ${user.shop_name || user.name}`,
+      `${item.title} for R ${(item.price / 100).toFixed(0)}`,
+      item.id,
+      now(),
+      user.id,
+    ),
     ...media.map((m, position) =>
       env.DB.prepare('INSERT INTO item_media (id, item_id, kind, media_key, position) VALUES (?, ?, ?, ?, ?)').bind(
         id('med'),
@@ -194,6 +210,73 @@ export async function createItem(request, env) {
   ]);
 
   return json({ item: itemJson(await loadItem(env, item.id, user.id)) }, 201);
+}
+
+/**
+ * PATCH /api/items/:id (the seller, while unsold): change any of the listing's details,
+ * its price, or its photos and videos (`media` replaces the whole gallery, in order).
+ * A lower price is announced to everyone who saved the piece or has it in their cart.
+ */
+export async function updateItem(request, env, itemId) {
+  const user = await requireUser(request, env);
+  const item = await loadItem(env, itemId, user.id);
+  if (item.seller_id !== user.id) throw new HttpError(403, 'Only the seller can change this listing');
+  if (item.status !== 'available') throw new HttpError(409, 'Sold listings cannot be changed');
+  const body = await readJson(request);
+
+  const next = {
+    title: 'title' in body ? str(body, 'title', { min: 3, max: 80 }) : item.title,
+    description: 'description' in body ? str(body, 'description', { max: 1000, optional: true }) : item.description,
+    caption: 'caption' in body ? str(body, 'caption', { max: 200, optional: true }) : item.caption,
+    price: 'priceZar' in body ? rands(body, 'priceZar') : item.price_cents,
+    original: 'originalPriceZar' in body ? (body.originalPriceZar ? rands(body, 'originalPriceZar') : null) : item.original_price_cents,
+    condition: 'condition' in body ? str(body, 'condition', { max: 40 }) : item.condition,
+    size: 'size' in body ? str(body, 'size', { max: 20 }) : item.size,
+    category: 'category' in body ? str(body, 'category', { max: 30 }) : item.category,
+  };
+  if (!CATEGORIES.includes(next.category)) throw new HttpError(400, 'Unknown category');
+
+  const statements = [];
+  let cover = item.photo_key;
+  if ('media' in body) {
+    const media = parseMedia(body, user.id);
+    cover = media.find((m) => m.kind === 'image')?.key;
+    if (!cover) throw new HttpError(400, 'Keep at least one photo; it is the cover shoppers see first');
+    statements.push(
+      env.DB.prepare('DELETE FROM item_media WHERE item_id = ?').bind(itemId),
+      ...media.map((m, position) =>
+        env.DB.prepare('INSERT INTO item_media (id, item_id, kind, media_key, position) VALUES (?, ?, ?, ?, ?)').bind(
+          id('med'),
+          itemId,
+          m.kind,
+          m.key,
+          position,
+        ),
+      ),
+    );
+  }
+  statements.unshift(
+    env.DB.prepare(
+      `UPDATE items SET title = ?, description = ?, caption = ?, price_cents = ?, original_price_cents = ?, condition = ?, size = ?,
+         category = ?, photo_key = ? WHERE id = ? AND status = 'available'`,
+    ).bind(next.title, next.description, next.caption, next.price, next.original, next.condition, next.size, next.category, cover, itemId),
+  );
+  if (next.price < item.price_cents) {
+    statements.push(
+      env.DB.prepare(
+        `INSERT INTO notifications (id, user_id, kind, title, body, item_id, created_at)
+         SELECT 'ntf_' || lower(hex(randomblob(10))), user_id, 'price_drop', ?1, ?2, ?3, ?4
+         FROM (SELECT user_id FROM saves WHERE item_id = ?3 UNION SELECT user_id FROM cart_items WHERE item_id = ?3)`,
+      ).bind(
+        `Price drop: ${next.title}`,
+        `Now R ${(next.price / 100).toFixed(0)} (was R ${(item.price_cents / 100).toFixed(0)}).`,
+        itemId,
+        now(),
+      ),
+    );
+  }
+  await env.DB.batch(statements);
+  return json({ item: itemJson(await loadItem(env, itemId, user.id)) });
 }
 
 /** DELETE /api/items/:id (the seller, while unsold) */
@@ -287,13 +370,20 @@ export async function listComments(request, env, itemId) {
   const user = await requireUser(request, env);
   await loadItem(env, itemId, user.id);
   const { results } = await env.DB.prepare(
-    `SELECT c.id, c.text, c.created_at, u.name, u.handle FROM comments c JOIN users u ON u.id = c.user_id
+    `SELECT c.id, c.text, c.created_at, c.user_id, u.name, u.handle FROM comments c JOIN users u ON u.id = c.user_id
      WHERE c.item_id = ? ORDER BY c.created_at DESC LIMIT 100`,
   )
     .bind(itemId)
     .all();
   return json({
-    comments: results.map((c) => ({ id: c.id, text: c.text, name: c.name, handle: `@${c.handle}`, createdAt: iso(c.created_at) })),
+    comments: results.map((c) => ({
+      id: c.id,
+      text: c.text,
+      userId: c.user_id,
+      name: c.name,
+      handle: `@${c.handle}`,
+      createdAt: iso(c.created_at),
+    })),
   });
 }
 
@@ -323,7 +413,10 @@ export async function addComment(request, env, itemId) {
           }),
         ]),
   ]);
-  return json({ comment: { id: comment.id, text, name: user.name, handle: `@${user.handle}`, createdAt: iso(comment.created_at) } }, 201);
+  return json(
+    { comment: { id: comment.id, text, userId: user.id, name: user.name, handle: `@${user.handle}`, createdAt: iso(comment.created_at) } },
+    201,
+  );
 }
 
 const REPORT_REASONS = ['Fake or counterfeit', 'Misleading photos or description', 'Prohibited item', 'Scam or spam', 'Offensive'];

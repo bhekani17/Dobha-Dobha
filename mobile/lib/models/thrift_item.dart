@@ -38,6 +38,9 @@ class ThriftItem {
   final bool isLiked;
   final bool isSaved;
   final bool isClaimed;
+  final bool inCart;
+  final double? sellerRating;
+  final int sellerReviewCount;
   final DateTime createdAt;
 
   const ThriftItem({
@@ -62,6 +65,9 @@ class ThriftItem {
     this.isLiked = false,
     this.isSaved = false,
     this.isClaimed = false,
+    this.inCart = false,
+    this.sellerRating,
+    this.sellerReviewCount = 0,
     required this.createdAt,
   });
 
@@ -90,22 +96,56 @@ class ThriftItem {
         isLiked: json['isLiked'] as bool? ?? false,
         isSaved: json['isSaved'] as bool? ?? false,
         isClaimed: json['isClaimed'] as bool? ?? false,
+        inCart: json['inCart'] as bool? ?? false,
+        sellerRating: (json['sellerRating'] as num?)?.toDouble(),
+        sellerReviewCount: json['sellerReviewCount'] as int? ?? 0,
         createdAt: DateTime.parse(json['createdAt'] as String),
+      );
+
+  /// The same item with some fields changed.
+  ThriftItem copyWith({int? commentsCount, bool? inCart}) => ThriftItem(
+        id: id,
+        title: title,
+        description: description,
+        haulCaption: haulCaption,
+        priceZar: priceZar,
+        originalPriceZar: originalPriceZar,
+        condition: condition,
+        size: size,
+        category: category,
+        photoUrl: photoUrl,
+        media: media,
+        sellerId: sellerId,
+        sellerName: sellerName,
+        sellerHandle: sellerHandle,
+        sellerLocation: sellerLocation,
+        sellerAvatarUrl: sellerAvatarUrl,
+        likesCount: likesCount,
+        commentsCount: commentsCount ?? this.commentsCount,
+        isLiked: isLiked,
+        isSaved: isSaved,
+        isClaimed: isClaimed,
+        inCart: inCart ?? this.inCart,
+        sellerRating: sellerRating,
+        sellerReviewCount: sellerReviewCount,
+        createdAt: createdAt,
       );
 }
 
 class ItemComment {
   final String id;
   final String text;
+  final String? userId;
   final String name;
   final String handle;
   final DateTime createdAt;
 
-  const ItemComment({required this.id, required this.text, required this.name, required this.handle, required this.createdAt});
+  const ItemComment({required this.id, required this.text, this.userId, required this.name, required this.handle, required this.createdAt});
 
   factory ItemComment.fromJson(Map<String, dynamic> json) => ItemComment(
         id: json['id'] as String,
         text: json['text'] as String,
+        userId: json['userId'] as String?,
         name: json['name'] as String,
         handle: json['handle'] as String,
         createdAt: DateTime.parse(json['createdAt'] as String),

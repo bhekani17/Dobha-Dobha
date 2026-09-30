@@ -8,6 +8,7 @@ import * as items from './items.js';
 import * as live from './live.js';
 import * as notifications from './notifications.js';
 import * as orders from './orders.js';
+import * as social from './social.js';
 
 export { StreamClaims } from './live.js';
 
@@ -26,12 +27,33 @@ const ROUTES = [
   ['POST', '/api/items', items.createItem],
   ['GET', '/api/items/mine', items.myItems],
   ['GET', '/api/items/:id', items.getItem],
+  ['PATCH', '/api/items/:id', items.updateItem],
   ['DELETE', '/api/items/:id', items.removeItem],
   ['POST', '/api/items/:id/like', items.toggleLike],
   ['POST', '/api/items/:id/save', items.toggleSave],
   ['GET', '/api/items/:id/comments', items.listComments],
   ['POST', '/api/items/:id/comments', items.addComment],
   ['POST', '/api/items/:id/report', items.reportItem],
+  ['POST', '/api/items/:id/offers', social.makeOffer],
+
+  ['GET', '/api/cart', social.getCart],
+  ['POST', '/api/cart/checkout', orders.checkoutCart],
+  ['POST', '/api/cart/:id', social.addToCart],
+  ['DELETE', '/api/cart/:id', social.removeFromCart],
+
+  ['GET', '/api/offers', social.listOffers],
+  ...['accept', 'decline', 'counter', 'cancel'].map((a) => ['POST', `/api/offers/:id/${a}`, (req, env, id) => social.respondToOffer(req, env, id, a)]),
+
+  ['GET', '/api/users', social.searchPeople],
+  ['GET', '/api/users/:id', social.getProfile],
+  ['GET', '/api/users/:id/followers', (req, env, id) => social.followList(req, env, id, 'followers')],
+  ['GET', '/api/users/:id/following', (req, env, id) => social.followList(req, env, id, 'following')],
+  ['POST', '/api/users/:id/follow', social.follow],
+  ['DELETE', '/api/users/:id/follow', social.follow],
+
+  ['GET', '/api/chats', social.listChats],
+  ['GET', '/api/chats/:id', social.getChat],
+  ['POST', '/api/chats/:id', social.sendMessage],
   ['GET', '/api/saved', items.savedItems],
   ['POST', '/api/uploads', items.uploadMedia],
 
@@ -41,6 +63,7 @@ const ROUTES = [
   ['POST', '/api/orders/:id/confirm', orders.confirmOrder],
   ['POST', '/api/orders/:id/dispute', orders.disputeOrder],
   ['POST', '/api/orders/:id/resolve', orders.resolveDispute],
+  ['POST', '/api/orders/:id/review', social.reviewOrder],
   ['GET', '/api/wallet', orders.wallet],
   ['POST', '/api/wallet/topup', orders.topUp],
   ['POST', '/api/wallet/withdraw', orders.withdraw],

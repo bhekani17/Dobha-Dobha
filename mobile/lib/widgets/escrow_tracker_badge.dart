@@ -5,6 +5,7 @@ import '../api.dart';
 import '../models/escrow_order.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../screens/seller_screen.dart';
 import 'item_photo.dart';
 import 'ui.dart';
 
@@ -205,8 +206,81 @@ class EscrowTrackerCard extends StatelessWidget {
       );
     }
 
-    // Disputed, refunded and done orders need nothing from the user; the sentence above says it all.
+    if (order.canReview) {
+      return AppButton(
+        color: DobhaColors.green,
+        onPressed: () => _rate(context, order),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [Icon(Icons.star_rounded, size: 18), SizedBox(width: 8), Text('Rate the seller')],
+        ),
+      );
+    }
+    if (order.reviewRating != null) {
+      return Row(
+        children: [
+          Text(isVendorView ? 'Buyer rated you ' : 'You rated ', style: TextStyle(fontSize: 13, color: DobhaColors.muted)),
+          StarRow(rating: order.reviewRating!, size: 16),
+        ],
+      );
+    }
+    // Disputed, refunded and other finished orders need nothing from the user; the sentence above says it all.
     return const SizedBox.shrink();
+  }
+
+  void _rate(BuildContext context, EscrowOrder order) {
+    var stars = 0;
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: Text('Rate ${order.item.sellerName}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('How was buying "${order.item.title}"?', style: TextStyle(color: DobhaColors.textSecondary)),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  for (var i = 1; i <= 5; i++)
+                    IconButton(
+                      tooltip: '$i star${i == 1 ? '' : 's'}',
+                      iconSize: 34,
+                      onPressed: () => setState(() => stars = i),
+                      icon: Icon(i <= stars ? Icons.star_rounded : Icons.star_outline_rounded,
+                          color: i <= stars ? DobhaColors.green : DobhaColors.muted),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: ctrl,
+                maxLength: 300,
+                maxLines: 3,
+                minLines: 1,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(hintText: 'Say something about the piece or seller (optional)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Later')),
+            FilledButton(
+              onPressed: stars == 0
+                  ? null
+                  : () {
+                      Navigator.of(ctx).pop();
+                      _act(context, () => AppState().reviewOrder(order.id, stars, ctrl.text.trim()), 'Thanks for rating');
+                    },
+              child: const Text('Send'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Couriers give a tracking number; the buyer sees it and is notified.

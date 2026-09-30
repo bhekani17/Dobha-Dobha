@@ -70,13 +70,9 @@ class _MainShellState extends State<MainShell> {
           bottomNavigationBar: SafeArea(
             minimum: const EdgeInsets.only(bottom: 10),
             child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-              decoration: BoxDecoration(
-                color: DobhaColors.surface,
-                borderRadius: BorderRadius.circular(26),
-                border: Border.all(color: DobhaColors.borderLight),
-              ),
+              // No bar behind the tabs: they sit straight on the page.
+              margin: const EdgeInsets.fromLTRB(8, 6, 8, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
                 children: [
                   for (var i = 0; i < _tabs.length; i++)
@@ -84,8 +80,9 @@ class _MainShellState extends State<MainShell> {
                       child: _NavItem(
                         tab: _tabs[i],
                         selected: _currentIndex == i,
-                        // Unread notifications live behind the bell on the Me tab.
-                        badge: i == _tabs.length - 1 && AppState().unreadNotifications > 0,
+                        // Unread notifications and messages live on the Me tab.
+                        badge: i == _tabs.length - 1 &&
+                            (AppState().unreadNotifications > 0 || AppState().unreadMessages > 0),
                         onTap: () => _select(i),
                       ),
                     ),
