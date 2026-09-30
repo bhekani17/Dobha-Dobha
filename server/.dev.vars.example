@@ -1,4 +1,10 @@
+# Copy to .dev.vars (which git ignores) and fill in. Never put real secrets in this file.
+
 # Local dev: `npm run livekit` (dev mode uses devkey / secret on ws://localhost:7880)
 LIVEKIT_URL=ws://localhost:7880
 LIVEKIT_API_KEY=devkey
 LIVEKIT_API_SECRET=secret
+
+# Google sign-in: the Web client id, plus the iOS one, comma-separated (same value as in wrangler.jsonc).
+# Only client ids are needed; the server never uses the client secret.
+GOOGLE_CLIENT_IDS=

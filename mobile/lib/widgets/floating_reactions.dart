@@ -1,13 +1,29 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../theme.dart';
+
+/// Reaction kinds sent over the data channel. Rendered as icons, never emoji.
+enum Reaction {
+  heart(Icons.favorite_rounded, DobhaColors.red),
+  fire(Icons.local_fire_department_rounded, DobhaColors.amber),
+  celebrate(Icons.celebration_rounded, DobhaColors.green);
+
+  final IconData icon;
+  final Color color;
+  const Reaction(this.icon, this.color);
+
+  static Reaction fromName(String? name) =>
+      Reaction.values.firstWhere((r) => r.name == name, orElse: () => Reaction.heart);
+}
+
 class FloatingReactionsController extends ChangeNotifier {
   final List<ReactionParticle> particles = [];
 
-  void addReaction([String emoji = '❤️']) {
+  void addReaction([Reaction reaction = Reaction.heart]) {
     final particle = ReactionParticle(
       id: UniqueKey().toString(),
-      emoji: emoji,
+      reaction: reaction,
       startX: 0.65 + math.Random().nextDouble() * 0.25, // float along right side
       wobbleSeed: math.Random().nextDouble() * 2 * math.pi,
       speed: 0.8 + math.Random().nextDouble() * 0.4,
@@ -23,14 +39,14 @@ class FloatingReactionsController extends ChangeNotifier {
 
 class ReactionParticle {
   final String id;
-  final String emoji;
+  final Reaction reaction;
   final double startX;
   final double wobbleSeed;
   final double speed;
 
   ReactionParticle({
     required this.id,
-    required this.emoji,
+    required this.reaction,
     required this.startX,
     required this.wobbleSeed,
     required this.speed,
@@ -129,9 +145,10 @@ class _AnimatedParticleState extends State<_AnimatedParticle> with SingleTickerP
             opacity: opacity,
             child: Transform.scale(
               scale: scale,
-              child: Text(
-                widget.particle.emoji,
-                style: const TextStyle(fontSize: 32),
+              child: Icon(
+                widget.particle.reaction.icon,
+                color: widget.particle.reaction.color,
+                size: 34,
               ),
             ),
           ),

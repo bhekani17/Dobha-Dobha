@@ -1,140 +1,92 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../api.dart';
 import '../models/escrow_order.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
+import 'item_photo.dart';
+import 'ui.dart';
 
 class EscrowTrackerCard extends StatelessWidget {
   final EscrowOrder order;
-  final bool isVendorView;
 
-  const EscrowTrackerCard({
-    super.key,
-    required this.order,
-    this.isVendorView = false,
-  });
+  const EscrowTrackerCard({super.key, required this.order});
+
+  bool get isVendorView => order.isSeller;
+
+  static Future<void> _act(BuildContext context, Future<void> Function() action, String done) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await action();
+      messenger.showSnackBar(SnackBar(content: Text(done)));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final status = order.status;
-    final currentStep = status.stepIndex;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: DobhaColors.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: status == EscrowStatus.payoutReleased
-              ? DobhaColors.green.withValues(alpha: 0.3)
-              : DobhaColors.escrowIndigo.withValues(alpha: 0.4),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 18),
+      radius: 24,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Order Header
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: DobhaColors.escrowIndigo.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: DobhaColors.escrowIndigo.withValues(alpha: 0.4)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.shield_rounded, color: DobhaColors.cyan, size: 12),
-                        const SizedBox(width: 4),
-                        Text(order.escrowVaultRef, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: DobhaColors.cyan)),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text('#${order.id}', style: const TextStyle(color: DobhaColors.muted, fontSize: 12, fontWeight: FontWeight.w600)),
-                ],
+              AppTag(isVendorView ? 'SALE' : 'PURCHASE', color: isVendorView ? DobhaColors.gold : DobhaColors.cyan),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('#${order.id}',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: DobhaColors.muted, fontSize: 12, fontWeight: FontWeight.w600)),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: _statusColor(status).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  status.label,
-                  style: TextStyle(color: _statusColor(status), fontSize: 11, fontWeight: FontWeight.w700),
-                ),
-              ),
+              AppTag(status.label, color: _statusColor(status)),
             ],
           ),
-          const SizedBox(height: 14),
-
-          // Item Info
+          const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: DobhaColors.cardElevated,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: DobhaColors.border),
-                ),
-                child: const Center(
-                  child: Icon(Icons.checkroom_rounded, color: DobhaColors.green, size: 24),
-                ),
-              ),
+              ItemThumb(item: order.item, size: 50),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(order.item.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(order.item.title,
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
                     Text(
                       '${order.item.formattedPrice} + R ${order.shippingFeeZar.toStringAsFixed(0)} shipping (${order.deliveryMethod})',
                       style: const TextStyle(fontSize: 12, color: DobhaColors.muted),
                     ),
-                    Text('Tracking: ${order.trackingNumber}', style: const TextStyle(fontSize: 11, color: DobhaColors.textSecondary)),
+                    Text(
+                      isVendorView ? 'Buyer: ${order.buyerName} · ${order.deliveryAddress}' : 'Tracking: ${order.trackingNumber}',
+                      style: const TextStyle(fontSize: 11, color: DobhaColors.textSecondary),
+                    ),
+                    Text('Escrow ref ${order.escrowVaultRef}', style: const TextStyle(fontSize: 10.5, color: DobhaColors.muted)),
                   ],
                 ),
               ),
-              Text(
-                'R ${order.totalZar.toStringAsFixed(0)}',
-                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: DobhaColors.green),
-              ),
+              Text('R ${order.totalZar.toStringAsFixed(0)}',
+                  style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: DobhaColors.green)),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Escrow Stepper Lifecycle Diagram
-          _buildLifecycleStepper(currentStep),
-          const SizedBox(height: 12),
-
-          // Explanatory note
-          Text(
-            status.description,
-            style: const TextStyle(fontSize: 11.5, color: DobhaColors.textSecondary, height: 1.3),
-          ),
+          const SizedBox(height: 18),
+          if (status != EscrowStatus.disputed) ...[
+            AppWell(
+              radius: 18,
+              padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
+              child: _buildLifecycleStepper(status.stepIndex),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Text(status.description(isSeller: isVendorView), style: const TextStyle(fontSize: 11.5, color: DobhaColors.textSecondary, height: 1.35)),
           const SizedBox(height: 14),
-
-          // Action Buttons based on Role & State
           _buildActionRow(context, order),
         ],
       ),
@@ -147,7 +99,6 @@ class EscrowTrackerCard extends StatelessWidget {
         return DobhaColors.cyan;
       case EscrowStatus.vendorDispatched:
         return DobhaColors.amber;
-      case EscrowStatus.receivedConfirmed:
       case EscrowStatus.payoutReleased:
         return DobhaColors.green;
       case EscrowStatus.disputed:
@@ -156,22 +107,21 @@ class EscrowTrackerCard extends StatelessWidget {
   }
 
   Widget _buildLifecycleStepper(int activeStep) {
-    const steps = [
-      'Buyer Paid\n(Escrow Held)',
-      'Vendor\nDispatched',
-      'Received\nas Shown',
-      'Vendor\nPaid',
-    ];
+    const steps = ['Paid\n(Held)', 'Vendor\nDispatched', 'Received\nas Shown', 'Vendor\nPaid'];
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: List.generate(steps.length * 2 - 1, (index) {
         if (index.isOdd) {
-          final lineStep = index ~/ 2;
-          final isCompleted = activeStep > lineStep;
+          final isCompleted = activeStep > index ~/ 2;
           return Expanded(
             child: Container(
-              height: 2,
-              color: isCompleted ? DobhaColors.green : DobhaColors.borderLight,
+              margin: const EdgeInsets.only(top: 11),
+              height: 3,
+              decoration: BoxDecoration(
+                color: isCompleted ? DobhaColors.green : DobhaColors.cardElevated,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           );
         }
@@ -183,31 +133,24 @@ class EscrowTrackerCard extends StatelessWidget {
         return Column(
           children: [
             Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDone ? DobhaColors.green : DobhaColors.cardElevated,
-                border: Border.all(
-                  color: isCurrent
-                      ? DobhaColors.cyan
-                      : (isDone ? DobhaColors.green : DobhaColors.borderLight),
-                  width: 1.5,
-                ),
-              ),
+              width: 24,
+              height: 24,
+              decoration: isDone
+                  ? BoxDecoration(color: DobhaColors.green, shape: BoxShape.circle)
+                  : Surfaces.card(circle: true),
               child: Center(
                 child: isDone
-                    ? const Icon(Icons.check, size: 13, color: Colors.black)
+                    ? const Icon(Icons.check, size: 14, color: Colors.black)
                     : Text('${step + 1}', style: const TextStyle(fontSize: 10, color: DobhaColors.muted, fontWeight: FontWeight.bold)),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
               steps[step],
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 9,
-                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
                 color: isCurrent ? DobhaColors.text : DobhaColors.muted,
               ),
             ),
@@ -221,109 +164,103 @@ class EscrowTrackerCard extends StatelessWidget {
     final appState = AppState();
 
     if (order.status == EscrowStatus.paymentHeld) {
-      return Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () {
-                HapticFeedback.mediumImpact();
-                appState.markOrderDispatched(order.id);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    backgroundColor: DobhaColors.cardElevated,
-                    content: Text('Simulated Vendor Dispatch for #${order.id} 🚚'),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.local_shipping_outlined, size: 16),
-              label: const Text('Simulate Vendor Dispatch'),
-            ),
-          ),
-        ],
+      if (!isVendorView) {
+        return const _Notice(icon: Icons.hourglass_top_rounded, text: 'Waiting for the vendor to dispatch', color: DobhaColors.cyan);
+      }
+      return AppButton(
+        onPressed: () {
+          HapticFeedback.mediumImpact();
+          _act(context, () => appState.dispatchOrder(order.id), 'Order ${order.id} marked as dispatched');
+        },
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [Icon(Icons.local_shipping_outlined, size: 17), SizedBox(width: 8), Text('Mark as Dispatched')],
+        ),
       );
     }
 
     if (order.status == EscrowStatus.vendorDispatched) {
+      if (isVendorView) {
+        return const _Notice(icon: Icons.local_shipping_outlined, text: 'In transit, waiting for buyer confirmation', color: DobhaColors.amber);
+      }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: DobhaColors.green,
-              foregroundColor: Colors.black,
-            ),
+          AppButton(
+            color: DobhaColors.green,
             onPressed: () {
               HapticFeedback.heavyImpact();
               _showConfirmDialog(context, order);
             },
-            icon: const Icon(Icons.verified_rounded, size: 18),
-            label: const Text('Confirm "Received as Shown" (Release Funds)'),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [Icon(Icons.verified_rounded, size: 18), SizedBox(width: 8), Text('Received as Shown')],
+            ),
           ),
           const SizedBox(height: 6),
           Center(
             child: TextButton(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Escrow condition mediation ticket logged with Dobha Support.'),
-                  ),
-                );
-              },
-              child: const Text('Report Condition Mismatch / Dispute', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+              onPressed: () => _confirmDispute(context, order),
+              child: const Text('Report a problem', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
             ),
           ),
         ],
       );
     }
 
+    if (order.status == EscrowStatus.disputed) {
+      return const _Notice(icon: Icons.support_agent_rounded, text: 'Dobha support is reviewing this order', color: DobhaColors.red);
+    }
+
     if (order.status == EscrowStatus.payoutReleased) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: DobhaColors.green.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.check_circle_rounded, color: DobhaColors.green, size: 16),
-            SizedBox(width: 8),
-            Text('Escrow Settled & Vendor Paid in Full', style: TextStyle(color: DobhaColors.green, fontWeight: FontWeight.w700, fontSize: 12)),
-          ],
-        ),
-      );
+      return const _Notice(icon: Icons.check_circle_rounded, text: 'Settled and vendor paid in full', color: DobhaColors.green);
     }
 
     return const SizedBox.shrink();
+  }
+
+  void _confirmDispute(BuildContext context, EscrowOrder order) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Report a problem?'),
+        content: const Text('The payment stays frozen in escrow while Dobha support looks into it with you and the vendor.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: DobhaColors.red, foregroundColor: Colors.white),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _act(context, () => AppState().disputeOrder(order.id), 'Problem reported. Support will be in touch.');
+            },
+            child: const Text('Report'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showConfirmDialog(BuildContext context, EscrowOrder order) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: DobhaColors.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
             Icon(Icons.thumb_up_alt_rounded, color: DobhaColors.green, size: 22),
             SizedBox(width: 10),
-            Text('Confirm Item Condition', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            Text('Confirm Condition', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Did "${order.item.title}" match the live stream & description?'),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: DobhaColors.cardElevated,
-                borderRadius: BorderRadius.circular(8),
-              ),
+            Text('Did "${order.item.title}" match the live stream and description?'),
+            const SizedBox(height: 12),
+            AppWell(
+              radius: 14,
               child: Text(
-                'Tapping confirm will permanently release R ${order.amountZar.toStringAsFixed(0)} from the Dobha Escrow Vault to ${order.item.sellerName}.',
+                'Confirming releases R ${order.amountZar.toStringAsFixed(0)} from escrow to ${order.item.sellerName}. This cannot be undone.',
                 style: const TextStyle(fontSize: 12, color: DobhaColors.textSecondary),
               ),
             ),
@@ -334,16 +271,35 @@ class EscrowTrackerCard extends StatelessWidget {
           FilledButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              AppState().confirmReceivedAndReleaseEscrow(order.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  backgroundColor: DobhaColors.green,
-                  content: Text('🎉 Escrow funds released to ${order.item.sellerName}!'),
-                ),
-              );
+              _act(context, () => AppState().confirmOrder(order.id), 'Funds released to ${order.item.sellerName}');
             },
-            child: const Text('Confirm & Release Payout'),
+            child: const Text('Confirm & Release'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Notice extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  const _Notice({required this.icon, required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppWell(
+      radius: 14,
+      tint: color,
+      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 8),
+          Flexible(child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 12))),
         ],
       ),
     );

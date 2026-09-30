@@ -19,6 +19,14 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
+  static const _tabs = [
+    _Tab(Icons.flash_on_outlined, Icons.flash_on, 'Dobha', DobhaColors.green),
+    _Tab(Icons.explore_outlined, Icons.explore, 'Explore', DobhaColors.green),
+    _Tab(Icons.sensors_rounded, Icons.sensors_rounded, 'Go Live', DobhaColors.red),
+    _Tab(Icons.shield_outlined, Icons.shield_rounded, 'Escrow', DobhaColors.cyan),
+    _Tab(Icons.person_outline_rounded, Icons.person_rounded, 'Profile', DobhaColors.green),
+  ];
+
   final List<Widget> _screens = const [
     FeedScreen(),
     ExploreScreen(),
@@ -32,92 +40,88 @@ class _MainShellState extends State<MainShell> {
     return ListenableBuilder(
       listenable: AppState(),
       builder: (context, _) {
-        final isFeed = _currentIndex == 0;
-
         return Scaffold(
           body: IndexedStack(
             index: _currentIndex,
             children: _screens,
           ),
           bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              color: isFeed ? Colors.black.withValues(alpha: 0.95) : DobhaColors.card,
-              border: const Border(
-                top: BorderSide(color: DobhaColors.border, width: 1),
-              ),
+            decoration: const BoxDecoration(
+              color: DobhaColors.surface,
+              border: Border(top: BorderSide(color: DobhaColors.border)),
             ),
             child: SafeArea(
-              child: NavigationBar(
-                selectedIndex: _currentIndex,
-                onDestinationSelected: (idx) {
-                  HapticFeedback.selectionClick();
-                  setState(() => _currentIndex = idx);
-                },
-                backgroundColor: Colors.transparent,
-                indicatorColor: DobhaColors.green.withValues(alpha: 0.2),
-                height: 64,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-                destinations: [
-                  const NavigationDestination(
-                    icon: Icon(Icons.flash_on_outlined),
-                    selectedIcon: Icon(Icons.flash_on, color: DobhaColors.green),
-                    label: 'Digital Dobha',
-                  ),
-                  const NavigationDestination(
-                    icon: Icon(Icons.explore_outlined),
-                    selectedIcon: Icon(Icons.explore, color: DobhaColors.green),
-                    label: 'Explore',
-                  ),
-                  NavigationDestination(
-                    icon: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: DobhaColors.red.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: DobhaColors.red.withValues(alpha: 0.5)),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < _tabs.length; i++)
+                      Expanded(
+                        child: _NavItem(
+                          tab: _tabs[i],
+                          selected: _currentIndex == i,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _currentIndex = i);
+                          },
+                        ),
                       ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.sensors_rounded, size: 14, color: DobhaColors.red),
-                          SizedBox(width: 4),
-                          Text('LIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: DobhaColors.red)),
-                        ],
-                      ),
-                    ),
-                    selectedIcon: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: DobhaColors.red,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.sensors_rounded, size: 14, color: Colors.white),
-                          SizedBox(width: 4),
-                          Text('LIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white)),
-                        ],
-                      ),
-                    ),
-                    label: 'Go Live',
-                  ),
-                  NavigationDestination(
-                    icon: const Icon(Icons.shield_outlined),
-                    selectedIcon: const Icon(Icons.shield_rounded, color: DobhaColors.cyan),
-                    label: 'Escrow',
-                  ),
-                  const NavigationDestination(
-                    icon: Icon(Icons.person_outline_rounded),
-                    selectedIcon: Icon(Icons.person_rounded, color: DobhaColors.green),
-                    label: 'Profile',
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+}
+
+class _Tab {
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final Color accent;
+  const _Tab(this.icon, this.selectedIcon, this.label, this.accent);
+}
+
+class _NavItem extends StatelessWidget {
+  final _Tab tab;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _NavItem({required this.tab, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 48,
+            height: 36,
+            decoration: BoxDecoration(
+              color: selected ? tab.accent.withValues(alpha: 0.16) : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(selected ? tab.selectedIcon : tab.icon, size: 20, color: selected ? tab.accent : DobhaColors.muted),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            tab.label,
+            maxLines: 1,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              color: selected ? tab.accent : DobhaColors.muted,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

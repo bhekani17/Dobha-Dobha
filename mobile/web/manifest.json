@@ -1,11 +1,11 @@
 {
-    "name": "dobha_live",
-    "short_name": "dobha_live",
+    "name": "Dobha Dobha",
+    "short_name": "Dobha Dobha",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#15171B",
+    "theme_color": "#15171B",
+    "description": "Joburg street thrifting: reels, live drops and escrow.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

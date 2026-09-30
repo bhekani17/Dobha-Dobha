@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Dobha (Cloudflare)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "mobile",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=SERVER_URL=https://dobha-live.ndlovubhekani17.workers.dev",
+        "--dart-define-from-file=config/google.json"
+      ]
+    },
+    {
+      "name": "Dobha (local server)",
+      "type": "dart",
+      "request": "launch",
+      "cwd": "mobile",
+      "program": "lib/main.dart",
+      "args": [
+        "--dart-define=SERVER_URL=http://localhost:3000",
+        "--dart-define-from-file=config/google.json"
+      ]
+    }
+  ]
+}
