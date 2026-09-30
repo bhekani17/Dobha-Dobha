@@ -17,20 +17,7 @@ without contacting a provider, top-ups add money that was never charged, and wit
 reach a bank. Wallet payments do check and deduct the stored balance. Replace the simulated
 parts in `server/src/orders.js` when a payment provider is connected.
 
-## Run locally
-
-1. LiveKit (terminal 1): `cd server` then `npm run livekit`
-2. Server (terminal 2), from `server/`:
-   - copy `.dev.vars.example` to `.dev.vars`
-   - `npm run db:migrate:local` (once, and after adding a migration)
-   - `npm run build:web` (once; `npm start` serves the web app from `mobile/build/web`)
-   - `npm start`, which serves http://localhost:3000
-3. App: `cd mobile` then `flutter run --dart-define=SERVER_URL=http://<your-pc-ip>:3000`
-   (or F5 in VS Code with the "Dobha (local server)" configuration)
-
-The phone must be on the same Wi-Fi as the PC. Find the PC's IP with `ipconfig`.
-
-## Going online
+## Deploying
 
 Video goes through LiveKit Cloud. Data lives in Cloudflare D1 (`dobha`) and photos in R2
 (`dobha-photos`); both are bound in `server/wrangler.jsonc`.
@@ -45,8 +32,9 @@ Video goes through LiveKit Cloud. Data lives in Cloudflare D1 (`dobha`) and phot
 3. Apply database migrations: `npm run db:migrate`
 4. Deploy: `npm run deploy` (builds the Flutter web app, then deploys it with the Worker).
 5. Build the phone app against it:
-   `flutter build apk --release --dart-define=SERVER_URL=https://dobha-live.<your-subdomain>.workers.dev`
-   The web app needs no SERVER_URL: it is served by the Worker and calls it on the same origin.
+   `flutter build apk --release --dart-define-from-file=config/google.json`
+   The app always talks to the live Worker (`liveServerUrl` in `mobile/lib/api.dart`); the web app is
+   served by the Worker and calls it on the same origin.
 
 ## API
 
@@ -92,4 +80,4 @@ Google sign-in on Android needs an OAuth client of type Android in Google Cloud,
 `com.dobhadobha.app` and the SHA-1 of the key that signed the build (the upload key for local
 release builds, and the Play app signing key from Play Console for installs from the Play Store).
 
-Play Store bundle: `flutter build appbundle --release --dart-define=SERVER_URL=https://<worker> --dart-define-from-file=config/google.json`
+Play Store bundle: `flutter build appbundle --release --dart-define-from-file=config/google.json`

@@ -11,7 +11,6 @@
 
   // LIVEKIT_URL, LIVEKIT_API_KEY and LIVEKIT_API_SECRET are secrets:
   //   npx wrangler secret put LIVEKIT_API_SECRET
-  // For local dev they come from .dev.vars (copy .dev.vars.example).
 
   // OAuth client ids whose Google ID tokens the server accepts (comma-separated).
   // Use the "Web application" client id; add the iOS one too if iOS sign-in is set up.
@@ -20,7 +19,7 @@
   "vars": { "ADMIN_EMAILS": "ndlovubhekani17@gmail.com", "GOOGLE_CLIENT_IDS": "787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com,787923055628-gm7j2ss8g15o30drcdmls7ugsh2t22vq.apps.googleusercontent.com" },
 
   // Accounts, listings, orders and the simulated wallet.
-  // Schema: migrations/ (npm run db:migrate, or db:migrate:local for wrangler dev).
+  // Schema: migrations/ (npm run db:migrate).
   "d1_databases": [
     { "binding": "DB", "database_name": "dobha", "database_id": "2df55e04-7723-476b-b7ac-1e8567e4eb24" }
   ],

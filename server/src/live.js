@@ -5,7 +5,6 @@ import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { requireUser } from './auth.js';
 import { HttpError, json, limited } from './http.js';
 
-const LOCAL_RE = /\/\/(localhost|127\.0\.0\.1)(?=[:/]|$)/;
 const ROOM_RE = /^[a-zA-Z0-9_-]{1,40}$/;
 const ROOMS_CACHE_MS = 3000;
 const CLAIM_MS = 30000;
@@ -14,16 +13,15 @@ const CLAIM_MS = 30000;
 // hitting the LiveKit API once per phone.
 let roomsCache = { at: 0, promise: null };
 
-// No defaults: locally they come from .dev.vars, deployed from Worker secrets.
+// LiveKit Cloud settings, from Worker secrets.
 export function livekitConfig(env) {
   const url = env.LIVEKIT_URL;
   const key = env.LIVEKIT_API_KEY;
   const secret = env.LIVEKIT_API_SECRET;
-  const local = Boolean(url) && LOCAL_RE.test(url);
-  // The dev key/secret are public knowledge; never sign tokens for a real LiveKit server with them.
-  const ok = Boolean(url && key && secret) && (local || (key !== 'devkey' && secret !== 'secret'));
+  // The LiveKit dev key/secret are public knowledge; never sign tokens with them.
+  const ok = Boolean(url && key && secret) && key !== 'devkey' && secret !== 'secret';
   if (!ok) throw new HttpError(500, 'Live streaming is not configured on the server');
-  return { url, key, secret, local };
+  return { url, key, secret };
 }
 
 function liveRooms(cfg) {
@@ -87,10 +85,7 @@ export async function token(request, env) {
   });
   at.addGrant({ roomJoin: true, room, canPublish: role === 'host', canSubscribe: true, canPublishData: true });
 
-  // A local LiveKit URL is useless to a phone ("localhost" is the phone itself),
-  // so point it at whatever host the client used to reach this server.
-  const url = cfg.local ? cfg.url.replace(LOCAL_RE, `//${new URL(request.url).hostname}`) : cfg.url;
-  return json({ url, token: await at.toJwt(), role });
+  return json({ url: cfg.url, token: await at.toJwt(), role });
 }
 
 // Rooms a host has just been given a token for but hasn't published in yet.
