@@ -253,3 +253,66 @@ class AppTag extends StatelessWidget {
     );
   }
 }
+
+/// Solid translucent panel for content laid over photos and video.
+class OverlayPanel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final double radius;
+
+  const OverlayPanel({super.key, required this.child, this.padding = const EdgeInsets.all(12), this.radius = 16});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(radius)),
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(color: Colors.white),
+        child: IconTheme.merge(data: const IconThemeData(color: Colors.white), child: child),
+      ),
+    );
+  }
+}
+
+/// Round translucent icon button for overlays on photos and video.
+class OverlayIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final Color color;
+  final String tooltip;
+  final double size;
+
+  const OverlayIconButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    required this.tooltip,
+    this.color = Colors.white,
+    this.size = 24,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.45),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  onTap!();
+                },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Icon(icon, size: size, color: onTap == null ? color.withValues(alpha: 0.4) : color),
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -48,7 +48,7 @@ class Api {
 
   Api(String baseUrl, {this.token}) : baseUrl = baseUrl.replaceAll(RegExp(r'/+$'), '');
 
-  /// Absolute URL for a server path such as `/photos/...`.
+  /// Absolute URL for a server path such as `/media/...`.
   String resolve(String path) => path.startsWith('http') ? path : '$baseUrl$path';
 
   Future<dynamic> get(String path, [Map<String, String>? query]) => _send('GET', path, query: query);
@@ -56,9 +56,10 @@ class Api {
   Future<dynamic> patch(String path, Object body) => _send('PATCH', path, body: body);
   Future<dynamic> delete(String path) => _send('DELETE', path);
 
-  /// Uploads image bytes and returns the storage key to attach to an item.
-  Future<String> uploadPhoto(Uint8List bytes, String contentType) async {
-    final res = await _send('POST', '/api/uploads', raw: bytes, contentType: contentType);
+  /// Uploads a photo or video and returns the storage key to attach to an item.
+  Future<String> uploadMedia(Uint8List bytes, String contentType) async {
+    final res = await _send('POST', '/api/uploads',
+        raw: bytes, contentType: contentType, timeout: const Duration(minutes: 5));
     return res['key'] as String;
   }
 
@@ -79,6 +80,7 @@ class Api {
     Object? body,
     Uint8List? raw,
     String? contentType,
+    Duration timeout = const Duration(seconds: 20),
   }) async {
     final req = http.Request(method, Uri.parse('$baseUrl$path').replace(queryParameters: query));
     if (token != null) req.headers['authorization'] = 'Bearer $token';
@@ -92,7 +94,7 @@ class Api {
 
     final http.Response res;
     try {
-      res = await http.Response.fromStream(await req.send().timeout(const Duration(seconds: 20)));
+      res = await http.Response.fromStream(await req.send().timeout(timeout));
     } catch (_) {
       throw ApiException(0, 'No connection. Check your internet and try again.');
     }

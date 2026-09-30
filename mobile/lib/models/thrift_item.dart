@@ -1,3 +1,17 @@
+enum MediaKind { image, video }
+
+/// One photo or video in a listing's gallery.
+class ItemMedia {
+  final MediaKind kind;
+  final String url;
+  const ItemMedia(this.kind, this.url);
+
+  bool get isVideo => kind == MediaKind.video;
+
+  factory ItemMedia.fromJson(Map<String, dynamic> json) =>
+      ItemMedia(json['kind'] == 'video' ? MediaKind.video : MediaKind.image, json['url'] as String);
+}
+
 class ThriftItem {
   static const categories = ['Jackets', 'Denim', 'Sneakers', 'Workwear', 'Vintage Tees', 'Knitwear', 'Other'];
   static const conditions = ['Grade A Vintage', '90s Deadstock', 'Lightly Worn', 'Distressed Classic'];
@@ -13,6 +27,7 @@ class ThriftItem {
   final String size;
   final String category;
   final String? photoUrl;
+  final List<ItemMedia> media;
   final String sellerId;
   final String sellerName;
   final String sellerHandle;
@@ -35,6 +50,7 @@ class ThriftItem {
     required this.size,
     required this.category,
     this.photoUrl,
+    this.media = const [],
     required this.sellerId,
     required this.sellerName,
     required this.sellerHandle,
@@ -61,6 +77,7 @@ class ThriftItem {
         size: json['size'] as String,
         category: json['category'] as String,
         photoUrl: json['photoUrl'] as String?,
+        media: [for (final m in json['media'] as List? ?? const []) ItemMedia.fromJson(m as Map<String, dynamic>)],
         sellerId: json['sellerId'] as String,
         sellerName: json['sellerName'] as String,
         sellerHandle: json['sellerHandle'] as String,

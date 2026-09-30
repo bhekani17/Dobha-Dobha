@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -296,10 +294,14 @@ class _NewListingScreenState extends State<NewListingScreen> {
   String _category = ThriftItem.categories.first;
   String _condition = ThriftItem.conditions.first;
   String _size = 'M';
-  Uint8List? _photo;
-  String _photoType = 'image/jpeg';
+  final _media = <PendingMedia>[];
   bool _busy = false;
+  String? _progress;
   String? _error;
+
+  static const _maxMedia = 10;
+  static const _maxVideos = 3;
+  static const _maxVideoBytes = 60 * 1024 * 1024;
 
   @override
   void dispose() {
@@ -309,25 +311,117 @@ class _NewListingScreenState extends State<NewListingScreen> {
     super.dispose();
   }
 
-  Future<void> _pickPhoto(ImageSource source) async {
+  int get _videoCount => _media.where((m) => m.isVideo).length;
+
+  static String? _typeFor(XFile file, {required bool video}) {
+    final name = file.name.toLowerCase();
+    final mime = file.mimeType;
+    if (mime != null && (mime.startsWith('image/') || mime.startsWith('video/'))) return mime;
+    if (video) {
+      if (name.endsWith('.mp4')) return 'video/mp4';
+      if (name.endsWith('.mov')) return 'video/quicktime';
+      if (name.endsWith('.webm')) return 'video/webm';
+      return null;
+    }
+    if (name.endsWith('.png')) return 'image/png';
+    if (name.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
+  }
+
+  Future<void> _addPhotos({required bool camera}) async {
+    final room = _maxMedia - _media.length;
+    if (room <= 0) return setState(() => _error = 'You can add up to $_maxMedia photos and videos');
     try {
-      final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 82);
-      if (file == null) return;
-      final bytes = await file.readAsBytes();
-      final name = file.name.toLowerCase();
+      final picker = ImagePicker();
+      final files = camera
+          ? [?await picker.pickImage(source: ImageSource.camera, maxWidth: 1600, imageQuality: 82)]
+          : await picker.pickMultiImage(maxWidth: 1600, imageQuality: 82, limit: room > 1 ? room : null);
+      final added = <PendingMedia>[];
+      for (final f in files.take(room)) {
+        added.add(PendingMedia(await f.readAsBytes(), _typeFor(f, video: false)!));
+      }
       setState(() {
-        _photo = bytes;
-        _photoType = file.mimeType ?? (name.endsWith('.png') ? 'image/png' : name.endsWith('.webp') ? 'image/webp' : 'image/jpeg');
+        _media.addAll(added);
+        _error = files.length > room ? 'Only the first $room were added (max $_maxMedia)' : null;
       });
     } catch (_) {
       setState(() => _error = 'Could not open photos. Check the app has permission.');
     }
   }
 
+  Future<void> _addVideo(ImageSource source) async {
+    if (_media.length >= _maxMedia) return setState(() => _error = 'You can add up to $_maxMedia photos and videos');
+    if (_videoCount >= _maxVideos) return setState(() => _error = 'You can add up to $_maxVideos videos');
+    try {
+      final file = await ImagePicker().pickVideo(source: source, maxDuration: const Duration(seconds: 60));
+      if (file == null) return;
+      final type = _typeFor(file, video: true);
+      if (type == null || !type.startsWith('video/')) {
+        return setState(() => _error = 'Use an MP4, MOV or WebM video');
+      }
+      final bytes = await file.readAsBytes();
+      if (bytes.length > _maxVideoBytes) {
+        return setState(() => _error = 'That video is too large (max 60 MB). Try a shorter clip.');
+      }
+      setState(() {
+        _media.add(PendingMedia(bytes, type));
+        _error = null;
+      });
+    } catch (_) {
+      setState(() => _error = 'Could not open videos. Check the app has permission.');
+    }
+  }
+
+  void _chooseVideoSource() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text('Add a video', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              const Text('Up to 60 seconds. Show the fit, the fabric and any flaws.',
+                  style: TextStyle(color: DobhaColors.muted, fontSize: 12.5)),
+              const SizedBox(height: 16),
+              AppButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  _addVideo(ImageSource.camera);
+                },
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.videocam_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('Record'),
+                ]),
+              ),
+              const SizedBox(height: 10),
+              AppButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  _addVideo(ImageSource.gallery);
+                },
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.video_library_outlined, size: 18),
+                  SizedBox(width: 8),
+                  Text('Choose from gallery'),
+                ]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     final price = double.tryParse(_price.text.trim().replaceAll(',', '.')) ?? 0;
     if (_title.text.trim().length < 3) return setState(() => _error = 'Give the piece a name (3+ characters)');
     if (price <= 0) return setState(() => _error = 'Enter a price in rand');
+    if (!_media.any((m) => !m.isVideo)) return setState(() => _error = 'Add at least one photo; it is the cover shoppers see first');
 
     setState(() {
       _busy = true;
@@ -342,15 +436,78 @@ class _NewListingScreenState extends State<NewListingScreen> {
         size: _size,
         description: _description.text.trim(),
         caption: _caption.text.trim(),
-        photo: _photo,
-        photoType: _photoType,
+        media: _media,
+        onProgress: (done, total) {
+          if (mounted && total > 0) setState(() => _progress = done < total ? 'Uploading ${done + 1} of $total...' : 'Publishing...');
+        },
       );
       if (mounted) Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _progress = null;
+        });
+      }
     }
+  }
+
+  Widget _mediaTile(int index) {
+    final m = _media[index];
+    final isCover = !m.isVideo && _media.indexWhere((x) => !x.isVideo) == index;
+    return SizedBox(
+      width: 104,
+      height: 136,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: m.isVideo
+                ? const ColoredBox(
+                    color: Colors.black,
+                    child: Center(child: Icon(Icons.play_circle_outline_rounded, color: Colors.white, size: 36)),
+                  )
+                : Image.memory(m.bytes, fit: BoxFit.cover),
+          ),
+          if (isCover || m.isVideo)
+            Positioned(
+              left: 6,
+              bottom: 6,
+              child: AppTag(isCover ? 'COVER' : 'VIDEO', color: isCover ? DobhaColors.green : DobhaColors.red, solid: true),
+            ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: OverlayIconButton(
+              icon: Icons.close_rounded,
+              size: 16,
+              tooltip: 'Remove',
+              onTap: _busy ? null : () => setState(() => _media.removeAt(index)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _addButton(IconData icon, String label, VoidCallback onTap) {
+    return Expanded(
+      child: AppButton(
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        onPressed: _busy || _media.length >= _maxMedia ? null : onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _dropdown(String label, String value, List<String> options, ValueChanged<String> onChanged) {
@@ -382,55 +539,47 @@ class _NewListingScreenState extends State<NewListingScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: [
-          AspectRatio(
-            aspectRatio: 4 / 3,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: Surfaces.card(radius: 24),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: _photo != null
-                    ? Image.memory(_photo!, fit: BoxFit.cover)
-                    : const AppWell(
-                        radius: 18,
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.add_a_photo_outlined, size: 38, color: DobhaColors.muted),
-                              SizedBox(height: 10),
-                              Text('Add a clear photo of the piece', style: TextStyle(color: DobhaColors.muted, fontWeight: FontWeight.w600)),
-                            ],
-                          ),
-                        ),
-                      ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           Row(
             children: [
-              Expanded(
-                child: AppButton(
-                  onPressed: () => _pickPhoto(ImageSource.camera),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.photo_camera_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Camera'),
-                  ]),
+              const Expanded(child: Text('Photos & Videos', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14))),
+              Text('${_media.length}/$_maxMedia', style: const TextStyle(color: DobhaColors.muted, fontSize: 12)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text('The first photo is the cover. Add up to 3 short videos.',
+              style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+          const SizedBox(height: 12),
+          if (_media.isEmpty)
+            const AppWell(
+              padding: EdgeInsets.symmetric(vertical: 34),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.add_photo_alternate_outlined, size: 36, color: DobhaColors.muted),
+                    SizedBox(height: 8),
+                    Text('Show the piece from every angle', style: TextStyle(color: DobhaColors.muted, fontWeight: FontWeight.w600)),
+                  ],
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: AppButton(
-                  onPressed: () => _pickPhoto(ImageSource.gallery),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.photo_library_outlined, size: 18),
-                    SizedBox(width: 8),
-                    Text('Gallery'),
-                  ]),
-                ),
+            )
+          else
+            SizedBox(
+              height: 136,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _media.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (_, i) => _mediaTile(i),
               ),
+            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _addButton(Icons.photo_library_outlined, 'Photos', () => _addPhotos(camera: false)),
+              const SizedBox(width: 10),
+              _addButton(Icons.photo_camera_outlined, 'Camera', () => _addPhotos(camera: true)),
+              const SizedBox(width: 10),
+              _addButton(Icons.videocam_outlined, 'Video', _chooseVideoSource),
             ],
           ),
           const SizedBox(height: 24),
@@ -483,7 +632,14 @@ class _NewListingScreenState extends State<NewListingScreen> {
             padding: const EdgeInsets.symmetric(vertical: 17),
             onPressed: _busy ? null : _submit,
             child: _busy
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.black))
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.black)),
+                      const SizedBox(width: 10),
+                      Text(_progress ?? 'Publishing...', style: const TextStyle(fontSize: 14)),
+                    ],
+                  )
                 : const Text('Publish Listing', style: TextStyle(fontSize: 15)),
           ),
         ],

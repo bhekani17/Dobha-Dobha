@@ -8,6 +8,15 @@ import '../models/escrow_order.dart';
 import '../models/thrift_item.dart';
 import '../models/user_profile.dart';
 
+/// A photo or video picked on the device, waiting to be uploaded with a listing.
+class PendingMedia {
+  final Uint8List bytes;
+  final String contentType;
+  const PendingMedia(this.bytes, this.contentType);
+
+  bool get isVideo => contentType.startsWith('video/');
+}
+
 /// App-wide state backed by the Dobha server. Screens listen to this and call
 /// its methods; failures surface as [ApiException]s with user-facing messages.
 class AppState extends ChangeNotifier {
@@ -261,11 +270,16 @@ class AppState extends ChangeNotifier {
     required String category,
     String description = '',
     String caption = '',
-    Uint8List? photo,
-    String photoType = 'image/jpeg',
+    List<PendingMedia> media = const [],
+    void Function(int uploaded, int total)? onProgress,
   }) async {
-    String? photoKey;
-    if (photo != null) photoKey = await _call(() => _api.uploadPhoto(photo, photoType));
+    // Upload in gallery order; the server keeps that order.
+    final keys = <String>[];
+    for (final m in media) {
+      onProgress?.call(keys.length, media.length);
+      keys.add(await _call(() => _api.uploadMedia(m.bytes, m.contentType)));
+    }
+    onProgress?.call(keys.length, media.length);
     final res = await _call(() => _api.post('/api/items', {
           'title': title,
           'priceZar': priceZar,
@@ -274,7 +288,7 @@ class AppState extends ChangeNotifier {
           'category': category,
           'description': description,
           'caption': caption,
-          'photoKey': ?photoKey,
+          'media': [for (final k in keys) {'key': k}],
         }));
     final item = ThriftItem.fromJson(res['item'] as Map<String, dynamic>);
     _myItems = [item, ..._myItems];
@@ -375,6 +389,7 @@ extension on ThriftItem {
         size: size,
         category: category,
         photoUrl: photoUrl,
+        media: media,
         sellerId: sellerId,
         sellerName: sellerName,
         sellerHandle: sellerHandle,

@@ -29,7 +29,7 @@ const ROUTES = [
   ['GET', '/api/items/:id/comments', items.listComments],
   ['POST', '/api/items/:id/comments', items.addComment],
   ['GET', '/api/saved', items.savedItems],
-  ['POST', '/api/uploads', items.uploadPhoto],
+  ['POST', '/api/uploads', items.uploadMedia],
 
   ['GET', '/api/orders', orders.listOrders],
   ['POST', '/api/orders', orders.createOrder],
@@ -50,8 +50,9 @@ const DEV_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 async function handle(request, env) {
   const { pathname } = new URL(request.url);
-  if (request.method === 'GET' && pathname.startsWith('/photos/')) {
-    return items.servePhoto(env, decodeURIComponent(pathname.slice('/photos/'.length)));
+  const media = /^\/(media|photos)\/(.+)$/.exec(pathname);
+  if ((request.method === 'GET' || request.method === 'HEAD') && media) {
+    return items.serveMedia(request, env, decodeURIComponent(media[2]));
   }
   for (const [method, re, handler] of ROUTES) {
     const m = re.exec(pathname);
@@ -70,7 +71,7 @@ export default {
         headers: {
           'access-control-allow-origin': origin,
           'access-control-allow-methods': 'GET, POST, PATCH, DELETE',
-          'access-control-allow-headers': 'authorization, content-type',
+          'access-control-allow-headers': 'authorization, content-type, range',
           'access-control-max-age': '600',
         },
       });
