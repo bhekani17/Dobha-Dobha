@@ -62,9 +62,6 @@ class UserProfile {
   final DateTime createdAt;
   final int salesCount;
 
-  /// Can settle disputes and review reported listings.
-  final bool isAdmin;
-
   const UserProfile({
     required this.id,
     required this.email,
@@ -79,7 +76,6 @@ class UserProfile {
     this.location = '',
     required this.createdAt,
     this.salesCount = 0,
-    this.isAdmin = false,
   });
 
   bool get isVendor => role == UserRole.vendor;
@@ -105,6 +101,5 @@ class UserProfile {
         location: json['location'] as String? ?? '',
         createdAt: DateTime.parse(json['createdAt'] as String),
         salesCount: json['salesCount'] as int? ?? 0,
-        isAdmin: json['isAdmin'] as bool? ?? false,
       );
 }

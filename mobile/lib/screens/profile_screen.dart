@@ -11,7 +11,6 @@ import '../widgets/item_photo.dart';
 import '../widgets/ui.dart';
 import '../widgets/user_avatar.dart';
 import 'account_sheets.dart';
-import 'admin_screen.dart';
 import 'edit_profile_screen.dart';
 import 'notifications_screen.dart';
 
@@ -88,16 +87,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             actions: [
               if (kDebugMode) ...[
                 AppButton.icon(icon: Icons.dns_outlined, size: 19, padding: 10, onPressed: _showServerSettings),
-                const SizedBox(width: 12),
-              ],
-              if (appState.isAdmin) ...[
-                AppButton.icon(
-                  icon: Icons.admin_panel_settings_outlined,
-                  iconColor: DobhaColors.amber,
-                  size: 19,
-                  padding: 10,
-                  onPressed: () => AdminScreen.open(context),
-                ),
                 const SizedBox(width: 12),
               ],
               const NotificationBell(),
