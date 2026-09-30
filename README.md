@@ -70,5 +70,25 @@ What the server enforces:
 - An item can only be claimed once; the claim and the stock change happen atomically.
 - Only the seller can mark an order dispatched; only the buyer can confirm or dispute it.
   Confirming pays the seller the price minus a 5% Dobha fee.
+- Couriers need the real tracking number when the seller dispatches; Safe Hub collections don't.
+- A disputed order stays frozen until an admin refunds the buyer or pays the seller. Admins are
+  the accounts listed in `ADMIN_EMAILS` in `server/wrangler.jsonc`; they get an Admin screen
+  (shield button on the Account tab) with open disputes and reported listings.
+- Sales, dispatches, payouts, disputes and comments create in-app notifications. The app polls
+  for them every 30 seconds and when it comes back to the foreground (no push notifications yet).
+- A daily cron deletes expired sessions and uploads that were never attached to a listing.
 - A stream name can only have one host (a Durable Object holds the lock across every Cloudflare
   location), and viewers can only join streams that are live.
+
+## Android release signing
+
+The app ID is `com.dobhadobha.app`. Release builds are signed with the upload key named in
+`mobile/android/key.properties` (git-ignored). Without that file they fall back to the debug key.
+Back up the keystore and `key.properties` somewhere safe: Play App Signing can reset a lost
+upload key, but it takes a support request and a few days.
+
+Google sign-in on Android needs an OAuth client of type Android in Google Cloud, with package
+`com.dobhadobha.app` and the SHA-1 of the key that signed the build (the upload key for local
+release builds, and the Play app signing key from Play Console for installs from the Play Store).
+
+Play Store bundle: `flutter build appbundle --release --dart-define=SERVER_URL=https://<worker> --dart-define-from-file=config/google.json`

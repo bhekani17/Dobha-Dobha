@@ -1,6 +1,7 @@
 // Listings, their photos and videos, likes, saves and comments.
-import { requireUser } from './auth.js';
-import { HttpError, id, iso, json, now, rands, readJson, str, zar } from './http.js';
+import { isAdmin, requireUser } from './auth.js';
+import { HttpError, id, iso, json, limited, now, rands, readJson, str, zar } from './http.js';
+import { notify } from './notifications.js';
 
 const CATEGORIES = ['Jackets', 'Denim', 'Sneakers', 'Workwear', 'Vintage Tees', 'Knitwear', 'Other'];
 const MEDIA_TYPES = {
@@ -68,16 +69,40 @@ async function loadItem(env, itemId, viewerId) {
   return row;
 }
 
-/** GET /api/items: the feed of available pieces, newest first. `before` pages by created time. */
+/**
+ * GET /api/items: available pieces, newest first, minus ones the viewer reported.
+ * Optional filters: q (title, description, caption, seller), category, location (stall area).
+ * `before` pages by created time.
+ */
 export async function listItems(request, env) {
   const user = await requireUser(request, env);
   const q = new URL(request.url).searchParams;
   const limit = Math.min(Number(q.get('limit')) || 30, 50);
   const before = Number(q.get('before')) || Number.MAX_SAFE_INTEGER;
-  const { results } = await env.DB.prepare(
-    `${ITEM_SELECT} WHERE i.status = 'available' AND i.created_at < ?2 ORDER BY i.created_at DESC LIMIT ?3`,
-  )
-    .bind(user.id, before, limit)
+
+  const where = [
+    "i.status = 'available'",
+    'i.created_at < ?2',
+    'NOT EXISTS (SELECT 1 FROM reports r WHERE r.item_id = i.id AND r.user_id = ?1)',
+  ];
+  const binds = [user.id, before, limit];
+  // instr() rather than LIKE, so % and _ in a search are matched literally.
+  const contains = (expr, value) => {
+    binds.push(value.toLowerCase());
+    where.push(`instr(lower(${expr}), ?${binds.length}) > 0`);
+  };
+  const search = (q.get('q') || '').trim().slice(0, 60);
+  if (search) contains("i.title || ' ' || i.description || ' ' || i.caption || ' ' || u.name || ' ' || u.shop_name || ' ' || u.handle", search);
+  const category = q.get('category') || '';
+  if (CATEGORIES.includes(category)) {
+    binds.push(category);
+    where.push(`i.category = ?${binds.length}`);
+  }
+  const location = (q.get('location') || '').trim().slice(0, 60);
+  if (location) contains('u.stall_location', location);
+
+  const { results } = await env.DB.prepare(`${ITEM_SELECT} WHERE ${where.join(' AND ')} ORDER BY i.created_at DESC LIMIT ?3`)
+    .bind(...binds)
     .all();
   return json({ items: results.map(itemJson) });
 }
@@ -184,6 +209,7 @@ export async function removeItem(request, env, itemId) {
 export async function uploadMedia(request, env) {
   const user = await requireUser(request, env);
   if (user.role !== 'vendor') throw new HttpError(403, 'Switch to vendor mode to upload photos and videos');
+  await limited(env.UPLOAD_LIMIT, request, user.id);
   const type = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
   const [kind, ext] = MEDIA_TYPES[type] || [];
   if (!kind) throw new HttpError(415, 'Use JPEG, PNG or WebP photos and MP4, MOV or WebM videos');
@@ -196,6 +222,8 @@ export async function uploadMedia(request, env) {
   // Stream the body into R2 rather than buffering a whole video in memory.
   const key = `items/${user.id}/${crypto.randomUUID()}.${ext}`;
   await env.PHOTOS.put(key, request.body, { httpMetadata: { contentType: type } });
+  // Recorded so uploads never attached to a listing can be deleted (see cleanup()).
+  await env.DB.prepare('INSERT INTO uploads (media_key, user_id, created_at) VALUES (?, ?, ?)').bind(key, user.id, now()).run();
   return json({ key, kind, url: mediaUrl(key) }, 201);
 }
 
@@ -208,7 +236,7 @@ export async function serveMedia(request, env, key) {
   // bytes=start-end, bytes=start- or bytes=-suffix (single ranges only).
   const m = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get('range') || '');
   let range;
-  if (m && m[1]) range = m[2] ? { offset: +m[1], length: +m[2] - +m[1] + 1 } : { offset: +m[1] };
+  if (m && m[1]) range = m[2] && +m[2] >= +m[1] ? { offset: +m[1], length: +m[2] - +m[1] + 1 } : { offset: +m[1] };
   else if (m && m[2]) range = { suffix: +m[2] };
   const obj = await env.PHOTOS.get(key, range ? { range } : undefined);
   if (!obj) throw new HttpError(404, 'Not found');
@@ -217,6 +245,7 @@ export async function serveMedia(request, env, key) {
     'content-type': obj.httpMetadata?.contentType || 'application/octet-stream',
     'cache-control': 'public, max-age=31536000, immutable',
     'accept-ranges': 'bytes',
+    'x-content-type-options': 'nosniff',
     etag: obj.httpEtag,
   });
   if (range) {
@@ -236,6 +265,7 @@ export async function serveMedia(request, env, key) {
 
 async function toggle(request, env, itemId, table) {
   const user = await requireUser(request, env);
+  await limited(env.ACTION_LIMIT, request, user.id);
   await loadItem(env, itemId, user.id);
   const existing = await env.DB.prepare(`SELECT 1 FROM ${table} WHERE user_id = ? AND item_id = ?`).bind(user.id, itemId).first();
   if (existing) {
@@ -253,7 +283,8 @@ export const toggleSave = (request, env, itemId) => toggle(request, env, itemId,
 
 /** GET /api/items/:id/comments */
 export async function listComments(request, env, itemId) {
-  await requireUser(request, env);
+  const user = await requireUser(request, env);
+  await loadItem(env, itemId, user.id);
   const { results } = await env.DB.prepare(
     `SELECT c.id, c.text, c.created_at, u.name, u.handle FROM comments c JOIN users u ON u.id = c.user_id
      WHERE c.item_id = ? ORDER BY c.created_at DESC LIMIT 100`,
@@ -268,13 +299,111 @@ export async function listComments(request, env, itemId) {
 /** POST /api/items/:id/comments */
 export async function addComment(request, env, itemId) {
   const user = await requireUser(request, env);
-  await loadItem(env, itemId, user.id);
+  await limited(env.ACTION_LIMIT, request, user.id);
+  const item = await loadItem(env, itemId, user.id);
   const text = str(await readJson(request), 'text', { max: 300 });
   const comment = { id: id('cmt'), created_at: now() };
-  await env.DB.prepare('INSERT INTO comments (id, item_id, user_id, text, created_at) VALUES (?, ?, ?, ?, ?)')
-    .bind(comment.id, itemId, user.id, text, comment.created_at)
-    .run();
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO comments (id, item_id, user_id, text, created_at) VALUES (?, ?, ?, ?, ?)').bind(
+      comment.id,
+      itemId,
+      user.id,
+      text,
+      comment.created_at,
+    ),
+    ...(item.seller_id === user.id
+      ? []
+      : [
+          notify(env, item.seller_id, {
+            kind: 'comment',
+            title: `New comment on "${item.title}"`,
+            body: `${user.name}: ${text.length > 120 ? `${text.slice(0, 117)}...` : text}`,
+            itemId,
+          }),
+        ]),
+  ]);
   return json({ comment: { id: comment.id, text, name: user.name, handle: `@${user.handle}`, createdAt: iso(comment.created_at) } }, 201);
+}
+
+const REPORT_REASONS = ['Fake or counterfeit', 'Misleading photos or description', 'Prohibited item', 'Scam or spam', 'Offensive'];
+
+/** POST /api/items/:id/report { reason }: hides the listing for the reporter and queues it for admins. */
+export async function reportItem(request, env, itemId) {
+  const user = await requireUser(request, env);
+  await limited(env.ACTION_LIMIT, request, user.id);
+  const item = await loadItem(env, itemId, user.id);
+  if (item.seller_id === user.id) throw new HttpError(400, "You can't report your own listing");
+  const reason = str(await readJson(request), 'reason', { max: 60 });
+  if (!REPORT_REASONS.includes(reason)) throw new HttpError(400, 'Pick a reason');
+  await env.DB.prepare('INSERT OR IGNORE INTO reports (item_id, user_id, reason, created_at) VALUES (?, ?, ?, ?)')
+    .bind(itemId, user.id, reason, now())
+    .run();
+  return json({ ok: true });
+}
+
+/** GET /api/admin/reports (admins): reported listings still up, most reported first. */
+export async function listReports(request, env) {
+  const user = await requireUser(request, env);
+  if (!isAdmin(env, user)) throw new HttpError(403, 'Admins only');
+  const [{ results: counts }, { results: rows }] = await env.DB.batch([
+    env.DB.prepare('SELECT item_id, COUNT(*) AS n, group_concat(DISTINCT reason) AS reasons FROM reports GROUP BY item_id'),
+    env.DB.prepare(`${ITEM_SELECT} WHERE i.status = 'available' AND i.id IN (SELECT item_id FROM reports)`).bind(user.id),
+  ]);
+  const byItem = new Map(counts.map((c) => [c.item_id, c]));
+  const items = rows
+    .map((r) => ({ ...itemJson(r), reports: byItem.get(r.id).n, reportReasons: byItem.get(r.id).reasons.split(',') }))
+    .sort((a, b) => b.reports - a.reports)
+    .slice(0, 100);
+  return json({ items });
+}
+
+/** POST /api/admin/items/:id/remove or /dismiss (admins): take a reported listing down, or clear its reports. */
+export async function moderateItem(request, env, itemId, action) {
+  const user = await requireUser(request, env);
+  if (!isAdmin(env, user)) throw new HttpError(403, 'Admins only');
+  const item = await loadItem(env, itemId, user.id);
+  await env.DB.batch([
+    ...(action === 'remove'
+      ? [
+          env.DB.prepare("UPDATE items SET status = 'removed' WHERE id = ? AND status = 'available'").bind(itemId),
+          notify(env, item.seller_id, {
+            kind: 'removed',
+            title: 'Listing removed',
+            body: `"${item.title}" was taken down after reports from other users.`,
+            itemId,
+          }),
+        ]
+      : []),
+    env.DB.prepare('DELETE FROM reports WHERE item_id = ?').bind(itemId),
+  ]);
+  return json({ ok: true });
+}
+
+/**
+ * Daily (the cron in wrangler.jsonc): deletes expired sessions, and uploads
+ * not attached to a listing within a day.
+ */
+export async function cleanup(env) {
+  const dayAgo = now() - 24 * 60 * 60 * 1000;
+  await env.DB.prepare('DELETE FROM sessions WHERE expires_at < ?').bind(now()).run();
+  const { results } = await env.DB.prepare(
+    `SELECT media_key FROM uploads u WHERE u.created_at < ?
+       AND NOT EXISTS (SELECT 1 FROM item_media m WHERE m.media_key = u.media_key) LIMIT 500`,
+  )
+    .bind(dayAgo)
+    .all();
+  const orphans = results.map((r) => r.media_key);
+  if (orphans.length) {
+    await env.PHOTOS.delete(orphans);
+    await env.DB.batch(orphans.map((k) => env.DB.prepare('DELETE FROM uploads WHERE media_key = ?').bind(k)));
+  }
+  // Attached uploads no longer need tracking.
+  await env.DB.prepare(
+    'DELETE FROM uploads WHERE created_at < ? AND EXISTS (SELECT 1 FROM item_media m WHERE m.media_key = uploads.media_key)',
+  )
+    .bind(dayAgo)
+    .run();
+  return orphans.length;
 }
 
 export { loadItem };

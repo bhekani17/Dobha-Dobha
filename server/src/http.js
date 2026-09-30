@@ -41,9 +41,10 @@ export const now = () => Date.now();
 export const zar = (cents) => (cents == null ? null : cents / 100);
 export const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
 
-export async function limited(limiter, request) {
-  const ip = request.headers.get('cf-connecting-ip') || 'local';
-  if (limiter && !(await limiter.limit({ key: ip })).success) {
+/** 429 once `key` (default: the caller's IP) goes over the limiter's budget. */
+export async function limited(limiter, request, key) {
+  key ??= request.headers.get('cf-connecting-ip') || 'local';
+  if (limiter && !(await limiter.limit({ key })).success) {
     throw new HttpError(429, 'Too many requests, try again in a minute');
   }
 }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../api.dart';
 import '../live_screen.dart';
 import 'feed_screen.dart';
+import 'notifications_screen.dart';
 import '../models/thrift_item.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
@@ -28,6 +29,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _roomsLoaded = false;
   Timer? _roomsTimer;
 
+  // Search runs on the server over every available piece; typing waits for a pause.
+  Timer? _searchDebounce;
+  bool _searching = false;
+  String? _searchError;
+  int _searchSeq = 0;
+
   final _categories = ['All', ...ThriftItem.categories];
   final _locations = ['All Joburg', 'Small Street', 'Braamfontein', 'Maboneng', 'Bree Street'];
 
@@ -36,11 +43,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
     super.initState();
     _loadRooms();
     _roomsTimer = Timer.periodic(const Duration(seconds: 10), (_) => _loadRooms());
+    _search();
   }
 
   @override
   void dispose() {
     _roomsTimer?.cancel();
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -53,6 +62,32 @@ class _ExploreScreenState extends State<ExploreScreen> {
       // Keep the last known list; the next poll retries.
     }
     if (mounted && !_roomsLoaded) setState(() => _roomsLoaded = true);
+  }
+
+  Future<void> _search() async {
+    _searchDebounce?.cancel();
+    final seq = ++_searchSeq;
+    setState(() {
+      _searching = true;
+      _searchError = null;
+    });
+    try {
+      await AppState().search(
+        query: _searchQuery,
+        category: _selectedCategory == 'All' ? null : _selectedCategory,
+        location: _selectedLocation == 'All Joburg' ? null : _selectedLocation,
+      );
+    } on ApiException catch (e) {
+      if (seq == _searchSeq) _searchError = e.message;
+    }
+    // Only the latest search clears the spinner; older ones may finish after it.
+    if (mounted && seq == _searchSeq) setState(() => _searching = false);
+  }
+
+  void _onQueryChanged(String value) {
+    setState(() => _searchQuery = value.trim());
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 350), _search);
   }
 
   void _watchLive(String roomName) {
@@ -69,22 +104,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return ListenableBuilder(
       listenable: AppState(),
       builder: (context, _) {
-        final allItems = AppState().feedItems;
-        final q = _searchQuery.toLowerCase();
-
-        final filtered = allItems.where((it) {
-          final matchesCategory = _selectedCategory == 'All' || it.category == _selectedCategory;
-          final matchesLocation =
-              _selectedLocation == 'All Joburg' ||
-              it.sellerLocation.toLowerCase().contains(_selectedLocation.toLowerCase());
-          final matchesSearch =
-              q.isEmpty ||
-              it.title.toLowerCase().contains(q) ||
-              it.description.toLowerCase().contains(q) ||
-              it.category.toLowerCase().contains(q) ||
-              it.sellerName.toLowerCase().contains(q);
-          return matchesCategory && matchesLocation && matchesSearch;
-        }).toList();
+        final filtered = AppState().searchResults;
 
         return Scaffold(
           appBar: AppBar(
@@ -101,23 +121,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
             actions: [
-              AppButton.icon(
-                icon: Icons.notifications_none_rounded,
-                size: 20,
-                padding: 10,
-                onPressed: () {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('No new drop notifications.')));
-                },
-              ),
+              const NotificationBell(),
               const SizedBox(width: 16),
             ],
           ),
           body: RefreshIndicator(
             color: DobhaColors.green,
             backgroundColor: DobhaColors.cardElevated,
-            onRefresh: () => Future.wait([AppState().loadFeed(), _loadRooms()]),
+            onRefresh: () => Future.wait([_search(), _loadRooms()]),
             child: CustomScrollView(
               slivers: [
                 SliverPadding(
@@ -126,7 +137,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     children: [
                       TextField(
                         controller: _searchCtrl,
-                        onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                        onChanged: _onQueryChanged,
+                        textInputAction: TextInputAction.search,
+                        onSubmitted: (_) => _search(),
                         decoration: InputDecoration(
                           hintText: 'Search pieces, brands or sellers',
                           prefixIcon: Icon(Icons.search_rounded, color: DobhaColors.muted),
@@ -135,7 +148,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                   icon: const Icon(Icons.clear, size: 18),
                                   onPressed: () {
                                     _searchCtrl.clear();
-                                    setState(() => _searchQuery = '');
+                                    _searchQuery = '';
+                                    _search();
                                   },
                                 )
                               : null,
@@ -161,7 +175,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                           (cat) => AppChip(
                             label: cat,
                             selected: _selectedCategory == cat,
-                            onTap: () => setState(() => _selectedCategory = cat),
+                            onTap: () {
+                              _selectedCategory = cat;
+                              _search();
+                            },
                           ),
                         ),
                       ),
@@ -173,29 +190,48 @@ class _ExploreScreenState extends State<ExploreScreen> {
                             icon: Icons.location_on_outlined,
                             accent: DobhaColors.cyan,
                             selected: _selectedLocation == loc,
-                            onTap: () => setState(() => _selectedLocation = loc),
+                            onTap: () {
+                              _selectedLocation = loc;
+                              _search();
+                            },
                           ),
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      Text(
-                        '${filtered.length} Thrift Pieces Found',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.muted),
+                      Row(
+                        children: [
+                          Text(
+                            _searching
+                                ? 'Searching...'
+                                : '${filtered.length}${filtered.length == 50 ? '+' : ''} Thrift Pieces Found',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.muted),
+                          ),
+                          if (_searching) ...[
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: DobhaColors.muted),
+                            ),
+                          ],
+                        ],
                       ),
                       const SizedBox(height: 14),
                     ],
                   ),
                 ),
-                if (filtered.isEmpty)
+                if (filtered.isEmpty && !_searching)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.all(32),
                       child: Column(
                         children: [
-                          Icon(Icons.search_off_rounded, size: 48, color: DobhaColors.muted),
+                          Icon(_searchError != null ? Icons.cloud_off_rounded : Icons.search_off_rounded,
+                              size: 48, color: DobhaColors.muted),
                           SizedBox(height: 12),
-                          Text('No items match your filter.', style: TextStyle(color: DobhaColors.muted)),
+                          Text(_searchError ?? 'No items match your filter.',
+                              textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted)),
                         ],
                       ),
                     ),

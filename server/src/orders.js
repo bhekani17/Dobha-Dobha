@@ -1,9 +1,10 @@
 // Escrow orders and the wallet. Payment providers are simulated: a "payment"
 // succeeds instantly and moves balances between wallet columns. Everything
 // else (orders, statuses, who owes whom) is real and stored in D1.
-import { requireUser } from './auth.js';
+import { isAdmin, requireUser } from './auth.js';
 import { HttpError, id, iso, json, now, rands, readJson, str, zar } from './http.js';
 import { itemJson, loadItem } from './items.js';
+import { notify } from './notifications.js';
 
 const DELIVERY = {
   'PUDO Locker-to-Locker': 5000,
@@ -12,15 +13,17 @@ const DELIVERY = {
 };
 const PAYMENT_METHODS = ['Capitec Pay (Instant)', 'Ozow Instant EFT', 'Debit / Credit Card', 'Dobha In-App Wallet'];
 const WALLET = 'Dobha In-App Wallet';
+const SAFE_HUB = 'Downtown Joburg Safe Hub';
 const COMMISSION = 0.05;
 
 const rand = (n) => Math.floor(Math.random() * n);
+const money = (cents) => `R ${(cents / 100).toFixed(0)}`;
 const txn = (env, userId, t) =>
   env.DB.prepare(
     'INSERT INTO transactions (id, user_id, title, subtitle, amount_cents, type, status, reference, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   ).bind(id('txn'), userId, t.title, t.subtitle, t.amount, t.type, t.status, t.reference, now());
 
-async function orderJson(env, o, viewerId) {
+export async function orderJson(env, o, viewerId) {
   const item = await env.DB.prepare(
     `SELECT i.*, u.name AS seller_name, u.handle AS seller_handle, u.shop_name, u.stall_location
      FROM items i JOIN users u ON u.id = i.seller_id WHERE i.id = ?`,
@@ -105,7 +108,8 @@ export async function createOrder(request, env) {
   const order = {
     id: `DB-${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
     vault: `ESC-ZAR-${100000 + rand(900000)}`,
-    tracking: deliveryMethod === 'Downtown Joburg Safe Hub' ? 'Collect at hub' : `PUDO-ZA-${10000 + rand(90000)}`,
+    // Couriers: the seller adds the real tracking number when they dispatch.
+    tracking: deliveryMethod === SAFE_HUB ? 'Collect at hub' : '',
   };
   // The batch is one transaction; if it fails, undo the claim and the wallet charge above
   // so the item isn't left sold with no order.
@@ -125,6 +129,13 @@ export async function createOrder(request, env) {
         status: 'Held in escrow',
         reference: order.vault,
       }),
+      notify(env, item.seller_id, {
+        kind: 'sale',
+        title: 'You made a sale',
+        body: `${user.name} bought "${item.title}" for ${money(item.price_cents)}. Pack it and mark it as dispatched.`,
+        orderId: order.id,
+        itemId,
+      }),
     ]);
   } catch (e) {
     await env.DB.batch([
@@ -139,15 +150,34 @@ export async function createOrder(request, env) {
   return json({ order: await orderJson(env, await loadOrder(env, order.id), user.id) }, 201);
 }
 
-/** POST /api/orders/:id/dispatch (seller) */
+/** POST /api/orders/:id/dispatch (seller) { trackingNumber }: required unless collected at the Safe Hub. */
 export async function dispatchOrder(request, env, orderId) {
   const user = await requireUser(request, env);
+  const o = await loadOrder(env, orderId);
+  if (o.seller_id !== user.id) throw new HttpError(403, 'Only the seller can dispatch this order');
+
+  let tracking = o.tracking;
+  if (o.delivery_method !== SAFE_HUB) {
+    const body = await request.json().catch(() => null);
+    tracking = str(body && typeof body === 'object' ? body : {}, 'trackingNumber', { min: 4, max: 40 });
+  }
   const res = await env.DB.prepare(
-    "UPDATE orders SET status = 'vendorDispatched', dispatched_at = ? WHERE id = ? AND seller_id = ? AND status = 'paymentHeld'",
+    "UPDATE orders SET status = 'vendorDispatched', dispatched_at = ?, tracking = ? WHERE id = ? AND status = 'paymentHeld'",
   )
-    .bind(now(), orderId, user.id)
+    .bind(now(), tracking, orderId)
     .run();
   if (!res.meta.changes) throw new HttpError(409, 'This order cannot be marked as dispatched');
+
+  await notify(env, o.buyer_id, {
+    kind: 'dispatched',
+    title: 'Your order is on its way',
+    body:
+      o.delivery_method === SAFE_HUB
+        ? 'Your piece is ready to collect at the Downtown Joburg Safe Hub.'
+        : `Sent with ${o.delivery_method}, tracking number ${tracking}.`,
+    orderId,
+    itemId: o.item_id,
+  }).run();
   return json({ order: await orderJson(env, await loadOrder(env, orderId), user.id) });
 }
 
@@ -164,9 +194,15 @@ export async function confirmOrder(request, env, orderId) {
     .run();
   if (!res.meta.changes) throw new HttpError(409, 'This order cannot be confirmed yet');
 
+  await env.DB.batch(releaseToSeller(env, o, `Buyer confirmed order ${o.id}`));
+  return json({ order: await orderJson(env, await loadOrder(env, orderId), user.id) });
+}
+
+/** Wallet moves (and the seller's notification) that pay the seller out of escrow, minus commission. */
+function releaseToSeller(env, o, reason) {
   const total = o.amount_cents + o.shipping_cents;
   const payout = Math.round(o.amount_cents * (1 - COMMISSION));
-  await env.DB.batch([
+  return [
     env.DB.prepare('UPDATE wallets SET locked_cents = MAX(locked_cents - ?, 0) WHERE user_id = ?').bind(total, o.buyer_id),
     env.DB.prepare('UPDATE wallets SET pending_cents = MAX(pending_cents - ?, 0), available_cents = available_cents + ? WHERE user_id = ?').bind(
       o.amount_cents,
@@ -175,17 +211,23 @@ export async function confirmOrder(request, env, orderId) {
     ),
     txn(env, o.seller_id, {
       title: 'Escrow released',
-      subtitle: `Buyer confirmed order ${o.id} (5% Dobha fee)`,
+      subtitle: `${reason} (5% Dobha fee)`,
       amount: payout,
       type: 'escrowRelease',
       status: 'Paid out',
       reference: o.vault_ref,
     }),
-  ]);
-  return json({ order: await orderJson(env, await loadOrder(env, orderId), user.id) });
+    notify(env, o.seller_id, {
+      kind: 'payout',
+      title: 'Payout released',
+      body: `${money(payout)} for order ${o.id} is now in your wallet.`,
+      orderId: o.id,
+      itemId: o.item_id,
+    }),
+  ];
 }
 
-/** POST /api/orders/:id/dispute (buyer): freezes the order for support to resolve. */
+/** POST /api/orders/:id/dispute (buyer): freezes the order until an admin settles it. */
 export async function disputeOrder(request, env, orderId) {
   const user = await requireUser(request, env);
   const res = await env.DB.prepare(
@@ -194,7 +236,91 @@ export async function disputeOrder(request, env, orderId) {
     .bind(orderId, user.id)
     .run();
   if (!res.meta.changes) throw new HttpError(409, 'This order cannot be disputed');
-  return json({ order: await orderJson(env, await loadOrder(env, orderId), user.id) });
+  const o = await loadOrder(env, orderId);
+  await notify(env, o.seller_id, {
+    kind: 'disputed',
+    title: 'Buyer reported a problem',
+    body: `The payment for order ${o.id} is frozen while Dobha support looks into it.`,
+    orderId,
+    itemId: o.item_id,
+  }).run();
+  return json({ order: await orderJson(env, o, user.id) });
+}
+
+async function requireAdmin(request, env) {
+  const user = await requireUser(request, env);
+  if (!isAdmin(env, user)) throw new HttpError(403, 'Admins only');
+  return user;
+}
+
+/** GET /api/admin/disputes (admins), oldest first. */
+export async function listDisputes(request, env) {
+  const admin = await requireAdmin(request, env);
+  const { results } = await env.DB.prepare(
+    `SELECT o.*, b.name AS buyer_name FROM orders o JOIN users b ON b.id = o.buyer_id
+     WHERE o.status = 'disputed' ORDER BY o.created_at`,
+  ).all();
+  return json({ orders: await Promise.all(results.map((o) => orderJson(env, o, admin.id))) });
+}
+
+/**
+ * POST /api/orders/:id/resolve { outcome: 'refund' | 'release' } (admins).
+ * Refunds go back to the buyer's Dobha wallet, since payments are simulated.
+ */
+export async function resolveDispute(request, env, orderId) {
+  const admin = await requireAdmin(request, env);
+  const outcome = (await readJson(request)).outcome;
+  if (outcome !== 'refund' && outcome !== 'release') throw new HttpError(400, 'Outcome must be refund or release');
+
+  const o = await loadOrder(env, orderId);
+  const res = await env.DB.prepare("UPDATE orders SET status = ?, confirmed_at = ? WHERE id = ? AND status = 'disputed'")
+    .bind(outcome === 'refund' ? 'refunded' : 'payoutReleased', now(), orderId)
+    .run();
+  if (!res.meta.changes) throw new HttpError(409, 'This order is not in dispute');
+
+  const total = o.amount_cents + o.shipping_cents;
+  if (outcome === 'release') {
+    await env.DB.batch([
+      ...releaseToSeller(env, o, `Dispute on order ${o.id} settled for the seller`),
+      notify(env, o.buyer_id, {
+        kind: 'resolved',
+        title: 'Dispute settled',
+        body: `Dobha support reviewed order ${o.id} and released the payment to the seller.`,
+        orderId,
+        itemId: o.item_id,
+      }),
+    ]);
+  } else {
+    await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE wallets SET locked_cents = MAX(locked_cents - ?1, 0), available_cents = available_cents + ?1 WHERE user_id = ?2',
+      ).bind(total, o.buyer_id),
+      env.DB.prepare('UPDATE wallets SET pending_cents = MAX(pending_cents - ?, 0) WHERE user_id = ?').bind(o.amount_cents, o.seller_id),
+      txn(env, o.buyer_id, {
+        title: 'Refund',
+        subtitle: `Dispute on order ${o.id} settled in your favour`,
+        amount: total,
+        type: 'refund',
+        status: 'Refunded',
+        reference: o.vault_ref,
+      }),
+      notify(env, o.buyer_id, {
+        kind: 'resolved',
+        title: 'You have been refunded',
+        body: `${money(total)} for order ${o.id} is back in your wallet.`,
+        orderId,
+        itemId: o.item_id,
+      }),
+      notify(env, o.seller_id, {
+        kind: 'resolved',
+        title: 'Dispute settled for the buyer',
+        body: `Dobha support refunded the buyer for order ${o.id}.`,
+        orderId,
+        itemId: o.item_id,
+      }),
+    ]);
+  }
+  return json({ order: await orderJson(env, await loadOrder(env, orderId), admin.id) });
 }
 
 /** GET /api/wallet */

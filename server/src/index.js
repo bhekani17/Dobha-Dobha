@@ -6,6 +6,7 @@ import * as google from './google.js';
 import { HttpError, json } from './http.js';
 import * as items from './items.js';
 import * as live from './live.js';
+import * as notifications from './notifications.js';
 import * as orders from './orders.js';
 
 export { StreamClaims } from './live.js';
@@ -30,6 +31,7 @@ const ROUTES = [
   ['POST', '/api/items/:id/save', items.toggleSave],
   ['GET', '/api/items/:id/comments', items.listComments],
   ['POST', '/api/items/:id/comments', items.addComment],
+  ['POST', '/api/items/:id/report', items.reportItem],
   ['GET', '/api/saved', items.savedItems],
   ['POST', '/api/uploads', items.uploadMedia],
 
@@ -38,9 +40,19 @@ const ROUTES = [
   ['POST', '/api/orders/:id/dispatch', orders.dispatchOrder],
   ['POST', '/api/orders/:id/confirm', orders.confirmOrder],
   ['POST', '/api/orders/:id/dispute', orders.disputeOrder],
+  ['POST', '/api/orders/:id/resolve', orders.resolveDispute],
   ['GET', '/api/wallet', orders.wallet],
   ['POST', '/api/wallet/topup', orders.topUp],
   ['POST', '/api/wallet/withdraw', orders.withdraw],
+
+  ['GET', '/api/notifications', notifications.listNotifications],
+  ['GET', '/api/notifications/unread', notifications.unreadCount],
+  ['POST', '/api/notifications/read', notifications.markRead],
+
+  ['GET', '/api/admin/disputes', orders.listDisputes],
+  ['GET', '/api/admin/reports', items.listReports],
+  ['POST', '/api/admin/items/:id/remove', (req, env, id) => items.moderateItem(req, env, id, 'remove')],
+  ['POST', '/api/admin/items/:id/dismiss', (req, env, id) => items.moderateItem(req, env, id, 'dismiss')],
 
   ['GET', '/api/rooms', live.rooms],
   ['GET', '/api/token', live.token],
@@ -95,5 +107,9 @@ export default {
       res.headers.set('access-control-allow-origin', origin);
     }
     return res;
+  },
+
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(items.cleanup(env));
   },
 };

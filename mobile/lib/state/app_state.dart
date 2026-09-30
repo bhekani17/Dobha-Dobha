@@ -1,9 +1,12 @@
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../google_auth.dart';
+import '../models/app_notification.dart';
 import '../models/escrow_order.dart';
 import '../models/thrift_item.dart';
 import '../models/user_profile.dart';
@@ -25,6 +28,7 @@ class AppState extends ChangeNotifier {
   AppState._internal();
 
   static const _tokenKey = 'auth_token';
+  static const _pollEvery = Duration(seconds: 30);
 
   Api _api = Api(defaultServerUrl());
   Api get api => _api;
@@ -41,6 +45,10 @@ class AppState extends ChangeNotifier {
   List<EscrowOrder> _orders = [];
   List<WalletTransaction> _transactions = [];
   double _available = 0, _locked = 0, _pending = 0;
+  List<ThriftItem> _searchResults = [];
+  List<AppNotification> _notifications = [];
+  int _unread = 0;
+  Timer? _pollTimer;
 
   // Item a vendor chose to pin when they next go live (device-local).
   ThriftItem? _livePinnedItem;
@@ -60,6 +68,10 @@ class AppState extends ChangeNotifier {
   double get lockedEscrowFunds => _locked;
   double get vendorPendingPayouts => _pending;
   ThriftItem? get livePinnedItem => _livePinnedItem;
+  bool get isAdmin => _user?.isAdmin ?? false;
+  List<ThriftItem> get searchResults => List.unmodifiable(_searchResults);
+  List<AppNotification> get notifications => List.unmodifiable(_notifications);
+  int get unreadNotifications => _unread;
 
   // ---- Session ----
 
@@ -83,6 +95,7 @@ class AppState extends ChangeNotifier {
         }
         _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
         refreshAll();
+        _startPolling();
       }
     } on ApiException catch (e) {
       if (e.isUnauthorized) await _clearSession();
@@ -142,9 +155,12 @@ class AppState extends ChangeNotifier {
     await prefs.setString(_tokenKey, token);
     notifyListeners();
     refreshAll();
+    _startPolling();
   }
 
   Future<void> _clearSession() async {
+    _pollTimer?.cancel();
+    _pollTimer = null;
     _api.token = null;
     _user = null;
     _feed = [];
@@ -154,6 +170,9 @@ class AppState extends ChangeNotifier {
     _transactions = [];
     _available = _locked = _pending = 0;
     _livePinnedItem = null;
+    _searchResults = [];
+    _notifications = [];
+    _unread = 0;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
   }
@@ -173,6 +192,49 @@ class AppState extends ChangeNotifier {
 
   void setServerUrl(String url) {
     _api = Api(url, token: _api.token);
+    notifyListeners();
+  }
+
+  // ---- Notifications ----
+
+  /// Checks for new notifications every [_pollEvery] while signed in. Push
+  /// notifications (Firebase) would replace this once a Firebase project is set up.
+  void _startPolling() {
+    _pollTimer?.cancel();
+    pollNotifications();
+    _pollTimer = Timer.periodic(_pollEvery, (_) => pollNotifications());
+  }
+
+  /// Refreshes the unread count; new ones usually mean an order changed, so orders and wallet reload too.
+  Future<void> pollNotifications() async {
+    if (_user == null) return;
+    try {
+      final res = await _call(() => _api.get('/api/notifications/unread'));
+      final unread = res['unread'] as int;
+      if (unread == _unread) return;
+      final grew = unread > _unread;
+      _unread = unread;
+      notifyListeners();
+      if (grew) {
+        await Future.wait([loadOrders(), loadWallet()].map((f) => f.catchError((_) {})));
+      }
+    } catch (_) {
+      // Offline or a server blip; the next poll tries again.
+    }
+  }
+
+  Future<void> loadNotifications() async {
+    final res = await _call(() => _api.get('/api/notifications'));
+    _notifications =
+        (res['notifications'] as List).map((n) => AppNotification.fromJson(n as Map<String, dynamic>)).toList();
+    _unread = res['unread'] as int;
+    notifyListeners();
+  }
+
+  Future<void> markNotificationsRead() async {
+    if (_unread == 0) return;
+    await _call(() => _api.post('/api/notifications/read'));
+    _unread = 0;
     notifyListeners();
   }
 
@@ -289,6 +351,38 @@ class AppState extends ChangeNotifier {
     _feed = swap(_feed);
     _myItems = swap(_myItems);
     _saved = swap(_saved);
+    _searchResults = swap(_searchResults);
+    notifyListeners();
+  }
+
+  /// Searches all available pieces on the server. Empty values mean "any".
+  Future<List<ThriftItem>> search({String query = '', String? category, String? location}) async {
+    final res = await _call(() => _api.get('/api/items', {
+          'limit': '50',
+          if (query.isNotEmpty) 'q': query,
+          'category': ?category,
+          'location': ?location,
+        }));
+    _searchResults = _items(res);
+    notifyListeners();
+    return _searchResults;
+  }
+
+  static const reportReasons = [
+    'Fake or counterfeit',
+    'Misleading photos or description',
+    'Prohibited item',
+    'Scam or spam',
+    'Offensive',
+  ];
+
+  /// Reports a listing. It disappears for this user straight away; admins review it.
+  Future<void> reportItem(String itemId, String reason) async {
+    await _call(() => _api.post('/api/items/$itemId/report', {'reason': reason}));
+    bool keep(ThriftItem i) => i.id != itemId;
+    _feed = _feed.where(keep).toList();
+    _searchResults = _searchResults.where(keep).toList();
+    _saved = _saved.where(keep).toList();
     notifyListeners();
   }
 
@@ -379,12 +473,14 @@ class AppState extends ChangeNotifier {
     return order;
   }
 
-  Future<void> dispatchOrder(String orderId) => _orderAction(orderId, 'dispatch');
+  /// [trackingNumber] is required unless the order is collected at the Safe Hub.
+  Future<void> dispatchOrder(String orderId, {String? trackingNumber}) =>
+      _orderAction(orderId, 'dispatch', trackingNumber == null ? null : {'trackingNumber': trackingNumber});
   Future<void> confirmOrder(String orderId) => _orderAction(orderId, 'confirm');
   Future<void> disputeOrder(String orderId) => _orderAction(orderId, 'dispute');
 
-  Future<void> _orderAction(String orderId, String action) async {
-    final res = await _call(() => _api.post('/api/orders/$orderId/$action'));
+  Future<void> _orderAction(String orderId, String action, [Object? body]) async {
+    final res = await _call(() => _api.post('/api/orders/$orderId/$action', body));
     final order = EscrowOrder.fromJson(res['order'] as Map<String, dynamic>);
     _orders = [for (final o in _orders) o.id == orderId ? order : o];
     notifyListeners();
@@ -404,6 +500,33 @@ class AppState extends ChangeNotifier {
   Future<void> withdrawFunds(double amountZar, String bank, String account) async {
     _applyWallet(await _call(() => _api.post('/api/wallet/withdraw', {'amountZar': amountZar, 'bank': bank, 'account': account})));
     notifyListeners();
+  }
+
+  // ---- Admin ----
+
+  Future<List<EscrowOrder>> loadDisputes() async {
+    final res = await _call(() => _api.get('/api/admin/disputes'));
+    return (res['orders'] as List).map((o) => EscrowOrder.fromJson(o as Map<String, dynamic>)).toList();
+  }
+
+  /// Settles a dispute: [refund] gives the buyer their money back, otherwise the seller is paid.
+  Future<void> resolveDispute(String orderId, {required bool refund}) async {
+    await _call(() => _api.post('/api/orders/$orderId/resolve', {'outcome': refund ? 'refund' : 'release'}));
+  }
+
+  Future<List<ReportedItem>> loadReports() async {
+    final res = await _call(() => _api.get('/api/admin/reports'));
+    return (res['items'] as List).map((i) => ReportedItem.fromJson(i as Map<String, dynamic>)).toList();
+  }
+
+  /// Takes a reported listing down ([remove]) or clears its reports.
+  Future<void> moderateItem(String itemId, {required bool remove}) async {
+    await _call(() => _api.post('/api/admin/items/$itemId/${remove ? 'remove' : 'dismiss'}'));
+    if (remove) {
+      _feed = _feed.where((i) => i.id != itemId).toList();
+      _searchResults = _searchResults.where((i) => i.id != itemId).toList();
+      notifyListeners();
+    }
   }
 }
 

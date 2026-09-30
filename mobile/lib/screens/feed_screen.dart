@@ -270,8 +270,60 @@ class _ReelItemCardState extends State<_ReelItemCard> {
             _snack('Copied to clipboard');
           },
         ),
+        if (item.sellerId != AppState().user.id)
+          _SidebarAction(
+            icon: Icons.flag_outlined,
+            label: 'Report',
+            tooltip: 'Report listing',
+            onTap: () => _report(item),
+          ),
       ],
     );
+  }
+
+  Future<void> _report(ThriftItem item) async {
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: DobhaColors.surface,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+              child: Text('Report this listing', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+              child: Text('It will be hidden for you and reviewed by the Dobha team.',
+                  style: TextStyle(fontSize: 12.5, color: DobhaColors.muted)),
+            ),
+            for (final r in AppState.reportReasons)
+              ListTile(
+                title: Text(r, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                trailing: Icon(Icons.chevron_right_rounded, color: DobhaColors.muted),
+                onTap: () => Navigator.of(ctx).pop(r),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (reason == null || !mounted) return;
+    // This card is removed from the feed once the report goes through, so hold on to these first.
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final fullScreen = widget.heroTag != null;
+    try {
+      await AppState().reportItem(item.id, reason);
+      messenger.showSnackBar(const SnackBar(content: Text('Thanks, the Dobha team will review it')));
+      // Opened full screen from a grid: the listing is gone for this user, so leave it.
+      if (fullScreen && navigator.canPop()) navigator.pop();
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   Widget _details(ThriftItem item) {
@@ -386,7 +438,7 @@ class ItemDetailScreen extends StatelessWidget {
       listenable: AppState(),
       builder: (context, _) {
         final state = AppState();
-        final latest = [...state.feedItems, ...state.savedItems, ...state.vendorInventory]
+        final latest = [...state.feedItems, ...state.searchResults, ...state.savedItems, ...state.vendorInventory]
                 .where((i) => i.id == item.id)
                 .firstOrNull ??
             item;
