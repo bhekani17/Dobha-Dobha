@@ -65,7 +65,9 @@ class EscrowTrackerCard extends StatelessWidget {
                       style: TextStyle(fontSize: 12, color: DobhaColors.muted),
                     ),
                     Text(
-                      isVendorView ? 'Buyer: ${order.buyerName} · ${order.deliveryAddress}' : 'Tracking: ${order.trackingNumber}',
+                      isVendorView
+                          ? 'Buyer: ${order.buyerName} · ${order.deliveryAddress}'
+                          : 'Tracking: ${order.trackingNumber.isEmpty ? 'added when the vendor dispatches' : order.trackingNumber}',
                       style: TextStyle(fontSize: 11, color: DobhaColors.textSecondary),
                     ),
                     Text('Escrow ref ${order.escrowVaultRef}', style: TextStyle(fontSize: 10.5, color: DobhaColors.muted)),
@@ -77,7 +79,7 @@ class EscrowTrackerCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          if (status != EscrowStatus.disputed) ...[
+          if (status.stepIndex >= 0) ...[
             AppWell(
               radius: 18,
               padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
@@ -103,6 +105,8 @@ class EscrowTrackerCard extends StatelessWidget {
         return DobhaColors.green;
       case EscrowStatus.disputed:
         return DobhaColors.red;
+      case EscrowStatus.refunded:
+        return DobhaColors.muted;
     }
   }
 
@@ -170,7 +174,11 @@ class EscrowTrackerCard extends StatelessWidget {
       return AppButton(
         onPressed: () {
           HapticFeedback.mediumImpact();
-          _act(context, () => appState.dispatchOrder(order.id), 'Order ${order.id} marked as dispatched');
+          if (order.isHubCollection) {
+            _act(context, () => appState.dispatchOrder(order.id), 'Order ${order.id} marked as dispatched');
+          } else {
+            _askTracking(context, order);
+          }
         },
         child: const Row(
           mainAxisSize: MainAxisSize.min,
@@ -212,11 +220,58 @@ class EscrowTrackerCard extends StatelessWidget {
       return _Notice(icon: Icons.support_agent_rounded, text: 'Dobha support is reviewing this order', color: DobhaColors.red);
     }
 
+    if (order.status == EscrowStatus.refunded) {
+      return _Notice(icon: Icons.undo_rounded, text: isVendorView ? 'Buyer refunded' : 'Refunded to your wallet', color: DobhaColors.muted);
+    }
+
     if (order.status == EscrowStatus.payoutReleased) {
       return _Notice(icon: Icons.check_circle_rounded, text: 'Settled and vendor paid in full', color: DobhaColors.green);
     }
 
     return const SizedBox.shrink();
+  }
+
+  /// Couriers give a tracking number; the buyer sees it and is notified.
+  void _askTracking(BuildContext context, EscrowOrder order) {
+    final ctrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Add tracking number'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('From your ${order.deliveryMethod} receipt. The buyer uses it to follow the parcel.',
+                style: TextStyle(fontSize: 12.5, color: DobhaColors.textSecondary)),
+            const SizedBox(height: 14),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              maxLength: 40,
+              decoration: const InputDecoration(labelText: 'Tracking number'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ListenableBuilder(
+            listenable: ctrl,
+            builder: (ctx, _) => FilledButton(
+              onPressed: ctrl.text.trim().length < 4
+                  ? null
+                  : () {
+                      Navigator.of(ctx).pop();
+                      _act(context, () => AppState().dispatchOrder(order.id, trackingNumber: ctrl.text.trim()),
+                          'Order ${order.id} marked as dispatched');
+                    },
+              child: const Text('Dispatch'),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _confirmDispute(BuildContext context, EscrowOrder order) {

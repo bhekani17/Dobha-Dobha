@@ -74,7 +74,13 @@ class _MainShellState extends State<MainShell> {
                     if (i == _liveIndex)
                       _LiveButton(selected: _currentIndex == i, onTap: () => _select(i))
                     else
-                      _NavItem(tab: _tabs[i], selected: _currentIndex == i, onTap: () => _select(i)),
+                      _NavItem(
+                        tab: _tabs[i],
+                        selected: _currentIndex == i,
+                        // Unread notifications live behind the bell on the Account tab.
+                        badge: i == _tabs.length - 1 && AppState().unreadNotifications > 0,
+                        onTap: () => _select(i),
+                      ),
                 ],
               ),
             ),
@@ -96,9 +102,10 @@ class _Tab {
 class _NavItem extends StatelessWidget {
   final _Tab tab;
   final bool selected;
+  final bool badge;
   final VoidCallback onTap;
 
-  const _NavItem({required this.tab, required this.selected, required this.onTap});
+  const _NavItem({required this.tab, required this.selected, required this.onTap, this.badge = false});
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +129,12 @@ class _NavItem extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(selected ? tab.selectedIcon : tab.icon, size: 22, color: color),
+              Badge(
+                isLabelVisible: badge,
+                smallSize: 8,
+                backgroundColor: DobhaColors.red,
+                child: Icon(selected ? tab.selectedIcon : tab.icon, size: 22, color: color),
+              ),
               AnimatedSize(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,

@@ -5,6 +5,7 @@ enum EscrowStatus {
   vendorDispatched, // Vendor shipped or dropped off at the locker/hub
   payoutReleased, // Buyer confirmed "Received as Shown"; vendor paid
   disputed, // Buyer reported a problem; funds frozen for support
+  refunded, // Dispute settled for the buyer; money back in their wallet
 }
 
 extension EscrowStatusX on EscrowStatus {
@@ -18,6 +19,8 @@ extension EscrowStatusX on EscrowStatus {
         return 'Completed';
       case EscrowStatus.disputed:
         return 'Under Review';
+      case EscrowStatus.refunded:
+        return 'Refunded';
     }
   }
 
@@ -35,6 +38,10 @@ extension EscrowStatusX on EscrowStatus {
         return 'Confirmed as shown and the vendor has been paid.';
       case EscrowStatus.disputed:
         return 'Dobha support is reviewing this order. Funds stay frozen until it is resolved.';
+      case EscrowStatus.refunded:
+        return isSeller
+            ? 'Dobha support settled this order for the buyer, who has been refunded.'
+            : 'Dobha support settled this order for you. The full amount is back in your wallet.';
     }
   }
 
@@ -47,6 +54,7 @@ extension EscrowStatusX on EscrowStatus {
       case EscrowStatus.payoutReleased:
         return 3;
       case EscrowStatus.disputed:
+      case EscrowStatus.refunded:
         return -1;
     }
   }
@@ -90,6 +98,9 @@ class EscrowOrder {
   });
 
   double get totalZar => amountZar + shippingFeeZar;
+
+  /// Collected at the Safe Hub instead of sent with a courier; no tracking number needed.
+  bool get isHubCollection => deliveryMethod == 'Downtown Joburg Safe Hub';
 
   factory EscrowOrder.fromJson(Map<String, dynamic> json) {
     DateTime? date(String key) => json[key] == null ? null : DateTime.parse(json[key] as String);

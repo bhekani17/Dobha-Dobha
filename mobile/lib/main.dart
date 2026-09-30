@@ -36,6 +36,12 @@ class _DobhaLiveAppState extends State<DobhaLiveApp> with WidgetsBindingObserver
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Catch up on sales and dispatches that happened while the app was in the background.
+    if (state == AppLifecycleState.resumed) AppState().pollNotifications();
+  }
+
+  @override
   void didChangePlatformBrightness() {
     final dark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
     if (dark == DobhaColors.isDark) return;

@@ -56,7 +56,14 @@ export function publicUser(u, stats = {}) {
     location: u.location ?? '',
     createdAt: new Date(u.created_at).toISOString(),
     salesCount: stats.salesCount ?? 0,
+    isAdmin: stats.isAdmin ?? false,
   };
+}
+
+/** Admins settle disputes and review reported listings. Set ADMIN_EMAILS (comma-separated) in wrangler.jsonc. */
+export function isAdmin(env, user) {
+  const emails = (env.ADMIN_EMAILS || '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return emails.includes(user.email.toLowerCase());
 }
 
 /** The signed-in user, or a 401. */
@@ -112,7 +119,7 @@ export async function register(request, env) {
     env.DB.prepare('INSERT INTO wallets (user_id) VALUES (?)').bind(user.id),
   ]);
 
-  return json({ token: await createSession(env, user.id), user: publicUser(user) }, 201);
+  return json({ token: await createSession(env, user.id), user: await withStats(env, user) }, 201);
 }
 
 export async function login(request, env) {
@@ -141,7 +148,7 @@ export async function withStats(env, user) {
   const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM orders WHERE seller_id = ? AND status = 'payoutReleased'")
     .bind(user.id)
     .first();
-  return publicUser(user, { salesCount: row?.n ?? 0 });
+  return publicUser(user, { salesCount: row?.n ?? 0, isAdmin: isAdmin(env, user) });
 }
 
 export async function me(request, env) {

@@ -1,5 +1,5 @@
 name: dobha_live
-description: "A new Flutter project."
+description: "Dobha Dobha: Joburg street thrifting with live drops and escrow."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

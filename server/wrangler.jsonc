@@ -16,7 +16,8 @@
   // OAuth client ids whose Google ID tokens the server accepts (comma-separated).
   // Use the "Web application" client id; add the iOS one too if iOS sign-in is set up.
   // Client ids are public, so they live here rather than in secrets.
-  "vars": { "GOOGLE_CLIENT_IDS": "787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com,787923055628-gm7j2ss8g15o30drcdmls7ugsh2t22vq.apps.googleusercontent.com" },
+  // ADMIN_EMAILS: comma-separated emails of accounts that can settle disputes and review reports.
+  "vars": { "ADMIN_EMAILS": "", "GOOGLE_CLIENT_IDS": "787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com,787923055628-gm7j2ss8g15o30drcdmls7ugsh2t22vq.apps.googleusercontent.com" },
 
   // Accounts, listings, orders and the simulated wallet.
   // Schema: migrations/ (npm run db:migrate, or db:migrate:local for wrangler dev).
@@ -34,6 +35,12 @@
 
   "ratelimits": [
     { "name": "TOKEN_LIMIT", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } },
-    { "name": "AUTH_LIMIT", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } }
-  ]
+    { "name": "AUTH_LIMIT", "namespace_id": "1002", "simple": { "limit": 10, "period": 60 } },
+    // Per signed-in user: uploads, and likes/saves/comments/reports.
+    { "name": "UPLOAD_LIMIT", "namespace_id": "1003", "simple": { "limit": 30, "period": 60 } },
+    { "name": "ACTION_LIMIT", "namespace_id": "1004", "simple": { "limit": 60, "period": 60 } }
+  ],
+
+  // Daily cleanup of expired sessions and unattached uploads (items.cleanup).
+  "triggers": { "crons": ["0 1 * * *"] }
 }
