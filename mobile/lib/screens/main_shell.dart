@@ -19,12 +19,15 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
+  // The middle tab (Go Live) is drawn as a round red button instead of a pill.
+  static const _liveIndex = 2;
+
   static final _tabs = [
-    _Tab(Icons.flash_on_outlined, Icons.flash_on, 'Dobha', DobhaColors.green),
-    _Tab(Icons.explore_outlined, Icons.explore, 'Explore', DobhaColors.green),
-    _Tab(Icons.sensors_rounded, Icons.sensors_rounded, 'Go Live', DobhaColors.red),
-    _Tab(Icons.shield_outlined, Icons.shield_rounded, 'Escrow', DobhaColors.cyan),
-    _Tab(Icons.person_outline_rounded, Icons.person_rounded, 'Profile', DobhaColors.green),
+    _Tab(Icons.flash_on_outlined, Icons.flash_on, 'Dobha'),
+    _Tab(Icons.explore_outlined, Icons.explore, 'Explore'),
+    _Tab(Icons.sensors_rounded, Icons.sensors_rounded, 'Go Live'),
+    _Tab(Icons.shield_outlined, Icons.shield_rounded, 'Escrow'),
+    _Tab(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
   ];
 
   final List<Widget> _screens = const [
@@ -34,6 +37,11 @@ class _MainShellState extends State<MainShell> {
     WalletScreen(),
     ProfileScreen(),
   ];
+
+  void _select(int i) {
+    HapticFeedback.selectionClick();
+    setState(() => _currentIndex = i);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,29 +57,25 @@ class _MainShellState extends State<MainShell> {
               for (var i = 0; i < _screens.length; i++) TickerMode(enabled: i == _currentIndex, child: _screens[i]),
             ],
           ),
-          bottomNavigationBar: Container(
-            decoration: BoxDecoration(
-              color: DobhaColors.surface,
-              border: Border(top: BorderSide(color: DobhaColors.border)),
-            ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-                child: Row(
-                  children: [
-                    for (var i = 0; i < _tabs.length; i++)
-                      Expanded(
-                        child: _NavItem(
-                          tab: _tabs[i],
-                          selected: _currentIndex == i,
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() => _currentIndex = i);
-                          },
-                        ),
-                      ),
-                  ],
-                ),
+          bottomNavigationBar: SafeArea(
+            minimum: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: DobhaColors.surface,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: DobhaColors.borderLight),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  for (var i = 0; i < _tabs.length; i++)
+                    if (i == _liveIndex)
+                      _LiveButton(selected: _currentIndex == i, onTap: () => _select(i))
+                    else
+                      _NavItem(tab: _tabs[i], selected: _currentIndex == i, onTap: () => _select(i)),
+                ],
               ),
             ),
           ),
@@ -85,10 +89,10 @@ class _Tab {
   final IconData icon;
   final IconData selectedIcon;
   final String label;
-  final Color accent;
-  const _Tab(this.icon, this.selectedIcon, this.label, this.accent);
+  const _Tab(this.icon, this.selectedIcon, this.label);
 }
 
+/// Icon only when idle; the selected tab grows into a green pill with its label.
 class _NavItem extends StatelessWidget {
   final _Tab tab;
   final bool selected;
@@ -98,33 +102,78 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            width: 48,
-            height: 36,
-            decoration: BoxDecoration(
-              color: selected ? tab.accent.withValues(alpha: 0.16) : Colors.transparent,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(selected ? tab.selectedIcon : tab.icon, size: 20, color: selected ? tab.accent : DobhaColors.muted),
+    final color = selected ? DobhaColors.green : DobhaColors.muted;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: tab.label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          height: 48,
+          padding: EdgeInsets.symmetric(horizontal: selected ? 16 : 12),
+          decoration: BoxDecoration(
+            color: selected ? DobhaColors.green.withValues(alpha: 0.16) : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
           ),
-          const SizedBox(height: 6),
-          Text(
-            tab.label,
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-              color: selected ? tab.accent : DobhaColors.muted,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(selected ? tab.selectedIcon : tab.icon, size: 22, color: color),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                child: selected
+                    ? Padding(
+                        padding: const EdgeInsets.only(left: 8),
+                        child: Text(
+                          tab.label,
+                          maxLines: 1,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color),
+                        ),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
           ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Go Live: a solid red circle, ringed when its tab is open.
+class _LiveButton extends StatelessWidget {
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LiveButton({required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: 'Go Live',
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          width: 52,
+          height: 52,
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: selected ? DobhaColors.red : Colors.transparent, width: 2),
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(color: DobhaColors.red, shape: BoxShape.circle),
+            child: const Icon(Icons.sensors_rounded, size: 24, color: Colors.white),
+          ),
+        ),
       ),
     );
   }

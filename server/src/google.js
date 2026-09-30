@@ -74,10 +74,14 @@ export async function googleSignIn(request, env) {
 
   let user = await env.DB.prepare('SELECT * FROM users WHERE google_sub = ?').bind(claims.sub).first();
   if (!user) {
-    // Google has verified this email, so an existing password account with it is the same person.
+    // Google has verified this email, so the account is theirs. Registration never verified it, though, so
+    // someone else may have signed up with it first: drop that password and its sessions so they're locked out.
     user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
     if (user) {
-      await env.DB.prepare('UPDATE users SET google_sub = ? WHERE id = ?').bind(claims.sub, user.id).run();
+      await env.DB.batch([
+        env.DB.prepare("UPDATE users SET google_sub = ?, password_hash = '', password_salt = '' WHERE id = ?").bind(claims.sub, user.id),
+        env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
+      ]);
     }
   }
 
