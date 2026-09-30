@@ -85,7 +85,7 @@ class _ItemGridTileState extends State<ItemGridTile> with SingleTickerProviderSt
                         Positioned(
                           top: 8,
                           left: 8,
-                          child: AppTag('VIDEO', color: DobhaColors.red, icon: Icons.play_arrow_rounded, solid: true),
+                          child: AppTag('VIDEO', color: Colors.black, icon: Icons.play_arrow_rounded, solid: true),
                         ),
                       if (item.media.length > 1)
                         Positioned(
@@ -99,7 +99,7 @@ class _ItemGridTileState extends State<ItemGridTile> with SingleTickerProviderSt
                               children: [
                                 const Icon(Icons.collections_outlined, size: 11),
                                 const SizedBox(width: 3),
-                                Text('${item.media.length}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800)),
+                                Text('${item.media.length}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700)),
                               ],
                             ),
                           ),
@@ -116,9 +116,9 @@ class _ItemGridTileState extends State<ItemGridTile> with SingleTickerProviderSt
                         children: [
                           Expanded(
                             child: Text(item.formattedPrice,
-                                style: TextStyle(fontWeight: FontWeight.w900, color: DobhaColors.green, fontSize: 15)),
+                                style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 15)),
                           ),
-                          if (item.isLiked) Icon(Icons.favorite, size: 14, color: DobhaColors.red),
+                          if (item.isLiked) Icon(Icons.favorite, size: 14, color: DobhaColors.green),
                         ],
                       ),
                       const SizedBox(height: 2),

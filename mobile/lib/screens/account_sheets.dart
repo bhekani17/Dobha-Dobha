@@ -48,7 +48,7 @@ class _FormSheetState extends State<_FormSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            Text(widget.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             if (widget.subtitle != null) ...[
               const SizedBox(height: 6),
               Text(widget.subtitle!, style: TextStyle(color: DobhaColors.textSecondary, height: 1.35)),

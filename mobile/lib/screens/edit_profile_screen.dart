@@ -75,7 +75,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Profile picture', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const Text('Profile picture', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
               for (final (icon, label, source) in [
                 (Icons.photo_camera_outlined, 'Take a photo', ImageSource.camera),
@@ -227,7 +227,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               if (user.isVendor) ...[
                 const SizedBox(height: 8),
-                const Text('Shop', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                const Text('Shop', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                 const SizedBox(height: 10),
                 _field('Shop name', _shop, icon: Icons.storefront_outlined),
                 _field('Stall location', _stall, icon: Icons.place_outlined),

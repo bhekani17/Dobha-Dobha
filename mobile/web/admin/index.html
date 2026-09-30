@@ -9,9 +9,10 @@
   <script src="https://accounts.google.com/gsi/client" async></script>
   <style>
     :root {
-      --bg: #15171b; --surface: #22252b; --well: #1a1d22; --raised: #2b2f36;
-      --text: #f2f3f5; --text2: #b4b8c0; --muted: #7c818b; --border: #2a2e35;
-      --green: #00a93b; --green-ink: #062b16; --red: #ff4d67; --amber: #f59e0b; --cyan: #00e5ff;
+      /* Black, white and green; red only for problems and destructive actions. */
+      --bg: #000000; --surface: #121212; --well: #0a0a0a; --raised: #1f1f1f;
+      --text: #ffffff; --text2: #bdbdbd; --muted: #8a8a8a; --border: #1f1f1f;
+      --green: #00a93b; --green-ink: #000000; --red: #ff453a; --amber: #bdbdbd; --cyan: #00a93b;
     }
     * { box-sizing: border-box; }
     body {
@@ -25,7 +26,7 @@
     /* Header */
     header { border-bottom: 1px solid var(--border); background: var(--surface); position: sticky; top: 0; z-index: 5; }
     header .wrap { display: flex; align-items: center; gap: 14px; height: 64px; }
-    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 17px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
     .brand img { width: 32px; height: 32px; border-radius: 8px; }
     .brand span { color: var(--green); }
     .spacer { flex: 1; }
@@ -53,9 +54,9 @@
     .head { display: flex; gap: 14px; align-items: flex-start; }
     .thumb { width: 72px; height: 72px; border-radius: 12px; background: var(--well); object-fit: cover; flex: none; display: grid; place-items: center; color: var(--muted); font-size: 11px; }
     a.thumb:hover { outline: 2px solid var(--green); }
-    .title { font-weight: 800; font-size: 15px; margin: 0 0 2px; }
+    .title { font-weight: 700; font-size: 15px; margin: 0 0 2px; }
     .sub { color: var(--muted); font-size: 12px; }
-    .price { margin-left: auto; font-weight: 900; font-size: 18px; color: var(--green); white-space: nowrap; }
+    .price { margin-left: auto; font-weight: 700; font-size: 18px; color: var(--green); white-space: nowrap; }
     dl { display: grid; grid-template-columns: 88px 1fr; gap: 4px 10px; margin: 0; font-size: 13px; }
     dt { color: var(--muted); }
     dd { margin: 0; color: var(--text2); overflow-wrap: anywhere; }

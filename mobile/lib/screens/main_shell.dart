@@ -19,15 +19,12 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
-  // The middle tab (Go Live) is drawn as a round red button instead of a pill.
-  static const _liveIndex = 2;
-
   static final _tabs = [
-    _Tab(Icons.flash_on_outlined, Icons.flash_on, 'Dobha'),
-    _Tab(Icons.explore_outlined, Icons.explore, 'Explore'),
-    _Tab(Icons.sensors_rounded, Icons.sensors_rounded, 'Go Live'),
-    _Tab(Icons.shield_outlined, Icons.shield_rounded, 'Escrow'),
-    _Tab(Icons.person_outline_rounded, Icons.person_rounded, 'Profile'),
+    _Tab(Icons.home_outlined, Icons.home_rounded, 'Home'),
+    _Tab(Icons.search_rounded, Icons.search_rounded, 'Explore'),
+    _Tab(Icons.add_circle_outline_rounded, Icons.add_circle_rounded, 'Sell'),
+    _Tab(Icons.receipt_long_outlined, Icons.receipt_long_rounded, 'Orders'),
+    _Tab(Icons.person_outline_rounded, Icons.person_rounded, 'Me'),
   ];
 
   final List<Widget> _screens = const [
@@ -49,38 +46,49 @@ class _MainShellState extends State<MainShell> {
       listenable: AppState(),
       builder: (context, _) {
         return Scaffold(
-          body: IndexedStack(
-            index: _currentIndex,
-            // Hidden tabs keep their state but stop animating, so feed videos pause
-            // and entrance animations wait until their tab is shown.
+          // Every tab stays built so it keeps its state; switching crossfades between them.
+          // Hidden tabs stop animating (feed videos pause), can't be tapped and are
+          // skipped by screen readers.
+          body: Stack(
+            fit: StackFit.expand,
             children: [
-              for (var i = 0; i < _screens.length; i++) TickerMode(enabled: i == _currentIndex, child: _screens[i]),
+              for (var i = 0; i < _screens.length; i++)
+                AnimatedOpacity(
+                  opacity: i == _currentIndex ? 1 : 0,
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  child: IgnorePointer(
+                    ignoring: i != _currentIndex,
+                    child: ExcludeSemantics(
+                      excluding: i != _currentIndex,
+                      child: TickerMode(enabled: i == _currentIndex, child: _screens[i]),
+                    ),
+                  ),
+                ),
             ],
           ),
           bottomNavigationBar: SafeArea(
             minimum: const EdgeInsets.only(bottom: 10),
             child: Container(
               margin: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
               decoration: BoxDecoration(
                 color: DobhaColors.surface,
-                borderRadius: BorderRadius.circular(30),
+                borderRadius: BorderRadius.circular(26),
                 border: Border.all(color: DobhaColors.borderLight),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   for (var i = 0; i < _tabs.length; i++)
-                    if (i == _liveIndex)
-                      _LiveButton(selected: _currentIndex == i, onTap: () => _select(i))
-                    else
-                      _NavItem(
+                    Expanded(
+                      child: _NavItem(
                         tab: _tabs[i],
                         selected: _currentIndex == i,
-                        // Unread notifications live behind the bell on the Account tab.
+                        // Unread notifications live behind the bell on the Me tab.
                         badge: i == _tabs.length - 1 && AppState().unreadNotifications > 0,
                         onTap: () => _select(i),
                       ),
+                    ),
                 ],
               ),
             ),
@@ -98,7 +106,7 @@ class _Tab {
   const _Tab(this.icon, this.selectedIcon, this.label);
 }
 
-/// Icon only when idle; the selected tab grows into a green pill with its label.
+/// Icon with its label underneath; the selected tab is green with a soft pill behind the icon.
 class _NavItem extends StatelessWidget {
   final _Tab tab;
   final bool selected;
@@ -113,78 +121,38 @@ class _NavItem extends StatelessWidget {
     return Semantics(
       button: true,
       selected: selected,
-      label: tab.label,
+      label: badge ? '${tab.label}, new notifications' : tab.label,
+      excludeSemantics: true,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          height: 48,
-          padding: EdgeInsets.symmetric(horizontal: selected ? 16 : 12),
-          decoration: BoxDecoration(
-            color: selected ? DobhaColors.green.withValues(alpha: 0.16) : Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Badge(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              width: 52,
+              height: 30,
+              decoration: BoxDecoration(
+                color: selected ? DobhaColors.green.withValues(alpha: 0.16) : Colors.transparent,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Badge(
                 isLabelVisible: badge,
                 smallSize: 8,
                 backgroundColor: DobhaColors.red,
-                child: Icon(selected ? tab.selectedIcon : tab.icon, size: 22, color: color),
+                alignment: const AlignmentDirectional(0.45, -0.7),
+                child: Center(child: Icon(selected ? tab.selectedIcon : tab.icon, size: 22, color: color)),
               ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: selected
-                    ? Padding(
-                        padding: const EdgeInsets.only(left: 8),
-                        child: Text(
-                          tab.label,
-                          maxLines: 1,
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Go Live: a solid red circle, ringed when its tab is open.
-class _LiveButton extends StatelessWidget {
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _LiveButton({required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: 'Go Live',
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          width: 52,
-          height: 52,
-          padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: selected ? DobhaColors.red : Colors.transparent, width: 2),
-          ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(color: DobhaColors.red, shape: BoxShape.circle),
-            child: const Icon(Icons.sensors_rounded, size: 24, color: Colors.white),
-          ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              tab.label,
+              maxLines: 1,
+              style: TextStyle(fontSize: 11.5, fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: color),
+            ),
+          ],
         ),
       ),
     );

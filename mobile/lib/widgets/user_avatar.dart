@@ -25,7 +25,7 @@ class UserAvatar extends StatelessWidget {
       color: Color.alphaBlend(DobhaColors.green.withValues(alpha: 0.18), DobhaColors.well),
       child: Text(
         initialsOf(name),
-        style: TextStyle(fontWeight: FontWeight.w900, fontSize: size * 0.34, color: DobhaColors.green),
+        style: TextStyle(fontWeight: FontWeight.w700, fontSize: size * 0.34, color: DobhaColors.green),
       ),
     );
     return SizedBox(

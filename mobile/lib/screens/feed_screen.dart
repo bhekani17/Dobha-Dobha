@@ -37,45 +37,7 @@ class _FeedScreenState extends State<FeedScreen> {
 
         return Scaffold(
           backgroundColor: Colors.black,
-          body: Stack(
-            fit: StackFit.expand,
-            children: [
-              _body(state, items),
-              // Top bar floats over the photo.
-              SafeArea(
-                bottom: false,
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: Row(
-                      children: [
-                        OverlayPanel(
-                          radius: 20,
-                          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text('DOBHA ', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
-                              Text('DIGITAL',
-                                  style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: DobhaColors.green, letterSpacing: 0.5)),
-                            ],
-                          ),
-                        ),
-                        const Spacer(),
-                        OverlayIconButton(
-                          icon: Icons.refresh_rounded,
-                          size: 20,
-                          tooltip: 'Refresh',
-                          onTap: state.feedLoading ? null : state.loadFeed,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          body: _body(state, items),
         );
       },
     );
@@ -92,8 +54,8 @@ class _FeedScreenState extends State<FeedScreen> {
                 title: state.feedError != null ? 'Could not load drops' : 'No drops yet',
                 text: state.feedError ??
                     (state.isVendor
-                        ? 'Be the first: list a piece from the Go Live tab.'
-                        : 'Vendors have not listed anything yet. Check back soon.'),
+                        ? 'Be the first: list a piece from the Sell tab.'
+                        : 'Sellers have not listed anything yet. Check back soon.'),
                 onRetry: state.loadFeed,
               ),
       );
@@ -101,7 +63,7 @@ class _FeedScreenState extends State<FeedScreen> {
     return RefreshIndicator(
       color: DobhaColors.green,
       backgroundColor: DobhaColors.cardElevated,
-      edgeOffset: MediaQuery.of(context).padding.top + 56,
+      edgeOffset: MediaQuery.of(context).padding.top,
       onRefresh: state.loadFeed,
       child: PageView.builder(
         controller: _pageController,
@@ -132,7 +94,7 @@ class _FeedMessage extends StatelessWidget {
           children: [
             AppWell(circle: true, padding: const EdgeInsets.all(22), child: Icon(icon, size: 40, color: DobhaColors.muted)),
             const SizedBox(height: 18),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Text(text, textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted, height: 1.4)),
             const SizedBox(height: 20),
@@ -201,7 +163,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                 duration: const Duration(milliseconds: 400),
                 builder: (context, scale, child) => Transform.scale(
                   scale: scale,
-                  child: Icon(Icons.favorite, color: DobhaColors.red, size: 110),
+                  child: Icon(Icons.favorite, color: DobhaColors.green, size: 110),
                 ),
               ),
             ),
@@ -237,7 +199,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
         const SizedBox(height: 18),
         _SidebarAction(
           icon: item.isLiked ? Icons.favorite : Icons.favorite_border,
-          iconColor: item.isLiked ? DobhaColors.red : Colors.white,
+          iconColor: item.isLiked ? DobhaColors.green : Colors.white,
           label: '${item.likesCount}',
           tooltip: item.isLiked ? 'Unlike' : 'Like',
           onTap: () {
@@ -262,23 +224,56 @@ class _ReelItemCardState extends State<_ReelItemCard> {
           },
         ),
         _SidebarAction(
-          icon: Icons.share_rounded,
-          label: 'Share',
-          tooltip: 'Share',
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: '${item.title} (${item.formattedPrice}) from ${item.sellerName} on Dobha Dobha'));
-            _snack('Copied to clipboard');
-          },
+          icon: Icons.more_horiz_rounded,
+          label: 'More',
+          tooltip: 'More options',
+          onTap: () => _more(item),
         ),
-        if (item.sellerId != AppState().user.id)
-          _SidebarAction(
-            icon: Icons.flag_outlined,
-            label: 'Report',
-            tooltip: 'Report listing',
-            onTap: () => _report(item),
-          ),
       ],
     );
+  }
+
+  Future<void> _more(ThriftItem item) async {
+    final isMine = item.sellerId == AppState().user.id;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: DobhaColors.surface,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.info_outline_rounded),
+              title: const Text('Details'),
+              onTap: () => Navigator.of(ctx).pop('details'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.link_rounded),
+              title: const Text('Copy to share'),
+              onTap: () => Navigator.of(ctx).pop('share'),
+            ),
+            if (!isMine)
+              ListTile(
+                leading: Icon(Icons.flag_outlined, color: DobhaColors.red),
+                title: Text('Report listing', style: TextStyle(color: DobhaColors.red)),
+                onTap: () => Navigator.of(ctx).pop('report'),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'details':
+        ItemInfoSheet.show(context, item);
+      case 'share':
+        Clipboard.setData(ClipboardData(text: '${item.title} (${item.formattedPrice}) from ${item.sellerName} on Dobha Dobha'));
+        _snack('Copied, paste it anywhere to share');
+      case 'report':
+        _report(item);
+    }
   }
 
   Future<void> _report(ThriftItem item) async {
@@ -293,7 +288,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Text('Report this listing', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+              child: Text('Report this listing', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
@@ -328,90 +323,137 @@ class _ReelItemCardState extends State<_ReelItemCard> {
 
   Widget _details(ThriftItem item) {
     final isMine = AppState().user.id == item.sellerId;
-    return OverlayPanel(
-      radius: 20,
-      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${item.sellerName}  ${item.sellerHandle}',
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (item.sellerLocation.isNotEmpty)
+    return GestureDetector(
+      onTap: () => ItemInfoSheet.show(context, item),
+      child: OverlayPanel(
+        radius: 20,
+        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              item.sellerName,
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.white.withValues(alpha: 0.75)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(item.title,
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.2),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 3),
+            Text('Size ${item.size} · ${item.condition}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.75))),
+            const SizedBox(height: 12),
             Row(
               children: [
-                Icon(Icons.location_on_outlined, size: 12, color: Colors.white.withValues(alpha: 0.7)),
-                const SizedBox(width: 2),
-                Flexible(
-                  child: Text(item.sellerLocation,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.7))),
+                Text(item.formattedPrice,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: DobhaColors.green, letterSpacing: -0.5)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppButton(
+                    color: isMine ? null : DobhaColors.green,
+                    radius: 14,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+                    onPressed: isMine ? null : () => CheckoutModal.show(context, item),
+                    child: Text(isMine ? 'Your listing' : 'Buy', style: const TextStyle(fontSize: 15)),
+                  ),
                 ),
               ],
             ),
-          const SizedBox(height: 8),
-          Text(item.title,
-              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, height: 1.2), maxLines: 2, overflow: TextOverflow.ellipsis),
-          if (item.haulCaption.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(item.haulCaption,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.8), height: 1.3)),
           ],
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+        ),
+      ),
+    );
+  }
+}
+
+/// Everything about a listing: shown when the info panel is tapped.
+class ItemInfoSheet extends StatelessWidget {
+  final ThriftItem item;
+  const ItemInfoSheet({super.key, required this.item});
+
+  static Future<void> show(BuildContext context, ThriftItem item) => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: DobhaColors.surface,
+        showDragHandle: true,
+        builder: (_) => ItemInfoSheet(item: item),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final isMine = AppState().user.id == item.sellerId;
+    Widget row(String label, String value) => Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AppTag(item.category, color: DobhaColors.green, solid: true),
-              AppTag(item.condition, color: DobhaColors.cyan, icon: Icons.sell_outlined),
-              AppTag('Size ${item.size}', color: Colors.white),
+              SizedBox(width: 92, child: Text(label, style: TextStyle(color: DobhaColors.muted, fontSize: 13.5))),
+              Expanded(child: Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
             ],
           ),
-          const SizedBox(height: 12),
-          Row(
+        );
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.formattedPrice,
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: DobhaColors.green, letterSpacing: -0.5)),
-                  if (item.originalPriceZar != null)
-                    Text(item.formattedOriginalPrice,
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.white.withValues(alpha: 0.6), decoration: TextDecoration.lineThrough)),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: AppButton(
-                  color: DobhaColors.green,
-                  radius: 14,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-                  onPressed: isMine ? null : () => CheckoutModal.show(context, item),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.flash_on, size: 17),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(isMine ? 'YOUR LISTING' : 'DOBHA / CLAIM',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, letterSpacing: 0.5)),
-                      ),
-                    ],
-                  ),
+              Text(item.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(item.formattedPrice, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: DobhaColors.green)),
+              if (item.originalPriceZar != null)
+                Text('Was ${item.formattedOriginalPrice}',
+                    style: TextStyle(fontSize: 13, color: DobhaColors.muted, decoration: TextDecoration.lineThrough)),
+              if (item.haulCaption.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(item.haulCaption, style: TextStyle(fontSize: 14, color: DobhaColors.textSecondary, height: 1.4)),
+              ],
+              const SizedBox(height: 16),
+              row('Size', item.size),
+              row('Condition', item.condition),
+              row('Category', item.category),
+              row('Seller', '${item.sellerName} (${item.sellerHandle})'),
+              if (item.sellerLocation.isNotEmpty) row('Stall', item.sellerLocation),
+              if (item.description.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(item.description, style: TextStyle(fontSize: 14, color: DobhaColors.textSecondary, height: 1.45)),
+              ],
+              const SizedBox(height: 14),
+              AppWell(
+                radius: 14,
+                child: Row(
+                  children: [
+                    Icon(Icons.verified_user_outlined, size: 18, color: DobhaColors.green),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('We hold your payment and only pay the seller once you have the piece.',
+                          style: TextStyle(fontSize: 12.5, color: DobhaColors.textSecondary, height: 1.35)),
+                    ),
+                  ],
                 ),
               ),
+              if (!isMine) ...[
+                const SizedBox(height: 16),
+                AppButton(
+                  color: DobhaColors.green,
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    CheckoutModal.show(context, item);
+                  },
+                  child: const Text('Buy', style: TextStyle(fontSize: 15)),
+                ),
+              ],
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -539,7 +581,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
             Row(
               children: [
                 Text('Comments${comments == null ? '' : ' (${comments.length})'}',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                 const Spacer(),
                 AppButton.icon(icon: Icons.close, size: 18, padding: 8, onPressed: () => Navigator.of(context).pop()),
               ],
@@ -604,7 +646,7 @@ class _Comment extends StatelessWidget {
             padding: EdgeInsets.zero,
             child: Center(
               child: Text(comment.name.isEmpty ? '?' : comment.name[0].toUpperCase(),
-                  style: TextStyle(fontWeight: FontWeight.w800, color: DobhaColors.green)),
+                  style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green)),
             ),
           ),
           const SizedBox(width: 12),
@@ -612,7 +654,7 @@ class _Comment extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(comment.handle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+                Text(comment.handle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 const SizedBox(height: 2),
                 Text(comment.text, style: TextStyle(color: DobhaColors.textSecondary, fontSize: 13)),
               ],

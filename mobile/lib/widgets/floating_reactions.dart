@@ -13,8 +13,8 @@ enum Reaction {
   const Reaction(this.icon);
 
   Color get color => switch (this) {
-        Reaction.heart => DobhaColors.red,
-        Reaction.fire => DobhaColors.amber,
+        Reaction.heart => DobhaColors.green,
+        Reaction.fire => Colors.white,
         Reaction.celebrate => DobhaColors.green,
       };
 

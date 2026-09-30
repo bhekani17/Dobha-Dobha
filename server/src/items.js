@@ -163,7 +163,8 @@ export async function createItem(request, env) {
   const category = str(body, 'category', { max: 30 });
   if (!CATEGORIES.includes(category)) throw new HttpError(400, 'Unknown category');
   const media = parseMedia(body, user.id);
-  const cover = media.find((m) => m.kind === 'image')?.key ?? null;
+  const cover = media.find((m) => m.kind === 'image')?.key;
+  if (!cover) throw new HttpError(400, 'Add at least one photo; it is the cover shoppers see first');
 
   const item = {
     id: id('itm'),

@@ -117,7 +117,7 @@ class _NotificationTile extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(n.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                      child: Text(n.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                     ),
                     if (!n.read)
                       Container(
@@ -224,7 +224,7 @@ class NotificationBell extends StatelessWidget {
                     child: Text(
                       unread > 9 ? '9+' : '$unread',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                      style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),

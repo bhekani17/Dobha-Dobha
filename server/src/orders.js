@@ -50,7 +50,10 @@ export async function orderJson(env, o, viewerId) {
 }
 
 async function loadOrder(env, orderId) {
-  const o = await env.DB.prepare('SELECT o.*, b.name AS buyer_name FROM orders o JOIN users b ON b.id = o.buyer_id WHERE o.id = ?')
+  const o = await env.DB.prepare(
+    `SELECT o.*, b.name AS buyer_name, i.title AS item_title FROM orders o
+     JOIN users b ON b.id = o.buyer_id JOIN items i ON i.id = o.item_id WHERE o.id = ?`,
+  )
     .bind(orderId)
     .first();
   if (!o) throw new HttpError(404, 'Order not found');
@@ -122,8 +125,8 @@ export async function createOrder(request, env) {
       env.DB.prepare('UPDATE wallets SET locked_cents = locked_cents + ? WHERE user_id = ?').bind(total, user.id),
       env.DB.prepare('UPDATE wallets SET pending_cents = pending_cents + ? WHERE user_id = ?').bind(item.price_cents, item.seller_id),
       txn(env, user.id, {
-        title: `Escrow: ${item.title}`,
-        subtitle: `Held until you confirm (${paymentMethod})`,
+        title: `Paid for ${item.title}`,
+        subtitle: `On hold until you have it (${paymentMethod})`,
         amount: total,
         type: 'escrowHold',
         status: 'Held in escrow',
@@ -132,7 +135,7 @@ export async function createOrder(request, env) {
       notify(env, item.seller_id, {
         kind: 'sale',
         title: 'You made a sale',
-        body: `${user.name} bought "${item.title}" for ${money(item.price_cents)}. Pack it and mark it as dispatched.`,
+        body: `${user.name} bought "${item.title}" for ${money(item.price_cents)}. Send it, then tap "I've sent it" in Orders.`,
         orderId: order.id,
         itemId,
       }),
@@ -170,10 +173,10 @@ export async function dispatchOrder(request, env, orderId) {
 
   await notify(env, o.buyer_id, {
     kind: 'dispatched',
-    title: 'Your order is on its way',
+    title: `"${o.item_title}" is on its way`,
     body:
       o.delivery_method === SAFE_HUB
-        ? 'Your piece is ready to collect at the Downtown Joburg Safe Hub.'
+        ? 'It is ready to collect at the Downtown Joburg Safe Hub.'
         : `Sent with ${o.delivery_method}, tracking number ${tracking}.`,
     orderId,
     itemId: o.item_id,
@@ -194,7 +197,7 @@ export async function confirmOrder(request, env, orderId) {
     .run();
   if (!res.meta.changes) throw new HttpError(409, 'This order cannot be confirmed yet');
 
-  await env.DB.batch(releaseToSeller(env, o, `Buyer confirmed order ${o.id}`));
+  await env.DB.batch(releaseToSeller(env, o, 'The buyer received it'));
   return json({ order: await orderJson(env, await loadOrder(env, orderId), user.id) });
 }
 
@@ -210,8 +213,8 @@ function releaseToSeller(env, o, reason) {
       o.seller_id,
     ),
     txn(env, o.seller_id, {
-      title: 'Escrow released',
-      subtitle: `${reason} (5% Dobha fee)`,
+      title: `Sold ${o.item_title}`,
+      subtitle: `${reason} (after the 5% Dobha fee)`,
       amount: payout,
       type: 'escrowRelease',
       status: 'Paid out',
@@ -219,8 +222,8 @@ function releaseToSeller(env, o, reason) {
     }),
     notify(env, o.seller_id, {
       kind: 'payout',
-      title: 'Payout released',
-      body: `${money(payout)} for order ${o.id} is now in your wallet.`,
+      title: 'You have been paid',
+      body: `${money(payout)} for "${o.item_title}" is now in your wallet.`,
       orderId: o.id,
       itemId: o.item_id,
     }),
@@ -240,7 +243,7 @@ export async function disputeOrder(request, env, orderId) {
   await notify(env, o.seller_id, {
     kind: 'disputed',
     title: 'Buyer reported a problem',
-    body: `The payment for order ${o.id} is frozen while Dobha support looks into it.`,
+    body: `The payment for "${o.item_title}" is on hold while Dobha support sorts it out.`,
     orderId,
     itemId: o.item_id,
   }).run();
@@ -281,11 +284,11 @@ export async function resolveDispute(request, env, orderId) {
   const total = o.amount_cents + o.shipping_cents;
   if (outcome === 'release') {
     await env.DB.batch([
-      ...releaseToSeller(env, o, `Dispute on order ${o.id} settled for the seller`),
+      ...releaseToSeller(env, o, 'Dobha support settled the problem for you'),
       notify(env, o.buyer_id, {
         kind: 'resolved',
-        title: 'Dispute settled',
-        body: `Dobha support reviewed order ${o.id} and released the payment to the seller.`,
+        title: 'Problem sorted',
+        body: `Dobha support looked into "${o.item_title}" and paid the seller.`,
         orderId,
         itemId: o.item_id,
       }),
@@ -297,8 +300,8 @@ export async function resolveDispute(request, env, orderId) {
       ).bind(total, o.buyer_id),
       env.DB.prepare('UPDATE wallets SET pending_cents = MAX(pending_cents - ?, 0) WHERE user_id = ?').bind(o.amount_cents, o.seller_id),
       txn(env, o.buyer_id, {
-        title: 'Refund',
-        subtitle: `Dispute on order ${o.id} settled in your favour`,
+        title: `Refund for ${o.item_title}`,
+        subtitle: 'Dobha support settled the problem for you',
         amount: total,
         type: 'refund',
         status: 'Refunded',
@@ -307,14 +310,14 @@ export async function resolveDispute(request, env, orderId) {
       notify(env, o.buyer_id, {
         kind: 'resolved',
         title: 'You have been refunded',
-        body: `${money(total)} for order ${o.id} is back in your wallet.`,
+        body: `${money(total)} for "${o.item_title}" is back in your wallet.`,
         orderId,
         itemId: o.item_id,
       }),
       notify(env, o.seller_id, {
         kind: 'resolved',
-        title: 'Dispute settled for the buyer',
-        body: `Dobha support refunded the buyer for order ${o.id}.`,
+        title: 'Buyer refunded',
+        body: `Dobha support refunded the buyer for "${o.item_title}".`,
         orderId,
         itemId: o.item_id,
       }),
