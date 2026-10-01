@@ -92,6 +92,8 @@ export async function register(request, env) {
   if (!EMAIL_RE.test(email)) throw new HttpError(400, 'Enter a valid email address');
   if (password.length < 8 || password.length > 200) throw new HttpError(400, 'Password must be at least 8 characters');
   if (!HANDLE_RE.test(handle)) throw new HttpError(400, 'Username: 3-20 lowercase letters, numbers or _');
+  if (body.acceptTerms !== true) throw new HttpError(400, 'Please read and agree to the Terms and Conditions');
+  const termsVersion = str(body, 'termsVersion', { max: 20 });
 
   const taken = await env.DB.prepare('SELECT email, handle FROM users WHERE email = ? OR handle = ?').bind(email, handle).first();
   if (taken) {
@@ -114,8 +116,9 @@ export async function register(request, env) {
   };
   await env.DB.batch([
     env.DB.prepare(
-      'INSERT INTO users (id, email, password_hash, password_salt, name, handle, phone, role, shop_name, stall_location, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    ).bind(user.id, email, user.password_hash, salt, name, handle, phone, 'shopper', '', '', user.created_at),
+      `INSERT INTO users (id, email, password_hash, password_salt, name, handle, phone, role, shop_name, stall_location, created_at, terms_version, terms_accepted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(user.id, email, user.password_hash, salt, name, handle, phone, 'shopper', '', '', user.created_at, termsVersion, user.created_at),
     env.DB.prepare('INSERT INTO wallets (user_id) VALUES (?)').bind(user.id),
   ]);
 

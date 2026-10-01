@@ -69,7 +69,10 @@ async function freeHandle(env, email) {
 /** POST /api/auth/google { idToken } */
 export async function googleSignIn(request, env) {
   await limited(env.AUTH_LIMIT, request);
-  const claims = await verifyIdToken(str(await readJson(request), 'idToken', { max: 4096 }), env);
+  const body = await readJson(request);
+  const claims = await verifyIdToken(str(body, 'idToken', { max: 4096 }), env);
+  // The app shows the terms next to the Google button; a new account accepts that version.
+  const termsVersion = str(body, 'termsVersion', { max: 20, optional: true }) || null;
   const email = claims.email.toLowerCase();
 
   let user = await env.DB.prepare('SELECT * FROM users WHERE google_sub = ?').bind(claims.sub).first();
@@ -101,9 +104,10 @@ export async function googleSignIn(request, env) {
     };
     await env.DB.batch([
       env.DB.prepare(
-        `INSERT INTO users (id, email, password_hash, password_salt, name, handle, phone, role, shop_name, stall_location, created_at, google_sub)
-         VALUES (?, ?, '', '', ?, ?, '', 'shopper', '', '', ?, ?)`,
-      ).bind(user.id, email, user.name, user.handle, user.created_at, claims.sub),
+        `INSERT INTO users (id, email, password_hash, password_salt, name, handle, phone, role, shop_name, stall_location, created_at, google_sub,
+           terms_version, terms_accepted_at)
+         VALUES (?, ?, '', '', ?, ?, '', 'shopper', '', '', ?, ?, ?, ?)`,
+      ).bind(user.id, email, user.name, user.handle, user.created_at, claims.sub, termsVersion, termsVersion ? user.created_at : null),
       env.DB.prepare('INSERT INTO wallets (user_id) VALUES (?)').bind(user.id),
     ]);
     created = true;
