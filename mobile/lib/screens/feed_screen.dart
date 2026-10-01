@@ -6,6 +6,7 @@ import '../models/thrift_item.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/checkout_modal.dart';
+import '../widgets/live_now_row.dart';
 import '../widgets/media_carousel.dart';
 import '../widgets/offer_card.dart';
 import '../widgets/user_avatar.dart';
@@ -75,10 +76,20 @@ class _FeedScreenState extends State<FeedScreen> {
             fit: StackFit.expand,
             children: [
               _body(state, items),
+              // Top of Home: who is live right now (when anyone is), and the cart.
               const SafeArea(
                 child: Align(
-                  alignment: Alignment.topRight,
-                  child: Padding(padding: EdgeInsets.fromLTRB(0, 8, 12, 0), child: CartButton(overlay: true)),
+                  alignment: Alignment.topCenter,
+                  child: Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: LiveNowRow()),
+                        Padding(padding: EdgeInsets.only(right: 12), child: CartButton(overlay: true)),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ],

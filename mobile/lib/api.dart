@@ -24,7 +24,24 @@ class ApiException implements Exception {
 class LiveRoom {
   final String name;
   final int viewers;
-  LiveRoom(this.name, this.viewers);
+
+  /// Who is hosting, when the server could tell (shown on Home's live row).
+  final String? hostId;
+  final String? hostName;
+  final String? hostAvatarUrl;
+
+  LiveRoom(this.name, this.viewers, {this.hostId, this.hostName, this.hostAvatarUrl});
+
+  factory LiveRoom.fromJson(Map<String, dynamic> json) {
+    final host = json['host'] as Map<String, dynamic>?;
+    return LiveRoom(
+      json['name'] as String,
+      json['viewers'] as int? ?? 0,
+      hostId: host?['id'] as String?,
+      hostName: host?['name'] as String?,
+      hostAvatarUrl: host?['avatarUrl'] as String?,
+    );
+  }
 }
 
 class JoinInfo {
@@ -60,7 +77,7 @@ class Api {
 
   Future<List<LiveRoom>> rooms() async {
     final data = await get('/api/rooms') as List;
-    return data.map((r) => LiveRoom(r['name'] as String, r['viewers'] as int)).toList();
+    return data.map((r) => LiveRoom.fromJson(r as Map<String, dynamic>)).toList();
   }
 
   Future<JoinInfo> liveToken({required String room, required bool host}) async {
