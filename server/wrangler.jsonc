@@ -40,6 +40,10 @@
     { "name": "ACTION_LIMIT", "namespace_id": "1004", "simple": { "limit": 60, "period": 60 } }
   ],
 
+  // Emails ("forgot password" codes, support answers to people who wrote in signed out) need a Cloudflare
+  // Email Service binding named EMAIL and an EMAIL_FROM var on a domain onboarded to it. Until both exist,
+  // /api/auth/forgot answers 503 and the app points people to "Contact support" instead.
+
   // Daily cleanup of expired sessions and unattached uploads (items.cleanup).
   "triggers": { "crons": ["0 1 * * *"] }
 }

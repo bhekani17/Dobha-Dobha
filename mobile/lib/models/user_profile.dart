@@ -62,6 +62,9 @@ class UserProfile {
   final DateTime createdAt;
   final int salesCount;
 
+  /// False for Google-only accounts, which have no password to change.
+  final bool hasPassword;
+
   const UserProfile({
     required this.id,
     required this.email,
@@ -76,6 +79,7 @@ class UserProfile {
     this.location = '',
     required this.createdAt,
     this.salesCount = 0,
+    this.hasPassword = true,
   });
 
   bool get isVendor => role == UserRole.vendor;
@@ -101,5 +105,6 @@ class UserProfile {
         location: json['location'] as String? ?? '',
         createdAt: DateTime.parse(json['createdAt'] as String),
         salesCount: json['salesCount'] as int? ?? 0,
+        hasPassword: json['hasPassword'] as bool? ?? true,
       );
 }

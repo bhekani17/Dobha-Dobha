@@ -147,7 +147,7 @@ class _NavItem extends StatelessWidget {
             Text(
               tab.label,
               maxLines: 1,
-              style: TextStyle(fontSize: 11.5, fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: color),
+              style: TextStyle(fontSize: 12, fontWeight: selected ? FontWeight.w600 : FontWeight.w500, color: color),
             ),
           ],
         ),

@@ -34,7 +34,7 @@ class WalletScreen extends StatelessWidget {
             children: [
               Icon(Icons.add_circle_outline_rounded, color: DobhaColors.green, size: 22),
               SizedBox(width: 8),
-              Text('Top Up Wallet', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+              Text('Top Up Wallet', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: -0.3)),
             ],
           ),
           content: Column(
@@ -93,7 +93,7 @@ class WalletScreen extends StatelessWidget {
             children: [
               Icon(Icons.account_balance_rounded, color: DobhaColors.cyan, size: 22),
               SizedBox(width: 8),
-              Text('Withdraw', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+              Text('Withdraw', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: -0.3)),
             ],
           ),
           content: Column(
@@ -174,12 +174,10 @@ class WalletScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             children: [
               if (openOffers.isNotEmpty) ...[
-                const Text('Offers', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                const SizedBox(height: 12),
+                const SectionTitle('Offers'),
                 ...openOffers.map((o) => OfferCard(offer: o)),
-                const SizedBox(height: 16),
-                const Text('Orders', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
+                const SectionTitle('Orders'),
               ],
               if (activeOrders.isEmpty)
                 AppWell(
@@ -194,21 +192,20 @@ class WalletScreen extends StatelessWidget {
               else
                 ...activeOrders.map((ord) => EscrowTrackerCard(order: ord)),
               const SizedBox(height: 28),
-              const Text('Wallet', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-              const SizedBox(height: 12),
+              const SectionTitle('Wallet'),
               // Main balance
               AppCard(
-                radius: 26,
+                radius: 20,
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('You can spend or withdraw',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: DobhaColors.textSecondary)),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: DobhaColors.textSecondary)),
                     const SizedBox(height: 6),
                     Text(
                       'R ${appState.availableBalance.toStringAsFixed(0)}',
-                      style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: DobhaColors.green, letterSpacing: -1),
+                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w700, letterSpacing: -1.2, height: 1.1),
                     ),
                     const SizedBox(height: 18),
                     Row(
@@ -262,11 +259,8 @@ class WalletScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
-
               const SizedBox(height: 28),
-              const Text('History', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-              const SizedBox(height: 12),
+              const SectionTitle('History'),
               if (txs.isEmpty)
                 AppWell(
                   radius: 18,
@@ -274,7 +268,17 @@ class WalletScreen extends StatelessWidget {
                   child: Center(child: Text('No transactions yet.', style: TextStyle(color: DobhaColors.muted, fontSize: 13))),
                 )
               else
-                ...txs.map(_buildTxTile),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < txs.length; i++) ...[
+                        if (i > 0) Divider(height: 1, color: DobhaColors.border),
+                        _buildTxTile(txs[i]),
+                      ],
+                    ],
+                  ),
+                ),
             ],
           ),
           ),
@@ -285,10 +289,8 @@ class WalletScreen extends StatelessWidget {
 
   Widget _buildTxTile(WalletTransaction tx) {
     final color = tx.isCredit ? DobhaColors.green : DobhaColors.cyan;
-    return AppCard(
-      margin: const EdgeInsets.only(bottom: 14),
-      radius: 18,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
           AppWell(
@@ -302,9 +304,9 @@ class WalletScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(tx.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                Text(tx.title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                 Text(tx.subtitle,
-                    style: TextStyle(fontSize: 11, color: DobhaColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    style: TextStyle(fontSize: 12, color: DobhaColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
@@ -313,9 +315,9 @@ class WalletScreen extends StatelessWidget {
             children: [
               Text(
                 '${tx.isCredit ? "+" : "-"}R ${tx.amountZar.toStringAsFixed(0)}',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: tx.isCredit ? DobhaColors.green : DobhaColors.text),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: tx.isCredit ? DobhaColors.green : DobhaColors.text),
               ),
-              Text(tx.status, style: TextStyle(fontSize: 10, color: DobhaColors.muted)),
+              Text(tx.status, style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
             ],
           ),
         ],
@@ -344,12 +346,12 @@ class _BalanceWell extends StatelessWidget {
               Icon(icon, size: 14, color: color),
               const SizedBox(width: 6),
               Flexible(
-                child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: DobhaColors.textSecondary)),
+                child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: DobhaColors.textSecondary)),
               ),
             ],
           ),
           const SizedBox(height: 6),
-          Text('R ${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: color)),
+          Text('R ${amount.toStringAsFixed(0)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: color, letterSpacing: -0.3)),
         ],
       ),
     );

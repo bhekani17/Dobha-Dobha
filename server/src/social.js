@@ -253,7 +253,7 @@ export async function searchPeople(request, env) {
   if (q.length < 2) return json({ users: [] });
   const { results } = await env.DB.prepare(
     `SELECT ${personSql('?1')} FROM users u
-     WHERE instr(lower(u.name || ' ' || u.handle || ' ' || u.shop_name), ?2) > 0
+     WHERE u.deleted_at IS NULL AND instr(lower(u.name || ' ' || u.handle || ' ' || u.shop_name), ?2) > 0
      ORDER BY (lower(u.handle) = ?2) DESC, u.role = 'vendor' DESC, u.created_at LIMIT 20`,
   )
     .bind(user.id, q)

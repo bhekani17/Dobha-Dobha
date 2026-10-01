@@ -14,7 +14,7 @@ import 'edit_profile_screen.dart';
 import 'chat_screens.dart';
 import 'notifications_screen.dart';
 import 'people_screens.dart';
-import 'terms_screen.dart';
+import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -31,61 +31,6 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   void dispose() {
     _tabController.dispose();
     super.dispose();
-  }
-
-  void _showSettings() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: DobhaColors.surface,
-      showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Edit profile'),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                EditProfileScreen.open(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: const Text('Terms and Conditions'),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                TermsScreen.open(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.logout_rounded, color: DobhaColors.red),
-              title: Text('Log out', style: TextStyle(color: DobhaColors.red)),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _confirmLogout();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _confirmLogout() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Log out?'),
-        content: const Text('You can log back in any time with your email and password.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Log Out')),
-        ],
-      ),
-    );
-    if (ok == true) await AppState().logout();
   }
 
   @override
@@ -108,7 +53,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               const SizedBox(width: 12),
               const NotificationBell(),
               const SizedBox(width: 12),
-              AppButton.icon(icon: Icons.settings_outlined, size: 19, padding: 10, onPressed: _showSettings),
+              AppButton.icon(icon: Icons.settings_outlined, size: 19, padding: 10, onPressed: () => SettingsScreen.open(context)),
               const SizedBox(width: 16),
             ],
           ),
@@ -116,16 +61,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             headerSliverBuilder: (context, _) => [
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
-                  child: AppCard(
-                    radius: 26,
-                    child: Column(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
+                  child: Column(
                       children: [
                         Row(
                           children: [
                             GestureDetector(
                               onTap: () => EditProfileScreen.open(context),
-                              child: UserAvatar(url: user.avatarUrl, name: user.name, size: 72),
+                              child: UserAvatar(url: user.avatarUrl, name: user.name, size: 76),
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -133,11 +76,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(user.name,
-                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+                                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 22, letterSpacing: -0.5),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis),
-                                  Text(user.handle, style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
-                                  const SizedBox(height: 2),
+                                  Text(user.handle, style: TextStyle(fontSize: 13, color: DobhaColors.muted)),
+                                  const SizedBox(height: 4),
                                   if (user.location.isNotEmpty)
                                     Row(
                                       children: [
@@ -147,7 +90,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                           child: Text(user.location,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(fontSize: 11.5, color: DobhaColors.textSecondary)),
+                                              style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary)),
                                         ),
                                       ],
                                     ),
@@ -160,7 +103,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         Align(
                           alignment: Alignment.centerLeft,
                           child: user.bio.isNotEmpty
-                              ? Text(user.bio, style: const TextStyle(fontSize: 13, height: 1.4))
+                              ? Text(user.bio, style: const TextStyle(fontSize: 14, height: 1.45))
                               : GestureDetector(
                                   onTap: () => EditProfileScreen.open(context),
                                   child: Text('Add a bio so buyers and sellers know you',
@@ -168,9 +111,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                                 ),
                         ),
                         const SizedBox(height: 18),
-                        AppWell(
-                          radius: 16,
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            border: Border.symmetric(horizontal: BorderSide(color: DobhaColors.border)),
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
@@ -195,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             Expanded(
                               child: Text(
                                 user.isVendor ? 'Selling as ${user.shopName}' : 'Want to sell your own pieces?',
-                                style: TextStyle(fontSize: 12.5, color: DobhaColors.textSecondary, fontWeight: FontWeight.w600),
+                                style: TextStyle(fontSize: 13, color: DobhaColors.textSecondary, fontWeight: FontWeight.w600),
                               ),
                             ),
                             AppButton(
@@ -207,8 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                             ),
                           ],
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
@@ -217,11 +161,12 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                 delegate: _TabsDelegate(
                   TabBar(
                     controller: _tabController,
-                    indicator: Surfaces.well(radius: 14, tint: DobhaColors.green),
+                    indicator: UnderlineTabIndicator(borderSide: BorderSide(color: DobhaColors.text, width: 2)),
                     indicatorSize: TabBarIndicatorSize.tab,
-                    labelColor: DobhaColors.green,
+                    labelColor: DobhaColors.text,
                     unselectedLabelColor: DobhaColors.muted,
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                    labelStyle: const TextStyle(fontFamily: DobhaColors.fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
+                    unselectedLabelStyle: const TextStyle(fontFamily: DobhaColors.fontFamily, fontWeight: FontWeight.w500, fontSize: 14),
                     tabs: [
                       Tab(text: 'Orders (${orders.length})'),
                       Tab(text: 'Saved (${saved.length})'),
@@ -280,10 +225,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(item.title,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13), maxLines: 1, overflow: TextOverflow.ellipsis),
                       Text('${item.condition} · ${item.sellerName}',
                           style: TextStyle(fontSize: 11, color: DobhaColors.muted), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 13)),
+                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w600, color: DobhaColors.green, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -295,7 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                         radius: 12,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         onPressed: () => CheckoutModal.show(context, item),
-                        child: const Text('DOBHA', style: TextStyle(fontSize: 11)),
+                        child: const Text('Buy', style: TextStyle(fontSize: 13)),
                       ),
               ],
             ),
@@ -319,9 +264,9 @@ class _Stat extends StatelessWidget {
       onTap: onTap,
       child: Column(
         children: [
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: -0.4)),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
+          Text(label, style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
         ],
       ),
     );
@@ -357,19 +302,16 @@ class _TabsDelegate extends SliverPersistentHeaderDelegate {
 
   _TabsDelegate(this.tabBar);
 
-  static const _pad = 8.0;
-
   @override
-  double get minExtent => tabBar.preferredSize.height + _pad * 2 + 8;
+  double get minExtent => tabBar.preferredSize.height + 1;
   @override
   double get maxExtent => minExtent;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
-      color: DobhaColors.bg,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: AppCard(radius: 18, padding: const EdgeInsets.all(_pad), child: tabBar),
+      decoration: BoxDecoration(color: DobhaColors.bg, border: Border(bottom: BorderSide(color: DobhaColors.border))),
+      child: tabBar,
     );
   }
 

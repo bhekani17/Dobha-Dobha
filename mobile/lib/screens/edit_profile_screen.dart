@@ -75,7 +75,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Profile picture', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              const Text('Profile picture', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
               const SizedBox(height: 16),
               for (final (icon, label, source) in [
                 (Icons.photo_camera_outlined, 'Take a photo', ImageSource.camera),

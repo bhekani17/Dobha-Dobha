@@ -100,7 +100,7 @@ class PinnedProductBanner extends StatelessWidget {
                           'Sold to ${current.claimedBy ?? "buyer"}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: DobhaColors.amber, fontSize: 12, fontWeight: FontWeight.w700),
+                          style: TextStyle(color: DobhaColors.amber, fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -164,7 +164,7 @@ Future<PinnedItem?> showPinItemModal({required BuildContext context, String? cur
                 children: [
                   Icon(Icons.sell_rounded, color: DobhaColors.green, size: 22),
                   const SizedBox(width: 8),
-                  const Text('Pin an item', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const Text('Pin an item', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
                   const Spacer(),
                   AppButton.icon(icon: Icons.close, size: 18, padding: 8, onPressed: () => Navigator.of(ctx).pop()),
                 ],

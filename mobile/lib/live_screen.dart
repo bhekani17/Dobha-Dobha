@@ -367,7 +367,7 @@ class _LiveScreenState extends State<LiveScreen> {
               children: [
                 const Icon(Icons.remove_red_eye_outlined, size: 14),
                 const SizedBox(width: 4),
-                Text('$viewers', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                Text('$viewers', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
               ],
             ),
           ),
@@ -470,7 +470,7 @@ class _LiveScreenState extends State<LiveScreen> {
                         Flexible(
                           child: Text(
                             m.text,
-                            style: TextStyle(color: DobhaColors.green, fontSize: 13, fontWeight: FontWeight.w700),
+                            style: TextStyle(color: DobhaColors.green, fontSize: 13, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ],

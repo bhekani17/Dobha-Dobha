@@ -101,7 +101,7 @@ class _SellerScreenState extends State<SellerScreen> {
                       sliver: SliverToBoxAdapter(
                         child: Text(
                           'For sale (${_items.length})',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3),
                         ),
                       ),
                     ),
@@ -118,9 +118,9 @@ class _SellerScreenState extends State<SellerScreen> {
                         sliver: SliverGrid.builder(
                           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
-                            mainAxisSpacing: 12,
+                            mainAxisSpacing: 20,
                             crossAxisSpacing: 12,
-                            childAspectRatio: 0.66,
+                            childAspectRatio: 0.62,
                           ),
                           itemCount: _items.length,
                           itemBuilder: (context, i) => ItemGridTile(
@@ -135,7 +135,7 @@ class _SellerScreenState extends State<SellerScreen> {
                       sliver: SliverToBoxAdapter(
                         child: Text(
                           'Reviews (${p.reviewCount})',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3),
                         ),
                       ),
                     ),
@@ -163,7 +163,7 @@ class _SellerScreenState extends State<SellerScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       child: AppCard(
-        radius: 24,
+        radius: 20,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -175,7 +175,7 @@ class _SellerScreenState extends State<SellerScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(p.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      Text(p.displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
                       Text(
                         p.followsYou && !p.isMe ? '${p.handle} · Follows you' : p.handle,
                         style: TextStyle(color: DobhaColors.muted, fontSize: 13),
@@ -261,10 +261,10 @@ class _Stat extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (icon != null) ...[Icon(icon, size: 16, color: DobhaColors.green), const SizedBox(width: 3)],
-                Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                Text(value, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
               ],
             ),
-            Text(label, style: TextStyle(fontSize: 11.5, color: DobhaColors.muted)),
+            Text(label, style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
           ],
         ),
       ),
@@ -303,7 +303,7 @@ class _ReviewTile extends StatelessWidget {
             Text(review.text, style: TextStyle(color: DobhaColors.textSecondary, height: 1.4)),
           ],
           const SizedBox(height: 6),
-          Text('Bought ${review.itemTitle}', style: TextStyle(fontSize: 11.5, color: DobhaColors.muted)),
+          Text('Bought ${review.itemTitle}', style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
         ],
       ),
     );

@@ -62,7 +62,7 @@ class Api {
   Future<dynamic> get(String path, [Map<String, String>? query]) => _send('GET', path, query: query);
   Future<dynamic> post(String path, [Object? body]) => _send('POST', path, body: body);
   Future<dynamic> patch(String path, Object body) => _send('PATCH', path, body: body);
-  Future<dynamic> delete(String path) => _send('DELETE', path);
+  Future<dynamic> delete(String path, [Object? body]) => _send('DELETE', path, body: body);
 
   /// PUT raw bytes (e.g. a profile picture).
   Future<dynamic> putBytes(String path, Uint8List bytes, String contentType) =>

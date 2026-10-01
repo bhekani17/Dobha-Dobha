@@ -54,7 +54,7 @@ class _CartScreenState extends State<CartScreen> {
                       children: [
                         Icon(Icons.shopping_bag_outlined, size: 48, color: DobhaColors.muted),
                         const SizedBox(height: 12),
-                        const Text('Your cart is empty', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                        const Text('Your cart is empty', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
                         const SizedBox(height: 6),
                         Text('Tap the bag on any piece to add it here and buy several at once.',
                             textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted, height: 1.4)),
@@ -82,7 +82,7 @@ class _CartScreenState extends State<CartScreen> {
                             Text('${available.length} piece${available.length == 1 ? '' : 's'}',
                                 style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
                             Text('R ${subtotal.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
                           ],
                         ),
                         const SizedBox(width: 16),

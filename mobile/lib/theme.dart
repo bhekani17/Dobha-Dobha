@@ -26,13 +26,13 @@ class _Palette {
 
 const _dark = _Palette(
   bg: Color(0xFF000000),
-  surface: Color(0xFF121212),
-  well: Color(0xFF0A0A0A),
-  cardElevated: Color(0xFF1F1F1F),
+  surface: Color(0xFF101010),
+  well: Color(0xFF080808),
+  cardElevated: Color(0xFF1C1C1C),
   text: Color(0xFFFFFFFF),
-  textSecondary: Color(0xFFBDBDBD),
-  muted: Color(0xFF8A8A8A),
-  border: Color(0xFF1F1F1F),
+  textSecondary: Color(0xFFC7C7C7),
+  muted: Color(0xFF8C8C8C),
+  border: Color(0xFF222222),
   borderLight: Color(0xFF2E2E2E),
   green: Color(0xFF00A93B),
   red: Color(0xFFFF453A),
@@ -41,13 +41,13 @@ const _dark = _Palette(
 // Green is deeper on white so text in it stays readable.
 const _light = _Palette(
   bg: Color(0xFFFFFFFF),
-  surface: Color(0xFFF4F4F4),
-  well: Color(0xFFEDEDED),
-  cardElevated: Color(0xFFE8E8E8),
-  text: Color(0xFF000000),
+  surface: Color(0xFFF7F7F7),
+  well: Color(0xFFEFEFEF),
+  cardElevated: Color(0xFFEDEDED),
+  text: Color(0xFF0A0A0A),
   textSecondary: Color(0xFF3D3D3D),
   muted: Color(0xFF6B6B6B),
-  border: Color(0xFFE5E5E5),
+  border: Color(0xFFE6E6E6),
   borderLight: Color(0xFFD4D4D4),
   green: Color(0xFF00A650),
   red: Color(0xFFD92D20),
@@ -78,6 +78,9 @@ class DobhaColors {
   static Color get amber => _p.textSecondary;
   static Color get cyan => _p.text;
 
+  /// The app's typeface, bundled in assets/fonts.
+  static const fontFamily = 'PlusJakartaSans';
+
   /// The logo for the current brightness: transparent on dark, black tile on light.
   static String get logoAsset => isDark ? 'assets/images/logo01.png' : 'assets/images/logo.png';
 }
@@ -93,16 +96,38 @@ ThemeData dobhaTheme(Brightness brightness) {
   }
 }
 
+/// One type scale for the whole app: big titles are tight and bold, body text is regular.
+TextTheme _textTheme() {
+  TextStyle s(double size, FontWeight weight, {double height = 1.35, double spacing = 0, Color? color}) =>
+      TextStyle(fontSize: size, fontWeight: weight, height: height, letterSpacing: spacing, color: color ?? DobhaColors.text);
+  return TextTheme(
+    displaySmall: s(32, FontWeight.w700, height: 1.15, spacing: -0.8),
+    headlineMedium: s(26, FontWeight.w700, height: 1.2, spacing: -0.6),
+    headlineSmall: s(22, FontWeight.w700, height: 1.2, spacing: -0.4),
+    titleLarge: s(19, FontWeight.w700, height: 1.25, spacing: -0.3),
+    titleMedium: s(16, FontWeight.w600, spacing: -0.1),
+    titleSmall: s(14, FontWeight.w600),
+    bodyLarge: s(16, FontWeight.w400, height: 1.45),
+    bodyMedium: s(14, FontWeight.w400, height: 1.45),
+    bodySmall: s(12, FontWeight.w400, color: DobhaColors.muted),
+    labelLarge: s(14, FontWeight.w600),
+    labelMedium: s(12, FontWeight.w600),
+    labelSmall: s(11, FontWeight.w600, spacing: 0.2),
+  );
+}
+
 ThemeData _buildTheme(Brightness brightness) {
   final fieldBorder = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: BorderSide.none,
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: DobhaColors.border),
   );
-  final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
+  final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
 
   return ThemeData(
     useMaterial3: true,
     brightness: brightness,
+    fontFamily: DobhaColors.fontFamily,
+    textTheme: _textTheme(),
     scaffoldBackgroundColor: DobhaColors.bg,
     canvasColor: DobhaColors.bg,
     splashFactory: NoSplash.splashFactory,
@@ -115,7 +140,7 @@ ThemeData _buildTheme(Brightness brightness) {
       onSurface: DobhaColors.text,
       error: DobhaColors.red,
     ),
-    // Fields are flat, filled with the surface tone.
+    // Fields are filled with the surface tone and outlined with a hairline.
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: DobhaColors.surface,
@@ -125,17 +150,18 @@ ThemeData _buildTheme(Brightness brightness) {
       border: fieldBorder,
       enabledBorder: fieldBorder,
       focusedBorder: fieldBorder.copyWith(
-        borderSide: BorderSide(color: DobhaColors.green.withValues(alpha: 0.6), width: 1.2),
+        borderSide: BorderSide(color: DobhaColors.green, width: 1.2),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         backgroundColor: DobhaColors.green,
         foregroundColor: Colors.black,
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        textStyle: const TextStyle(fontFamily: DobhaColors.fontFamily, fontWeight: FontWeight.w600, fontSize: 15),
         shape: shape,
         elevation: 0,
+        minimumSize: const Size(0, 50),
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 18),
       ),
     ),
@@ -143,8 +169,10 @@ ThemeData _buildTheme(Brightness brightness) {
       style: OutlinedButton.styleFrom(
         foregroundColor: DobhaColors.text,
         backgroundColor: DobhaColors.cardElevated,
+        textStyle: const TextStyle(fontFamily: DobhaColors.fontFamily, fontWeight: FontWeight.w600, fontSize: 15),
         side: BorderSide.none,
         shape: shape,
+        minimumSize: const Size(0, 50),
         padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
       ),
     ),
@@ -159,8 +187,10 @@ ThemeData _buildTheme(Brightness brightness) {
       centerTitle: false,
       scrolledUnderElevation: 0,
       titleTextStyle: TextStyle(
-        fontSize: 19,
+        fontFamily: DobhaColors.fontFamily,
+        fontSize: 20,
         fontWeight: FontWeight.w700,
+        letterSpacing: -0.4,
         color: DobhaColors.text,
       ),
     ),
@@ -176,22 +206,36 @@ ThemeData _buildTheme(Brightness brightness) {
       backgroundColor: DobhaColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: DobhaColors.border)),
     ),
+    listTileTheme: ListTileThemeData(
+      iconColor: DobhaColors.textSecondary,
+      titleTextStyle: TextStyle(fontFamily: DobhaColors.fontFamily, fontSize: 15, fontWeight: FontWeight.w500, color: DobhaColors.text),
+      subtitleTextStyle: TextStyle(fontFamily: DobhaColors.fontFamily, fontSize: 13, color: DobhaColors.muted),
+    ),
+    progressIndicatorTheme: ProgressIndicatorThemeData(color: DobhaColors.green),
     popupMenuTheme: PopupMenuThemeData(
       color: DobhaColors.cardElevated,
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: DobhaColors.borderLight)),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
       elevation: 0,
       backgroundColor: DobhaColors.cardElevated,
-      contentTextStyle: TextStyle(color: DobhaColors.text, fontWeight: FontWeight.w600),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      contentTextStyle: TextStyle(fontFamily: DobhaColors.fontFamily, color: DobhaColors.text, fontWeight: FontWeight.w500),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: DobhaColors.borderLight)),
     ),
     dividerTheme: DividerThemeData(color: DobhaColors.border, thickness: 1),
-    tabBarTheme: const TabBarThemeData(dividerColor: Colors.transparent),
+    tabBarTheme: TabBarThemeData(
+      dividerColor: DobhaColors.border,
+      indicator: UnderlineTabIndicator(borderSide: BorderSide(color: DobhaColors.text, width: 2)),
+      indicatorSize: TabBarIndicatorSize.tab,
+      labelColor: DobhaColors.text,
+      unselectedLabelColor: DobhaColors.muted,
+      labelStyle: const TextStyle(fontFamily: DobhaColors.fontFamily, fontWeight: FontWeight.w600, fontSize: 14),
+      unselectedLabelStyle: const TextStyle(fontFamily: DobhaColors.fontFamily, fontWeight: FontWeight.w500, fontSize: 14),
+    ),
     // One gentle transition everywhere instead of each platform's default.
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {

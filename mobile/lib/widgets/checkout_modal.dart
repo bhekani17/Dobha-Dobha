@@ -121,7 +121,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
           children: [
             Icon(Icons.check_circle_rounded, color: DobhaColors.green, size: 26),
             SizedBox(width: 10),
-            Text(many ? "They're yours" : "It's yours", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            Text(many ? "They're yours" : "It's yours", style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: -0.3)),
           ],
         ),
         content: Column(
@@ -196,7 +196,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Checkout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      Text('Checkout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
                       Text('The seller is paid only once you have it', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
                     ],
                   ),
@@ -262,7 +262,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
             const SizedBox(height: 22),
 
             Text('How do you want it?',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.textSecondary)),
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.textSecondary)),
             const SizedBox(height: 12),
             ..._deliveryOptions.map((opt) {
               final isSelected = _selectedDelivery == opt['name'];
@@ -289,7 +289,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(opt['name'] as String,
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.text)),
+                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.text)),
                             Text(opt['sub'] as String,
                                 style: TextStyle(fontSize: 11, color: DobhaColors.muted, fontWeight: FontWeight.w500)),
                           ],
@@ -315,7 +315,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             const SizedBox(height: 22),
 
-            Text('Pay with', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.textSecondary)),
+            Text('Pay with', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.textSecondary)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 12,
@@ -359,7 +359,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Total', style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
-                    Text('R ${total.toStringAsFixed(0)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+                    Text('R ${total.toStringAsFixed(0)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
                   ],
                 ),
                 const SizedBox(width: 16),

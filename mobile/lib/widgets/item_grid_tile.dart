@@ -6,7 +6,7 @@ import '../theme.dart';
 import 'item_photo.dart';
 import 'ui.dart';
 
-/// Flat product tile for grids. Fades and slides in on first build, staggered
+/// Product tile for grids: rounded photo with price and details underneath. Fades and slides in on first build, staggered
 /// by [index], and shrinks slightly while pressed.
 class ItemGridTile extends StatefulWidget {
   final ThriftItem item;
@@ -70,70 +70,70 @@ class _ItemGridTileState extends State<ItemGridTile> with SingleTickerProviderSt
         child: AnimatedScale(
           scale: _pressed ? 0.96 : 1,
           duration: const Duration(milliseconds: 110),
-          child: Container(
-            clipBehavior: Clip.antiAlias,
-            decoration: Surfaces.card(radius: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
+                      ColoredBox(color: DobhaColors.surface),
                       Hero(tag: 'item-${item.id}', child: ItemPhoto(item: item, iconSize: 40)),
                       if (videos > 0)
-                        Positioned(
+                        const Positioned(
                           top: 8,
                           left: 8,
-                          child: AppTag('VIDEO', color: Colors.black, icon: Icons.play_arrow_rounded, solid: true),
+                          child: OverlayPanel(
+                            radius: 20,
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.play_arrow_rounded, size: 16),
+                          ),
                         ),
                       if (item.media.length > 1)
                         Positioned(
                           top: 8,
                           right: 8,
                           child: OverlayPanel(
-                            radius: 8,
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.collections_outlined, size: 11),
-                                const SizedBox(width: 3),
-                                Text('${item.media.length}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700)),
-                              ],
-                            ),
+                            radius: 20,
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            child: Text('1/${item.media.length}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      if (item.isLiked)
+                        Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: OverlayPanel(
+                            radius: 20,
+                            padding: const EdgeInsets.all(5),
+                            child: Icon(Icons.favorite, size: 14, color: DobhaColors.green),
                           ),
                         ),
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(item.formattedPrice,
-                                style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 15)),
-                          ),
-                          if (item.isLiked) Icon(Icons.favorite, size: 14, color: DobhaColors.green),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      Text(item.title,
-                          maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                      const SizedBox(height: 2),
-                      Text('${item.sellerName} · ${item.size}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: DobhaColors.muted, fontSize: 11)),
-                    ],
-                  ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(2, 8, 2, 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.formattedPrice,
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: -0.3)),
+                    const SizedBox(height: 1),
+                    Text(item.title,
+                        maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: DobhaColors.textSecondary)),
+                    const SizedBox(height: 1),
+                    Text('Size ${item.size}  ·  ${item.sellerName}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

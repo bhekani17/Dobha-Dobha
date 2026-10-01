@@ -10,6 +10,7 @@ import '../legal/terms.dart';
 import '../models/app_notification.dart';
 import '../models/escrow_order.dart';
 import '../models/social.dart';
+import '../models/support.dart';
 import '../models/thrift_item.dart';
 import '../models/user_profile.dart';
 
@@ -170,6 +171,27 @@ class AppState extends ChangeNotifier {
     } catch (_) {
       // Signing out locally is what matters.
     }
+    await GoogleAuth.signOut();
+    await _clearSession();
+    notifyListeners();
+  }
+
+  /// Emails a 6-digit code for [resetPassword]. Succeeds whether or not the email has an account.
+  Future<void> forgotPassword(String email) => _api.post('/api/auth/forgot', {'email': email});
+
+  /// Sets a new password with the emailed code and signs in.
+  Future<void> resetPassword({required String email, required String code, required String password}) async {
+    final res = await _api.post('/api/auth/reset', {'email': email, 'code': code, 'password': password});
+    await _startSession(res as Map<String, dynamic>);
+  }
+
+  /// Changes the password; other devices are signed out, this one stays in.
+  Future<void> changePassword({required String current, required String password}) =>
+      _call(() => _api.post('/api/me/password', {'current': current, 'password': password}));
+
+  /// Deletes the account for good. Password accounts confirm with [password]; Google-only ones type DELETE.
+  Future<void> deleteAccount({String? password}) async {
+    await _call(() => _api.delete('/api/me', password != null ? {'password': password} : {'confirm': 'DELETE'}));
     await GoogleAuth.signOut();
     await _clearSession();
     notifyListeners();
@@ -728,5 +750,16 @@ class AppState extends ChangeNotifier {
 
   Future<void> sendMessage(String userId, String text, {String? itemId}) async {
     await _call(() => _api.post('/api/chats/$userId', {'text': text, 'itemId': ?itemId}));
+  }
+
+  // ---- Support ----
+
+  /// Sends a question to Dobha support. Works signed out too (then [email] is needed for the answer).
+  Future<void> contactSupport({required String topic, required String message, String? orderId, String? email}) =>
+      _call(() => _api.post('/api/support', {'topic': topic, 'message': message, 'orderId': ?orderId, 'email': ?email}));
+
+  Future<List<SupportRequest>> loadSupportRequests() async {
+    final res = await _call(() => _api.get('/api/support'));
+    return [for (final r in res['requests'] as List) SupportRequest.fromJson(r as Map<String, dynamic>)];
   }
 }

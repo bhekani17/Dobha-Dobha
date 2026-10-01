@@ -128,7 +128,7 @@ class OfferCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(o.formattedAmount, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: DobhaColors.green)),
+              Text(o.formattedAmount, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, color: DobhaColors.green, letterSpacing: -0.3)),
             ],
           ),
           const SizedBox(height: 12),

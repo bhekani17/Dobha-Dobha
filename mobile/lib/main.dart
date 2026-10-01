@@ -101,7 +101,8 @@ class _AuthGateState extends State<AuthGate> {
       builder: (context, _) {
         final state = AppState();
         // Signing in (including from Google's callback) closes any open login/register screens.
-        if (state.isLoggedIn && !_wasLoggedIn) {
+        // Signing out (or deleting the account) from a pushed screen like Settings closes it too.
+        if (state.isLoggedIn != _wasLoggedIn) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
           });

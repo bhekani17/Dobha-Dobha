@@ -1,6 +1,7 @@
 // Cloudflare Worker: the Dobha API (accounts, listings, orders, wallet, live
 // streaming tokens) plus item photos. The Flutter web app (mobile/build/web) is
 // served by Workers assets before this runs.
+import * as account from './account.js';
 import * as auth from './auth.js';
 import * as google from './google.js';
 import { HttpError, json } from './http.js';
@@ -9,6 +10,7 @@ import * as live from './live.js';
 import * as notifications from './notifications.js';
 import * as orders from './orders.js';
 import * as social from './social.js';
+import * as support from './support.js';
 
 export { StreamClaims } from './live.js';
 
@@ -18,8 +20,12 @@ const ROUTES = [
   ['POST', '/api/auth/login', auth.login],
   ['POST', '/api/auth/google', google.googleSignIn],
   ['POST', '/api/auth/logout', auth.logout],
+  ['POST', '/api/auth/forgot', account.forgotPassword],
+  ['POST', '/api/auth/reset', account.resetPassword],
   ['GET', '/api/me', auth.me],
   ['PATCH', '/api/me', auth.updateMe],
+  ['DELETE', '/api/me', account.deleteAccount],
+  ['POST', '/api/me/password', account.changePassword],
   ['PUT', '/api/me/avatar', auth.setAvatar],
   ['DELETE', '/api/me/avatar', auth.setAvatar],
 
@@ -72,7 +78,13 @@ const ROUTES = [
   ['GET', '/api/notifications/unread', notifications.unreadCount],
   ['POST', '/api/notifications/read', notifications.markRead],
 
+  ['GET', '/api/support', support.myRequests],
+  ['POST', '/api/support', support.createRequest],
+
   ['GET', '/api/admin/disputes', orders.listDisputes],
+  ['GET', '/api/admin/support', support.listOpen],
+  ['POST', '/api/admin/support/:id/reply', (req, env, id) => support.answer(req, env, id, 'reply')],
+  ['POST', '/api/admin/support/:id/close', (req, env, id) => support.answer(req, env, id, 'close')],
   ['GET', '/api/admin/reports', items.listReports],
   ['POST', '/api/admin/items/:id/remove', (req, env, id) => items.moderateItem(req, env, id, 'remove')],
   ['POST', '/api/admin/items/:id/dismiss', (req, env, id) => items.moderateItem(req, env, id, 'dismiss')],

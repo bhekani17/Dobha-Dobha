@@ -113,7 +113,7 @@ class _StudioScreenState extends State<StudioScreen> {
               child: Icon(Icons.storefront_rounded, size: 40, color: DobhaColors.green),
             ),
             const SizedBox(height: 20),
-            const Text('Sell on Dobha', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+            const Text('Sell on Dobha', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
             const SizedBox(height: 8),
             Text(
               'List pieces from your stall, go live to shoppers across SA, and get paid once the buyer has their piece.',
@@ -141,7 +141,7 @@ class _StudioScreenState extends State<StudioScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
           AppCard(
-            radius: 24,
+            radius: 20,
             child: Row(
               children: [
                 AppWell(
@@ -155,7 +155,7 @@ class _StudioScreenState extends State<StudioScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user.shopName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                      Text(user.shopName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, letterSpacing: -0.3)),
                       const SizedBox(height: 4),
                       Row(
                         children: [
@@ -224,7 +224,7 @@ class _StudioScreenState extends State<StudioScreen> {
                             Text(item.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.text)),
+                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.text)),
                             const SizedBox(height: 2),
                             Text(
                                 item.isClaimed
@@ -419,10 +419,10 @@ class _NewListingScreenState extends State<NewListingScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Add a video', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              const Text('Add a video', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
               const SizedBox(height: 4),
               Text('Up to 60 seconds. Show the fit, the fabric and any flaws.',
-                  style: TextStyle(color: DobhaColors.muted, fontSize: 12.5)),
+                  style: TextStyle(color: DobhaColors.muted, fontSize: 13)),
               const SizedBox(height: 16),
               AppButton(
                 onPressed: () {
