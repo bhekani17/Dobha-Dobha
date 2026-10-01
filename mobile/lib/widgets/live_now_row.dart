@@ -106,7 +106,7 @@ class _LiveCircle extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(color: DobhaColors.red, borderRadius: BorderRadius.circular(6)),
                       child: const Text('LIVE',
-                          style: TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.w700, letterSpacing: 0.4)),
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600, letterSpacing: 0.4)),
                     ),
                   ),
                 ],
@@ -118,7 +118,7 @@ class _LiveCircle extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 11.5,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   shadows: [Shadow(color: Colors.black54, blurRadius: 4)],
                 ),

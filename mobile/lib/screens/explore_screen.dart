@@ -112,7 +112,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('Area', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              child: Text('Area', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
             ),
             for (final loc in _locations)
               ListTile(
@@ -216,8 +216,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       ),
                       if (_people.isNotEmpty && _searchQuery.length >= 2) ...[
                         const SizedBox(height: 18),
-                        const Text('People', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 10),
+                        const SectionTitle('People'),
                         SizedBox(
                           height: 96,
                           child: ListView.separated(
@@ -242,7 +241,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                       Text(p.handle,
                                           maxLines: 1,
                                           overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(fontSize: 10.5, color: DobhaColors.muted)),
+                                          style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
                                     ],
                                   ),
                                 ),
@@ -254,14 +253,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       // Live streams only take space when someone is live.
                       if (_liveRooms.isNotEmpty) ...[
                         const SizedBox(height: 18),
-                        Row(
-                          children: [
-                            Icon(Icons.circle, color: DobhaColors.red, size: 10),
-                            const SizedBox(width: 8),
-                            const Text('Live now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
+                        const SectionTitle('Live now'),
                         _buildLiveStreamsBar(),
                       ],
                       const SizedBox(height: 18),
@@ -273,7 +265,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                                 ? 'Searching...'
                                 : '${filtered.length}${filtered.length == 50 ? '+' : ''} pieces'
                                       '${_selectedLocation == _locations.first ? '' : ' in $_selectedLocation'}',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.muted),
+                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.muted),
                           ),
                           if (_searching) ...[
                             const SizedBox(width: 8),
@@ -316,9 +308,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     sliver: SliverGrid.builder(
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: 2,
-                        mainAxisSpacing: 12,
+                        mainAxisSpacing: 20,
                         crossAxisSpacing: 12,
-                        childAspectRatio: 0.66,
+                        childAspectRatio: 0.62,
                       ),
                       itemCount: filtered.length,
                       itemBuilder: (context, i) => ItemGridTile(
@@ -345,7 +337,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       clipBehavior: Clip.none,
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
-        children: [for (final c in chips) Padding(padding: const EdgeInsets.only(right: 12), child: c)],
+        children: [for (final c in chips) Padding(padding: const EdgeInsets.only(right: 8), child: c)],
       ),
     );
   }
@@ -407,7 +399,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                   Text(
                     'Tap to watch',
-                    style: TextStyle(color: DobhaColors.green, fontSize: 11, fontWeight: FontWeight.w700),
+                    style: TextStyle(color: DobhaColors.green, fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                 ],
               ),

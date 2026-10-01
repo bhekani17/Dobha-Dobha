@@ -150,7 +150,7 @@ class _FeedMessage extends StatelessWidget {
           children: [
             AppWell(circle: true, padding: const EdgeInsets.all(22), child: Icon(icon, size: 40, color: DobhaColors.muted)),
             const SizedBox(height: 18),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
             const SizedBox(height: 6),
             Text(text, textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted, height: 1.4)),
             const SizedBox(height: 20),
@@ -211,6 +211,8 @@ class _ReelItemCardState extends State<_ReelItemCard> {
               ? MediaCarousel(item: item, active: widget.active)
               : Hero(tag: widget.heroTag!, child: MediaCarousel(item: item, active: widget.active)),
         ),
+        // Soft fades top and bottom keep the text over the photo readable without boxes.
+        const PhotoScrim(top: true),
         if (_showHeartAnim)
           IgnorePointer(
             child: Center(
@@ -228,7 +230,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
           // In the feed the nav bar sits below; full-screen detail needs the bottom inset.
           bottom: widget.heroTag != null,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 10, 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -260,7 +262,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
             ),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 20),
         _SidebarAction(
           icon: item.isLiked ? Icons.favorite : Icons.favorite_border,
           iconColor: item.isLiked ? DobhaColors.green : Colors.white,
@@ -352,12 +354,12 @@ class _ReelItemCardState extends State<_ReelItemCard> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Text('Report this listing', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+              child: Text('Report this listing', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: -0.3)),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
               child: Text('It will be hidden for you and reviewed by the Dobha team.',
-                  style: TextStyle(fontSize: 12.5, color: DobhaColors.muted)),
+                  style: TextStyle(fontSize: 13, color: DobhaColors.muted)),
             ),
             for (final r in AppState.reportReasons)
               ListTile(
@@ -387,67 +389,100 @@ class _ReelItemCardState extends State<_ReelItemCard> {
 
   Widget _details(ThriftItem item) {
     final isMine = AppState().user.id == item.sellerId;
-    return GestureDetector(
-      onTap: () => ItemInfoSheet.show(context, item),
-      child: OverlayPanel(
-        radius: 20,
-        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            GestureDetector(
-              onTap: () => SellerScreen.open(context, item.sellerId),
-              child: Text(
-                sellerLine(item),
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12.5, color: Colors.white.withValues(alpha: 0.75)),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(item.title,
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, height: 1.2),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 3),
-            Text(['Size ${item.size}', item.condition, item.stockLabel].where((s) => s.isNotEmpty).join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.75))),
-            const SizedBox(height: 12),
-            Row(
+    const shadow = [Shadow(color: Colors.black45, blurRadius: 8)];
+    final meta = ['Size ${item.size}', item.condition, item.stockLabel].where((s) => s.isNotEmpty).join('  ·  ');
+    return DefaultTextStyle.merge(
+      style: const TextStyle(color: Colors.white, shadows: shadow),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          GestureDetector(
+            onTap: () => ItemInfoSheet.show(context, item),
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.formattedPrice,
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: DobhaColors.green, letterSpacing: -0.5)),
-                const SizedBox(width: 12),
-                if (!isMine) ...[
-                  Semantics(
-                    label: item.inCart ? 'Remove from cart' : 'Add to cart',
-                    child: AppButton(
-                      radius: 14,
-                      selected: item.inCart,
-                      padding: const EdgeInsets.all(12),
-                      onPressed: () => toggleCart(context, item),
-                      child: Icon(item.inCart ? Icons.shopping_bag_rounded : Icons.shopping_bag_outlined,
-                          size: 22, color: item.inCart ? DobhaColors.green : DobhaColors.text),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: AppButton(
-                    color: isMine ? null : DobhaColors.green,
-                    radius: 14,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-                    onPressed: isMine ? () => NewListingScreen.open(context, editing: item) : () => CheckoutModal.show(context, item),
-                    child: Text(isMine ? 'Edit listing' : 'Buy', style: const TextStyle(fontSize: 15)),
+                GestureDetector(
+                  onTap: () => SellerScreen.open(context, item.sellerId),
+                  child: Text(
+                    sellerLine(item),
+                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                const SizedBox(height: 4),
+                Text(item.title,
+                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: -0.4),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 4),
+                Text(meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.75))),
+                const SizedBox(height: 10),
+                Text(item.formattedPrice,
+                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.8, height: 1.1)),
               ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 14),
+          DefaultTextStyle.merge(
+            style: const TextStyle(shadows: []),
+            child: Row(
+              children: [
+                Expanded(
+                  child: AppButton(
+                    color: isMine ? Colors.white : DobhaColors.green,
+                    radius: 14,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+                    onPressed: isMine ? () => NewListingScreen.open(context, editing: item) : () => CheckoutModal.show(context, item),
+                    child: Text(isMine ? 'Edit listing' : 'Buy now'),
+                  ),
+                ),
+                if (!isMine) ...[
+                  const SizedBox(width: 10),
+                  Semantics(
+                    label: item.inCart ? 'Remove from cart' : 'Add to cart',
+                    child: _GlassButton(
+                      onTap: () => toggleCart(context, item),
+                      child: Icon(item.inCart ? Icons.shopping_bag_rounded : Icons.shopping_bag_outlined,
+                          size: 22, color: item.inCart ? DobhaColors.green : Colors.white),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Square translucent button that sits next to Buy over the photo.
+class _GlassButton extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  const _GlassButton({required this.child, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: SizedBox(width: 52, height: 52, child: Center(child: child)),
       ),
     );
   }
@@ -483,8 +518,8 @@ class ItemInfoSheet extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 92, child: Text(label, style: TextStyle(color: DobhaColors.muted, fontSize: 13.5))),
-              Expanded(child: Text(value, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600))),
+              SizedBox(width: 92, child: Text(label, style: TextStyle(color: DobhaColors.muted, fontSize: 14))),
+              Expanded(child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
             ],
           ),
         );
@@ -496,9 +531,9 @@ class ItemInfoSheet extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(item.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+              Text(item.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
               const SizedBox(height: 4),
-              Text(item.formattedPrice, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: DobhaColors.green)),
+              Text(item.formattedPrice, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: DobhaColors.green, letterSpacing: -0.3)),
               if (item.originalPriceZar != null)
                 Text('Was ${item.formattedOriginalPrice}',
                     style: TextStyle(fontSize: 13, color: DobhaColors.muted, decoration: TextDecoration.lineThrough)),
@@ -555,7 +590,7 @@ class ItemInfoSheet extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text('We hold your payment and only pay the seller once you have the piece.',
-                          style: TextStyle(fontSize: 12.5, color: DobhaColors.textSecondary, height: 1.35)),
+                          style: TextStyle(fontSize: 13, color: DobhaColors.textSecondary, height: 1.35)),
                     ),
                   ],
                 ),
@@ -732,7 +767,7 @@ class _CommentsSheetState extends State<CommentsSheet> {
             Row(
               children: [
                 Text('Comments${comments == null ? '' : ' (${comments.length})'}',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, letterSpacing: -0.3)),
                 const Spacer(),
                 AppButton.icon(icon: Icons.close, size: 18, padding: 8, onPressed: () => Navigator.of(context).pop()),
               ],
@@ -807,7 +842,7 @@ class _Comment extends StatelessWidget {
               children: [
                 GestureDetector(
                   onTap: comment.userId == null ? null : () => SellerScreen.open(context, comment.userId!),
-                  child: Text(comment.handle, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                  child: Text(comment.handle, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                 ),
                 const SizedBox(height: 2),
                 Text(comment.text, style: TextStyle(color: DobhaColors.textSecondary, fontSize: 13)),
@@ -838,16 +873,18 @@ class _SidebarAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         children: [
-          OverlayIconButton(icon: icon, color: iconColor, tooltip: tooltip, onTap: onTap),
-          const SizedBox(height: 4),
-          OverlayPanel(
-            radius: 8,
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
-          ),
+          OverlayIconButton(icon: icon, color: iconColor, tooltip: tooltip, onTap: onTap, size: 26),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+              )),
         ],
       ),
     );

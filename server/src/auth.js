@@ -7,10 +7,10 @@ const SESSION_MS = 60 * 24 * 60 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const HANDLE_RE = /^[a-z0-9_]{3,20}$/;
 
-const b64url = (bytes) =>
+export const b64url = (bytes) =>
   btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 
-async function hashPassword(password, salt) {
+export async function hashPassword(password, salt) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
   const bits = await crypto.subtle.deriveBits(
     { name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations: PBKDF2_ITERATIONS },
@@ -20,12 +20,12 @@ async function hashPassword(password, salt) {
   return b64url(bits);
 }
 
-async function sha256(text) {
+export async function sha256(text) {
   return b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
 }
 
 // Constant-time compare so response timing doesn't leak how much of a hash matched.
-function same(a, b) {
+export function same(a, b) {
   if (a.length !== b.length) return false;
   let diff = 0;
   for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
@@ -57,6 +57,8 @@ export function publicUser(u, stats = {}) {
     createdAt: new Date(u.created_at).toISOString(),
     salesCount: stats.salesCount ?? 0,
     isAdmin: stats.isAdmin ?? false,
+    // Google-only accounts have no password to change or confirm with.
+    hasPassword: Boolean(u.password_hash),
   };
 }
 

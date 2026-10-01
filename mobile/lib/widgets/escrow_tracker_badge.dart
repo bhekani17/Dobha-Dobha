@@ -6,6 +6,7 @@ import '../models/escrow_order.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../screens/seller_screen.dart';
+import '../screens/support_screens.dart';
 import 'item_photo.dart';
 import 'ui.dart';
 
@@ -32,14 +33,14 @@ class EscrowTrackerCard extends StatelessWidget {
 
     return AppCard(
       margin: const EdgeInsets.only(bottom: 18),
-      radius: 24,
+      radius: 20,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             children: [
               Text(isVendorView ? 'You sold' : 'You bought',
-                  style: TextStyle(color: DobhaColors.muted, fontSize: 12.5, fontWeight: FontWeight.w600)),
+                  style: TextStyle(color: DobhaColors.muted, fontSize: 13, fontWeight: FontWeight.w600)),
               const Spacer(),
               AppTag(status.label(isSeller: isVendorView), color: _statusColor(status)),
             ],
@@ -67,7 +68,7 @@ class EscrowTrackerCard extends StatelessWidget {
                 ),
               ),
               Text('R ${order.totalZar.toStringAsFixed(0)}',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: DobhaColors.green)),
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: DobhaColors.green, letterSpacing: -0.3)),
             ],
           ),
           const SizedBox(height: 18),
@@ -79,9 +80,17 @@ class EscrowTrackerCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          Text(status.description(isSeller: isVendorView), style: TextStyle(fontSize: 11.5, color: DobhaColors.textSecondary, height: 1.35)),
+          Text(status.description(isSeller: isVendorView), style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary, height: 1.35)),
           const SizedBox(height: 14),
           _buildActionRow(context, order),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => ContactSupportScreen.open(context, orderId: order.id),
+              icon: Icon(Icons.support_agent_rounded, size: 16, color: DobhaColors.muted),
+              label: Text('Get help with this order', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+            ),
+          ),
         ],
       ),
     );
@@ -295,7 +304,7 @@ class EscrowTrackerCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('From your ${order.deliveryMethod} receipt. The buyer uses it to follow the parcel.',
-                style: TextStyle(fontSize: 12.5, color: DobhaColors.textSecondary)),
+                style: TextStyle(fontSize: 13, color: DobhaColors.textSecondary)),
             const SizedBox(height: 14),
             TextField(
               controller: ctrl,
@@ -355,7 +364,7 @@ class EscrowTrackerCard extends StatelessWidget {
           children: [
             Icon(Icons.check_circle_rounded, color: DobhaColors.green, size: 22),
             SizedBox(width: 10),
-            Text('Got it?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            Text('Got it?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: -0.3)),
           ],
         ),
         content: Column(

@@ -80,6 +80,8 @@
     .field span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
     .field input { width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--border); background: var(--well); color: var(--text); font: inherit; }
     .field input:focus { outline: none; border-color: var(--green); }
+    .field textarea { width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--border); background: var(--well); color: var(--text); font: inherit; resize: vertical; }
+    .field textarea:focus { outline: none; border-color: var(--green); }
     .login .btn.green { width: 100%; padding: 12px; margin-top: 4px; }
     .or { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 18px 0; }
     .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
@@ -122,7 +124,8 @@
     const TOKEN_KEY = 'dobha_admin_token';
     const REFRESH_MS = 60_000;
 
-    const state = { token: null, user: null, tab: 'disputes', disputes: [], reports: [], updatedAt: null, busy: false };
+    const state = { token: null, user: null, tab: 'disputes', disputes: [], reports: [], support: [], updatedAt: null, busy: false };
+    const TOPICS = { order: 'An order', payment: 'Payments or wallet', selling: 'Selling', account: 'Account', safety: 'Safety or a scam', bug: 'Something not working', other: 'Something else' };
     const app = document.getElementById('app');
 
     // ---- helpers ----
@@ -214,9 +217,10 @@
       if (!state.user?.isAdmin || state.busy) return;
       state.busy = true;
       try {
-        const [d, r] = await Promise.all([api('GET', '/api/admin/disputes'), api('GET', '/api/admin/reports')]);
+        const [d, r, s] = await Promise.all([api('GET', '/api/admin/disputes'), api('GET', '/api/admin/reports'), api('GET', '/api/admin/support')]);
         state.disputes = d.orders;
         state.reports = r.items;
+        state.support = s.requests;
         state.updatedAt = new Date();
         render();
       } catch (e) {
@@ -262,7 +266,7 @@
           },
             h('img', { src: '/icons/Icon-192.png', alt: '' }),
             h('h1', {}, 'Dobha Admin'),
-            h('p', {}, 'Settle disputes and review reported listings.'),
+            h('p', {}, 'Settle disputes, review reported listings and answer support questions.'),
             h('div', { id: 'google' }),
             h('div', { class: 'or' }, 'or with email'),
             h('label', { class: 'field' }, h('span', {}, 'Email'), h('input', { name: 'email', type: 'email', autocomplete: 'username', required: true })),
@@ -298,7 +302,9 @@
       const tabs = [
         ['disputes', 'Disputes', state.disputes.length],
         ['reports', 'Reported listings', state.reports.length],
+        ['support', 'Support', state.support.length],
       ];
+      const cards = { disputes: disputeCards, reports: reportCards, support: supportCards }[state.tab];
       app.replaceChildren(
         h('header', {},
           h('div', { class: 'wrap' },
@@ -317,7 +323,7 @@
             state.updatedAt && h('span', { class: 'updated' }, `Updated ${state.updatedAt.toLocaleTimeString('en-ZA', { timeStyle: 'short' })}`),
             h('button', { class: 'btn', onclick: (e) => { e.target.disabled = true; load().finally(() => (e.target.disabled = false)); } }, 'Refresh'),
           ),
-          h('div', { class: 'grid' }, state.tab === 'disputes' ? disputeCards() : reportCards()),
+          h('div', { class: 'grid' }, cards()),
         ),
       );
     }
@@ -401,6 +407,46 @@
         ));
     }
 
+    function supportCards() {
+      if (!state.support.length) return h('div', { class: 'empty' }, h('strong', {}, 'No open questions'), 'Questions people send from Help in the app show up here.');
+      return state.support.map((q) => {
+        const reply = h('textarea', { rows: 4, maxlength: 2000, placeholder: q.userName ? 'Your answer. They get it as a notification in the app.' : 'Your answer.' });
+        return h('article', { class: 'card' },
+          h('div', { class: 'head' },
+            h('div', {},
+              h('p', { class: 'title' }, TOPICS[q.topic] || q.topic),
+              h('div', { class: 'sub' }, `Sent ${date(q.createdAt)}`),
+            ),
+          ),
+          h('dl', {},
+            h('dt', {}, 'From'), h('dd', {}, q.userName ? `${q.userName} (${q.userHandle})` : 'Not signed in'),
+            h('dt', {}, 'Email'), h('dd', {}, h('a', { href: `mailto:${q.email}`, style: 'color: var(--cyan)' }, q.email)),
+            q.orderId && [h('dt', {}, 'Order'), h('dd', {}, `#${q.orderId}`)],
+          ),
+          h('div', { class: 'desc' }, q.message),
+          !q.userName && h('div', { class: 'sub' }, 'They wrote in signed out. If email sending is not set up yet, answer them by email as well.'),
+          h('label', { class: 'field' }, reply),
+          h('div', { class: 'actions' },
+            h('button', {
+              class: 'btn',
+              onclick: async (e) => {
+                const btn = e.currentTarget;
+                if (await confirmDialog({ title: 'Close without answering?', body: 'Use this for spam or questions already answered another way.', action: 'Close' }))
+                  act(btn, () => api('POST', `/api/admin/support/${q.id}/close`), 'Closed');
+              },
+            }, 'Close'),
+            h('button', {
+              class: 'btn green',
+              onclick: (e) => {
+                if (reply.value.trim().length < 2) return toast('Write an answer first');
+                act(e.currentTarget, () => api('POST', `/api/admin/support/${q.id}/reply`, { reply: reply.value.trim() }), 'Answer sent');
+              },
+            }, 'Send answer'),
+          ),
+        );
+      });
+    }
+
     // ---- start ----
 
     (async () => {
@@ -414,8 +460,10 @@
       }
     })();
 
-    setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+    // Refreshing re-renders the cards, so hold off while a support answer is half written.
+    const drafting = () => [...document.querySelectorAll('textarea')].some((t) => t.value.trim());
+    setInterval(() => { if (!document.hidden && !drafting()) load(); }, REFRESH_MS);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && !drafting()) load(); });
   </script>
 </body>
 </html>

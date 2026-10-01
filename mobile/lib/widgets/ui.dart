@@ -3,13 +3,14 @@ import 'package:flutter/services.dart';
 
 import '../theme.dart';
 
-/// Flat building blocks: solid colour surfaces, no shadows or gradients.
+/// Flat building blocks: solid colour surfaces edged with a hairline, no shadows.
 /// Hierarchy comes from surface tone; state (pressed, selected) from colour.
 class Surfaces {
   /// A card or panel sitting on the page.
   static BoxDecoration card({double radius = 16, Color? color, bool circle = false}) {
     return BoxDecoration(
       color: color ?? DobhaColors.surface,
+      border: color == null ? Border.all(color: DobhaColors.border) : null,
       shape: circle ? BoxShape.circle : BoxShape.rectangle,
       borderRadius: circle ? null : BorderRadius.circular(radius),
     );
@@ -177,7 +178,7 @@ class _AppButtonState extends State<AppButton> {
             borderRadius: widget.circle ? null : BorderRadius.circular(widget.radius),
           ),
           child: DefaultTextStyle.merge(
-            style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 14),
+            style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 15, letterSpacing: -0.1),
             child: IconTheme.merge(
               data: IconThemeData(color: fg),
               child: Center(widthFactor: 1, heightFactor: 1, child: widget.child),
@@ -189,7 +190,7 @@ class _AppButtonState extends State<AppButton> {
   }
 }
 
-/// Selectable pill: filled with the accent when selected.
+/// Selectable pill: outlined when idle, filled with the accent when selected.
 class AppChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -210,17 +211,28 @@ class AppChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fg = selected ? Colors.black : DobhaColors.textSecondary;
-    return AppButton(
-      onPressed: onTap,
-      color: selected ? accent : null,
-      radius: 20,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[Icon(icon, size: 14, color: fg), const SizedBox(width: 6)],
-          Text(label, style: TextStyle(color: fg, fontSize: 12, fontWeight: selected ? FontWeight.w700 : FontWeight.w600)),
-        ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? accent : DobhaColors.borderLight),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[Icon(icon, size: 14, color: fg), const SizedBox(width: 6)],
+            Text(label, style: TextStyle(color: fg, fontSize: 13, fontWeight: selected ? FontWeight.w600 : FontWeight.w500)),
+          ],
+        ),
       ),
     );
   }
@@ -249,7 +261,7 @@ class AppTag extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 11, color: fg), const SizedBox(width: 4)],
-          Text(text, style: TextStyle(color: fg, fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
+          Text(text, style: TextStyle(color: fg, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.3)),
         ],
       ),
     );
@@ -268,7 +280,7 @@ class OverlayPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: padding,
-      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(radius)),
+      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(radius)),
       child: DefaultTextStyle.merge(
         style: const TextStyle(color: Colors.white),
         child: IconTheme.merge(data: const IconThemeData(color: Colors.white), child: child),
@@ -299,7 +311,7 @@ class OverlayIconButton extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.black.withValues(alpha: 0.45),
+        color: Colors.black.withValues(alpha: 0.35),
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -314,6 +326,50 @@ class OverlayIconButton extends StatelessWidget {
             child: Icon(icon, size: size, color: onTap == null ? color.withValues(alpha: 0.4) : color),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Darkens the bottom (and optionally the top) of a photo so white text on it stays readable.
+class PhotoScrim extends StatelessWidget {
+  final bool top;
+  const PhotoScrim({super.key, this.top = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            stops: top ? const [0, 0.16, 0.5, 1] : const [0, 0.5, 1],
+            colors: top
+                ? [Colors.black.withValues(alpha: 0.45), Colors.transparent, Colors.transparent, Colors.black.withValues(alpha: 0.85)]
+                : [Colors.transparent, Colors.transparent, Colors.black.withValues(alpha: 0.85)],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Heading above a group of content on a page.
+class SectionTitle extends StatelessWidget {
+  final String text;
+  final Widget? trailing;
+  const SectionTitle(this.text, {super.key, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3))),
+          ?trailing,
+        ],
       ),
     );
   }

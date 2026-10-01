@@ -65,10 +65,23 @@ flutter:
   uses-material-design: true
 
   # logo.png: original (black tile), used in light mode and for app icons.
-  # logo01.png: transparent, used in dark mode. The .svg sources stay unbundled.
+  # logo01.png: transparent, used in dark mode.
   assets:
     - assets/images/logo.png
     - assets/images/logo01.png
+
+  # Plus Jakarta Sans (SIL Open Font License, see assets/fonts/OFL.txt).
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-400.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-500.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-600.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-700.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

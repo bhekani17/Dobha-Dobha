@@ -140,7 +140,7 @@ class _PersonTileState extends State<PersonTile> {
         [p.handle, if (p.isVendor) 'Seller', if (p.followsYou && !p.isMe) 'Follows you'].join(' · '),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: DobhaColors.muted, fontSize: 12.5),
+        style: TextStyle(color: DobhaColors.muted, fontSize: 13),
       ),
       trailing: p.isMe
           ? null

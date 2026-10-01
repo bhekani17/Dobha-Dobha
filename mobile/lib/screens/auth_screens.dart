@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/google_button.dart';
 import '../widgets/ui.dart';
+import 'support_screens.dart';
 import 'terms_screen.dart';
 
 /// Brand mark used on the splash and welcome screens.
@@ -80,14 +81,20 @@ class WelcomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              const Center(child: DobhaLogo(size: 170)),
-              const SizedBox(height: 22),
+              const Center(child: DobhaLogo(size: 150)),
+              const SizedBox(height: 20),
+              const Text(
+                "Thrift Joburg's streets\nfrom your phone",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.8, height: 1.15),
+              ),
+              const SizedBox(height: 12),
               Text(
                 'Dig through downtown bales from your phone. Watch sellers live and buy pieces in one tap.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: DobhaColors.textSecondary, height: 1.45, fontSize: 14),
+                style: TextStyle(color: DobhaColors.muted, height: 1.5, fontSize: 15),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 32),
               _Feature(icon: Icons.sensors_rounded, color: DobhaColors.green, text: 'Live drops from Joburg stalls'),
               _Feature(icon: Icons.flash_on_rounded, color: DobhaColors.green, text: 'Buy a piece in one tap'),
               _Feature(icon: Icons.verified_user_rounded, color: DobhaColors.green, text: 'Sellers are paid only once you have it'),
@@ -96,18 +103,39 @@ class WelcomeScreen extends StatelessWidget {
                 color: DobhaColors.green,
                 padding: const EdgeInsets.symmetric(vertical: 17),
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                child: const Text('Create Account', style: TextStyle(fontSize: 15)),
+                child: const Text('Create account', style: TextStyle(fontSize: 16)),
               ),
-              const SizedBox(height: 16),
-              AppButton(
-                padding: const EdgeInsets.symmetric(vertical: 17),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  side: BorderSide(color: DobhaColors.borderLight),
+                  padding: const EdgeInsets.symmetric(vertical: 17),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                child: const Text('I already have an account', style: TextStyle(fontSize: 15)),
+                child: const Text('I already have an account', style: TextStyle(fontSize: 16)),
               ),
               const GoogleSignInSection(),
+              const _HelpLink(),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// "Need help?" for people who are not signed in: answers, and support by email.
+class _HelpLink extends StatelessWidget {
+  const _HelpLink();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: TextButton(
+        onPressed: () => HelpScreen.open(context),
+        child: Text('Need help?', style: TextStyle(color: DobhaColors.muted, fontSize: 13)),
       ),
     );
   }
@@ -127,7 +155,7 @@ class _Feature extends StatelessWidget {
         children: [
           AppWell(circle: true, padding: const EdgeInsets.all(9), tint: color, child: Icon(icon, size: 17, color: color)),
           const SizedBox(width: 14),
-          Expanded(child: Text(text, style: const TextStyle(fontWeight: FontWeight.w700))),
+          Expanded(child: Text(text, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500))),
         ],
       ),
     );
@@ -144,6 +172,7 @@ class _AuthForm extends StatelessWidget {
   final String action;
   final VoidCallback onSubmit;
   final Widget footer;
+  final bool showGoogle;
 
   const _AuthForm({
     required this.title,
@@ -154,6 +183,7 @@ class _AuthForm extends StatelessWidget {
     required this.action,
     required this.onSubmit,
     required this.footer,
+    this.showGoogle = true,
   });
 
   @override
@@ -168,9 +198,9 @@ class _AuthForm extends StatelessWidget {
               child: AppButton.icon(icon: Icons.arrow_back_rounded, size: 20, padding: 10, onPressed: () => Navigator.of(context).pop()),
             ),
             const SizedBox(height: 28),
-            Text(title, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(subtitle, style: TextStyle(color: DobhaColors.muted, fontSize: 14)),
+            Text(title, style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, letterSpacing: -0.8, height: 1.15)),
+            const SizedBox(height: 8),
+            Text(subtitle, style: TextStyle(color: DobhaColors.muted, fontSize: 15, height: 1.45)),
             const SizedBox(height: 28),
             for (final f in fields) Padding(padding: const EdgeInsets.only(bottom: 14), child: f),
             if (error != null)
@@ -195,7 +225,7 @@ class _AuthForm extends StatelessWidget {
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.black))
                   : Text(action, style: const TextStyle(fontSize: 15)),
             ),
-            const GoogleSignInSection(),
+            if (showGoogle) const GoogleSignInSection(),
             const SizedBox(height: 22),
             footer,
           ],
@@ -205,18 +235,27 @@ class _AuthForm extends StatelessWidget {
   }
 }
 
-class _PasswordField extends StatefulWidget {
+/// Password input with a show/hide toggle. [isNew] tells password managers to suggest a new one.
+class PasswordField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
   final TextInputAction action;
   final VoidCallback? onSubmitted;
-  const _PasswordField({required this.controller, required this.label, this.action = TextInputAction.done, this.onSubmitted});
+  final bool isNew;
+  const PasswordField({
+    super.key,
+    required this.controller,
+    required this.label,
+    this.action = TextInputAction.done,
+    this.onSubmitted,
+    this.isNew = false,
+  });
 
   @override
-  State<_PasswordField> createState() => _PasswordFieldState();
+  State<PasswordField> createState() => _PasswordFieldState();
 }
 
-class _PasswordFieldState extends State<_PasswordField> {
+class _PasswordFieldState extends State<PasswordField> {
   bool _hidden = true;
 
   @override
@@ -225,7 +264,7 @@ class _PasswordFieldState extends State<_PasswordField> {
       controller: widget.controller,
       obscureText: _hidden,
       textInputAction: widget.action,
-      autofillHints: const [AutofillHints.password],
+      autofillHints: [widget.isNew ? AutofillHints.newPassword : AutofillHints.password],
       onSubmitted: (_) => widget.onSubmitted?.call(),
       decoration: InputDecoration(
         labelText: widget.label,
@@ -297,13 +336,24 @@ class _LoginScreenState extends State<LoginScreen> {
             autofillHints: const [AutofillHints.email],
             decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline_rounded, size: 19)),
           ),
-          _PasswordField(controller: _password, label: 'Password', onSubmitted: _submit),
-        ],
-        footer: Center(
-          child: TextButton(
-            onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const RegisterScreen())),
-            child: const Text('New here? Create an account'),
+          PasswordField(controller: _password, label: 'Password', onSubmitted: _submit),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => ForgotPasswordScreen(email: _email.text.trim()))),
+              child: const Text('Forgot password?'),
+            ),
           ),
+        ],
+        footer: Column(
+          children: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const RegisterScreen())),
+              child: const Text('New here? Create an account'),
+            ),
+            const _HelpLink(),
+          ],
         ),
       ),
     );
@@ -414,8 +464,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             autofillHints: const [AutofillHints.telephoneNumber],
             decoration: const InputDecoration(labelText: 'Phone (optional)', prefixIcon: Icon(Icons.phone_outlined, size: 19)),
           ),
-          _PasswordField(controller: _password, label: 'Password (8+ characters)', action: TextInputAction.next),
-          _PasswordField(controller: _confirm, label: 'Confirm password', onSubmitted: _submit),
+          PasswordField(controller: _password, label: 'Password (8+ characters)', action: TextInputAction.next, isNew: true),
+          PasswordField(controller: _confirm, label: 'Confirm password', onSubmitted: _submit, isNew: true),
           TermsCheckbox(value: _agreed, onChanged: (v) => setState(() => _agreed = v)),
         ],
         footer: Center(
@@ -423,6 +473,134 @@ class _RegisterScreenState extends State<RegisterScreen> {
             onPressed: () => Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen())),
             child: const Text('Already have an account? Log in'),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Forgot password": email a 6-digit code, then set a new password with it (which also signs in).
+class ForgotPasswordScreen extends StatefulWidget {
+  final String email;
+  const ForgotPasswordScreen({super.key, this.email = ''});
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  late final _email = TextEditingController(text: widget.email);
+  final _code = TextEditingController();
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _codeSent = false;
+  bool _busy = false;
+  bool _emailUnavailable = false;
+  String? _error;
+
+  static final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
+  @override
+  void dispose() {
+    for (final c in [_email, _code, _password, _confirm]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action();
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          // The server can't send email yet: point to support instead of a dead end.
+          _emailUnavailable = e.status == 503;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _sendCode() async {
+    if (!_emailRe.hasMatch(_email.text.trim())) {
+      setState(() => _error = 'Enter the email address on your account');
+      return;
+    }
+    await _run(() async {
+      await AppState().forgotPassword(_email.text.trim());
+      if (mounted) setState(() => _codeSent = true);
+    });
+  }
+
+  Future<void> _reset() async {
+    String? problem;
+    if (_code.text.trim().length != 6) {
+      problem = 'Enter the 6-digit code from the email';
+    } else if (_password.text.length < 8) {
+      problem = 'Your new password must be at least 8 characters';
+    } else if (_password.text != _confirm.text) {
+      problem = 'Passwords do not match';
+    }
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
+    // Signing in returns to the app through AuthGate.
+    await _run(() => AppState().resetPassword(email: _email.text.trim(), code: _code.text.trim(), password: _password.text));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final email = _email.text.trim();
+    return AutofillGroup(
+      child: _AuthForm(
+        title: _codeSent ? 'Check your email' : 'Forgot password',
+        subtitle: _codeSent
+            ? 'If $email has a Dobha account, we sent it a 6-digit code. It works for 15 minutes. Check your spam folder too.'
+            : 'Enter your email and we will send you a code to set a new password. If you signed up with Google, use Continue with Google instead.',
+        error: _error,
+        busy: _busy,
+        action: _codeSent ? 'Set new password' : 'Send code',
+        onSubmit: _codeSent ? _reset : _sendCode,
+        showGoogle: false,
+        fields: [
+          if (!_codeSent)
+            TextField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              onSubmitted: (_) => _sendCode(),
+              decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.mail_outline_rounded, size: 19)),
+            )
+          else ...[
+            TextField(
+              controller: _code,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              autofillHints: const [AutofillHints.oneTimeCode],
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(labelText: '6-digit code', counterText: '', prefixIcon: Icon(Icons.pin_outlined, size: 19)),
+            ),
+            PasswordField(controller: _password, label: 'New password (8+ characters)', action: TextInputAction.next, isNew: true),
+            PasswordField(controller: _confirm, label: 'Confirm new password', onSubmitted: _reset, isNew: true),
+          ],
+        ],
+        footer: Column(
+          children: [
+            if (_codeSent) TextButton(onPressed: _busy ? null : _sendCode, child: const Text('Send a new code')),
+            if (_emailUnavailable || _codeSent)
+              TextButton(
+                onPressed: () => ContactSupportScreen.open(context, topic: 'account'),
+                child: Text(_emailUnavailable ? 'Contact support to get back in' : 'No email? Contact support'),
+              ),
+          ],
         ),
       ),
     );

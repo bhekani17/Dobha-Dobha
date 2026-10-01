@@ -99,6 +99,7 @@ class _NotificationTile extends StatelessWidget {
     'review': (Icons.star_rounded, _Tone.green),
     'follow': (Icons.person_add_alt_1_rounded, _Tone.green),
     'price_drop': (Icons.trending_down_rounded, _Tone.green),
+    'support': (Icons.support_agent_rounded, _Tone.green),
   };
 
   @override
@@ -136,7 +137,7 @@ class _NotificationTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 3),
-                Text(n.body, style: TextStyle(fontSize: 12.5, color: DobhaColors.textSecondary, height: 1.35)),
+                Text(n.body, style: TextStyle(fontSize: 13, color: DobhaColors.textSecondary, height: 1.35)),
                 const SizedBox(height: 6),
                 Text(_ago(n.createdAt), style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
               ],
@@ -232,7 +233,7 @@ class NotificationBell extends StatelessWidget {
                     child: Text(
                       unread > 9 ? '9+' : '$unread',
                       textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ),
