@@ -65,6 +65,7 @@ export function itemJson(r) {
     sellerRating: r.seller_rating ?? null,
     sellerReviewCount: r.seller_reviews ?? 0,
     isClaimed: r.status === 'sold',
+    quantity: r.quantity ?? 1,
     createdAt: iso(r.created_at),
   };
 }
@@ -160,6 +161,14 @@ function parseMedia(body, userId) {
   return media;
 }
 
+/** How many of the piece the seller has: a whole number from 1 to 999 (default 1). */
+function quantityFrom(body) {
+  if (body.quantity == null || body.quantity === '') return 1;
+  const n = Number(body.quantity);
+  if (!Number.isInteger(n) || n < 1 || n > 999) throw new HttpError(400, 'Quantity must be a whole number from 1 to 999');
+  return n;
+}
+
 /** POST /api/items (vendors only) */
 export async function createItem(request, env) {
   const user = await requireUser(request, env);
@@ -181,13 +190,14 @@ export async function createItem(request, env) {
     original: body.originalPriceZar ? rands(body, 'originalPriceZar') : null,
     condition: str(body, 'condition', { max: 40 }),
     size: str(body, 'size', { max: 20 }),
+    quantity: quantityFrom(body),
   };
 
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO items (id, seller_id, title, description, caption, price_cents, original_price_cents, condition, size, category, photo_key, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(item.id, user.id, item.title, item.description, item.caption, item.price, item.original, item.condition, item.size, category, cover, now()),
+      `INSERT INTO items (id, seller_id, title, description, caption, price_cents, original_price_cents, condition, size, category, photo_key, quantity, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(item.id, user.id, item.title, item.description, item.caption, item.price, item.original, item.condition, item.size, category, cover, item.quantity, now()),
     env.DB.prepare(
       `INSERT INTO notifications (id, user_id, kind, title, body, item_id, created_at)
        SELECT 'ntf_' || lower(hex(randomblob(10))), follower_id, 'new_listing', ?, ?, ?, ? FROM follows WHERE seller_id = ?`,
@@ -233,6 +243,7 @@ export async function updateItem(request, env, itemId) {
     condition: 'condition' in body ? str(body, 'condition', { max: 40 }) : item.condition,
     size: 'size' in body ? str(body, 'size', { max: 20 }) : item.size,
     category: 'category' in body ? str(body, 'category', { max: 30 }) : item.category,
+    quantity: 'quantity' in body ? quantityFrom(body) : item.quantity,
   };
   if (!CATEGORIES.includes(next.category)) throw new HttpError(400, 'Unknown category');
 
@@ -258,8 +269,8 @@ export async function updateItem(request, env, itemId) {
   statements.unshift(
     env.DB.prepare(
       `UPDATE items SET title = ?, description = ?, caption = ?, price_cents = ?, original_price_cents = ?, condition = ?, size = ?,
-         category = ?, photo_key = ? WHERE id = ? AND status = 'available'`,
-    ).bind(next.title, next.description, next.caption, next.price, next.original, next.condition, next.size, next.category, cover, itemId),
+         category = ?, photo_key = ?, quantity = ? WHERE id = ? AND status = 'available'`,
+    ).bind(next.title, next.description, next.caption, next.price, next.original, next.condition, next.size, next.category, cover, next.quantity, itemId),
   );
   if (next.price < item.price_cents) {
     statements.push(
