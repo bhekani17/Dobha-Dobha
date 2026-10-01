@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../google_auth.dart';
 import '../theme.dart';
+import '../screens/terms_screen.dart';
 import 'google_button_stub.dart' if (dart.library.js_interop) 'google_button_web.dart';
 import 'ui.dart';
 
@@ -82,6 +83,8 @@ class _GoogleSignInSectionState extends State<GoogleSignInSection> {
             );
           },
         ),
+        // Google sign-in creates an account for new users, so it carries the same agreement.
+        const TermsNotice(),
       ],
     );
   }

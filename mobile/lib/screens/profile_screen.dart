@@ -14,6 +14,7 @@ import 'edit_profile_screen.dart';
 import 'chat_screens.dart';
 import 'notifications_screen.dart';
 import 'people_screens.dart';
+import 'terms_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -47,6 +48,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               onTap: () {
                 Navigator.of(ctx).pop();
                 EditProfileScreen.open(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: const Text('Terms and Conditions'),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                TermsScreen.open(context);
               },
             ),
             ListTile(

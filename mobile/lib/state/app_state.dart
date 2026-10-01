@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../google_auth.dart';
+import '../legal/terms.dart';
 import '../models/app_notification.dart';
 import '../models/escrow_order.dart';
 import '../models/social.dart';
@@ -146,6 +147,8 @@ class AppState extends ChangeNotifier {
       'email': email,
       'password': password,
       'phone': phone,
+      'acceptTerms': true,
+      'termsVersion': termsVersion,
     });
     await _startSession(res as Map<String, dynamic>);
   }
@@ -157,7 +160,7 @@ class AppState extends ChangeNotifier {
 
   /// Exchanges a verified Google ID token for a Dobha session.
   Future<void> loginWithGoogle(String idToken) async {
-    final res = await _api.post('/api/auth/google', {'idToken': idToken});
+    final res = await _api.post('/api/auth/google', {'idToken': idToken, 'termsVersion': termsVersion});
     await _startSession(res as Map<String, dynamic>);
   }
 

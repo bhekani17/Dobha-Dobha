@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/google_button.dart';
 import '../widgets/ui.dart';
+import 'terms_screen.dart';
 
 /// Brand mark used on the splash and welcome screens.
 /// The brand logo for the current theme: transparent on dark, the original
@@ -324,6 +325,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _password = TextEditingController();
   final _confirm = TextEditingController();
   bool _busy = false;
+  bool _agreed = false;
   String? _error;
 
   static final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
@@ -344,6 +346,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_emailRe.hasMatch(_email.text.trim())) return 'Enter a valid email address';
     if (_password.text.length < 8) return 'Password must be at least 8 characters';
     if (_password.text != _confirm.text) return 'Passwords do not match';
+    if (!_agreed) return 'Please read and agree to the Terms and Conditions';
     return null;
   }
 
@@ -413,6 +416,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           _PasswordField(controller: _password, label: 'Password (8+ characters)', action: TextInputAction.next),
           _PasswordField(controller: _confirm, label: 'Confirm password', onSubmitted: _submit),
+          TermsCheckbox(value: _agreed, onChanged: (v) => setState(() => _agreed = v)),
         ],
         footer: Center(
           child: TextButton(
