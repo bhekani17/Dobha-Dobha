@@ -226,7 +226,12 @@ class _StudioScreenState extends State<StudioScreen> {
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: DobhaColors.text)),
                             const SizedBox(height: 2),
-                            Text(item.isClaimed ? 'Sold' : (isSelected ? 'Pinned for your next live' : '${item.condition} · Size ${item.size}'),
+                            Text(
+                                item.isClaimed
+                                    ? 'Sold out'
+                                    : (isSelected
+                                        ? 'Pinned for your next live'
+                                        : [item.condition, 'Size ${item.size}', item.stockLabel].where((s) => s.isNotEmpty).join(' · ')),
                                 style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w600,
@@ -303,6 +308,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
   final _price = TextEditingController();
   final _description = TextEditingController();
   final _caption = TextEditingController();
+  final _quantity = TextEditingController(text: '1');
   String _category = ThriftItem.categories.first;
   String _condition = ThriftItem.conditions.first;
   String _size = 'M';
@@ -326,6 +332,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
       _price.text = item.priceZar.toStringAsFixed(item.priceZar % 1 == 0 ? 0 : 2);
       _description.text = item.description;
       _caption.text = item.haulCaption;
+      _quantity.text = '${item.quantity < 1 ? 1 : item.quantity}';
       _category = ThriftItem.categories.contains(item.category) ? item.category : ThriftItem.categories.last;
       _condition = item.condition;
       _size = item.size;
@@ -335,7 +342,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
 
   @override
   void dispose() {
-    for (final c in [_title, _price, _description, _caption]) {
+    for (final c in [_title, _price, _description, _caption, _quantity]) {
       c.dispose();
     }
     super.dispose();
@@ -451,6 +458,8 @@ class _NewListingScreenState extends State<NewListingScreen> {
     final price = double.tryParse(_price.text.trim().replaceAll(',', '.')) ?? 0;
     if (_title.text.trim().length < 3) return setState(() => _error = 'Give the piece a name (3+ characters)');
     if (price <= 0) return setState(() => _error = 'Enter a price in rand');
+    final quantity = int.tryParse(_quantity.text.trim()) ?? 0;
+    if (quantity < 1 || quantity > 999) return setState(() => _error = 'How many do you have? Enter 1 to 999');
     if (!_media.any((m) => !m.isVideo)) return setState(() => _error = 'Add at least one photo; it is the cover shoppers see first');
 
     setState(() {
@@ -474,6 +483,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
           size: _size,
           description: _description.text.trim(),
           caption: _caption.text.trim(),
+          quantity: quantity,
           media: _media,
           onProgress: progress,
         );
@@ -486,6 +496,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
           size: _size,
           description: _description.text.trim(),
           caption: _caption.text.trim(),
+          quantity: quantity,
           media: [for (final m in _media) m.pending!],
           onProgress: progress,
         );
@@ -642,10 +653,27 @@ class _NewListingScreenState extends State<NewListingScreen> {
             decoration: const InputDecoration(labelText: 'What is it? (e.g. 90s Carhartt Detroit Jacket)'),
           ),
           const SizedBox(height: 14),
-          TextField(
-            controller: _price,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Price', prefixText: 'R '),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  controller: _price,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(labelText: 'Price (each)', prefixText: 'R '),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: TextField(
+                  controller: _quantity,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'How many?', helperText: 'Identical pieces'),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           Row(

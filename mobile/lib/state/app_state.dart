@@ -432,6 +432,7 @@ class AppState extends ChangeNotifier {
     required String category,
     String description = '',
     String caption = '',
+    int quantity = 1,
     List<PendingMedia> media = const [],
     void Function(int uploaded, int total)? onProgress,
   }) async {
@@ -450,6 +451,7 @@ class AppState extends ChangeNotifier {
           'category': category,
           'description': description,
           'caption': caption,
+          'quantity': quantity,
           'media': [for (final k in keys) {'key': k}],
         }));
     final item = ThriftItem.fromJson(res['item'] as Map<String, dynamic>);
@@ -469,6 +471,7 @@ class AppState extends ChangeNotifier {
     required String category,
     String description = '',
     String caption = '',
+    int quantity = 1,
     required List<ListingMedia> media,
     void Function(int uploaded, int total)? onProgress,
   }) async {
@@ -493,6 +496,7 @@ class AppState extends ChangeNotifier {
           'category': category,
           'description': description,
           'caption': caption,
+          'quantity': quantity,
           'media': [for (final k in keys) {'key': k}],
         }));
     final updated = ThriftItem.fromJson(res['item'] as Map<String, dynamic>);
@@ -549,7 +553,11 @@ class AppState extends ChangeNotifier {
         }));
     final order = EscrowOrder.fromJson(res['order'] as Map<String, dynamic>);
     _orders = [order, ..._orders];
-    _feed = _feed.where((i) => i.id != item.id).toList();
+    if (item.quantity <= 1) {
+      _feed = _feed.where((i) => i.id != item.id).toList();
+    } else {
+      loadFeed().catchError((_) {});
+    }
     _cart = _cart.where((i) => i.id != item.id).toList();
     notifyListeners();
     loadWallet().catchError((_) {});
@@ -632,11 +640,10 @@ class AppState extends ChangeNotifier {
       rethrow;
     }
     final bought = (res['orders'] as List).map((o) => EscrowOrder.fromJson(o as Map<String, dynamic>)).toList();
-    final boughtIds = {for (final o in bought) o.item.id};
     _orders = [...bought, ..._orders];
-    _feed = _feed.where((i) => !boughtIds.contains(i.id)).toList();
     notifyListeners();
-    await Future.wait([loadCart(), loadWallet()].map((f) => f.catchError((_) {})));
+    // Pieces with stock left stay in the feed, so reload it rather than dropping what was bought.
+    await Future.wait([loadCart(), loadWallet(), loadFeed()].map((f) => f.catchError((_) {})));
     return [for (final f in res['failed'] as List) (f as Map<String, dynamic>)['error'] as String];
   }
 

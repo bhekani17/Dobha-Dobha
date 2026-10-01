@@ -38,6 +38,9 @@ class ThriftItem {
   final bool isLiked;
   final bool isSaved;
   final bool isClaimed;
+
+  /// How many the seller has left; 0 once sold out.
+  final int quantity;
   final bool inCart;
   final double? sellerRating;
   final int sellerReviewCount;
@@ -65,6 +68,7 @@ class ThriftItem {
     this.isLiked = false,
     this.isSaved = false,
     this.isClaimed = false,
+    this.quantity = 1,
     this.inCart = false,
     this.sellerRating,
     this.sellerReviewCount = 0,
@@ -72,6 +76,9 @@ class ThriftItem {
   });
 
   String get formattedPrice => 'R ${priceZar.toStringAsFixed(0)}';
+
+  /// "8 left" when the seller has more than one, otherwise empty.
+  String get stockLabel => !isClaimed && quantity > 1 ? '$quantity left' : '';
   String get formattedOriginalPrice => originalPriceZar != null ? 'R ${originalPriceZar!.toStringAsFixed(0)}' : '';
 
   factory ThriftItem.fromJson(Map<String, dynamic> json) => ThriftItem(
@@ -96,6 +103,7 @@ class ThriftItem {
         isLiked: json['isLiked'] as bool? ?? false,
         isSaved: json['isSaved'] as bool? ?? false,
         isClaimed: json['isClaimed'] as bool? ?? false,
+        quantity: json['quantity'] as int? ?? 1,
         inCart: json['inCart'] as bool? ?? false,
         sellerRating: (json['sellerRating'] as num?)?.toDouble(),
         sellerReviewCount: json['sellerReviewCount'] as int? ?? 0,
@@ -125,6 +133,7 @@ class ThriftItem {
         isLiked: isLiked,
         isSaved: isSaved,
         isClaimed: isClaimed,
+        quantity: quantity,
         inCart: inCart ?? this.inCart,
         sellerRating: sellerRating,
         sellerReviewCount: sellerReviewCount,

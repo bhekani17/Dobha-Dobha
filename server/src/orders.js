@@ -119,15 +119,20 @@ async function placeOrder(env, user, itemId, { deliveryMethod, paymentMethod, ad
     if (!res.meta.changes) throw new HttpError(402, 'Not enough in your wallet, top up or pick another payment method');
   }
 
-  const claimed = await env.DB.prepare("UPDATE items SET status = 'sold', buyer_id = ? WHERE id = ? AND status = 'available'")
+  // Take one from stock in a single statement, so two buyers can't get the last one.
+  const claimed = await env.DB.prepare(
+    `UPDATE items SET quantity = quantity - 1, status = CASE WHEN quantity = 1 THEN 'sold' ELSE 'available' END, buyer_id = ?
+     WHERE id = ? AND status = 'available' AND quantity >= 1 RETURNING quantity`,
+  )
     .bind(user.id, itemId)
-    .run();
-  if (!claimed.meta.changes) {
+    .first();
+  if (!claimed) {
     if (paymentMethod === WALLET) {
       await env.DB.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(total, user.id).run();
     }
-    throw new HttpError(409, 'Someone already bought this piece');
+    throw new HttpError(409, 'Someone already bought the last one');
   }
+  const soldOut = claimed.quantity === 0;
 
   const order = {
     id: `DB-${crypto.randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`,
@@ -160,15 +165,19 @@ async function placeOrder(env, user, itemId, { deliveryMethod, paymentMethod, ad
         orderId: order.id,
         itemId,
       }),
-      // Sold pieces leave every cart, and other offers on them are closed.
-      env.DB.prepare('DELETE FROM cart_items WHERE item_id = ?').bind(itemId),
-      env.DB.prepare(
-        "UPDATE offers SET status = CASE WHEN id = ?2 THEN 'used' ELSE 'declined' END, updated_at = ?3 WHERE item_id = ?1 AND status IN ('pending', 'countered', 'accepted')",
-      ).bind(itemId, offerId, now()),
+      // It leaves this buyer's cart; once the last one sells it leaves every cart and open offers close.
+      soldOut
+        ? env.DB.prepare('DELETE FROM cart_items WHERE item_id = ?').bind(itemId)
+        : env.DB.prepare('DELETE FROM cart_items WHERE item_id = ? AND user_id = ?').bind(itemId, user.id),
+      soldOut
+        ? env.DB.prepare(
+            "UPDATE offers SET status = CASE WHEN id = ?2 THEN 'used' ELSE 'declined' END, updated_at = ?3 WHERE item_id = ?1 AND status IN ('pending', 'countered', 'accepted')",
+          ).bind(itemId, offerId, now())
+        : env.DB.prepare("UPDATE offers SET status = 'used', updated_at = ? WHERE id = ?").bind(now(), offerId),
     ]);
   } catch (e) {
     await env.DB.batch([
-      env.DB.prepare("UPDATE items SET status = 'available', buyer_id = NULL WHERE id = ? AND buyer_id = ?").bind(itemId, user.id),
+      env.DB.prepare("UPDATE items SET quantity = quantity + 1, status = 'available' WHERE id = ?").bind(itemId),
       ...(paymentMethod === WALLET
         ? [env.DB.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(total, user.id)]
         : []),
