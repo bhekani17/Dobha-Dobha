@@ -27,7 +27,24 @@ export function livekitConfig(env) {
 function liveRooms(cfg) {
   if (!roomsCache.promise || Date.now() - roomsCache.at > ROOMS_CACHE_MS) {
     const service = new RoomServiceClient(cfg.url.replace(/^ws/, 'http'), cfg.key, cfg.secret);
-    const promise = service.listRooms().then((rooms) => rooms.filter((r) => r.numPublishers > 0));
+    const promise = service.listRooms().then(async (rooms) => {
+      const live = rooms.filter((r) => r.numPublishers > 0);
+      // The host's Dobha user id rides in their token metadata; find it so the app can show who is live.
+      return Promise.all(
+        live.map(async (room) => {
+          let hostId = null;
+          try {
+            for (const p of await service.listParticipants(room.name)) {
+              const meta = JSON.parse(p.metadata || '{}');
+              if (meta.role === 'host' && meta.userId) hostId = meta.userId;
+            }
+          } catch {
+            // A room that just ended; show it without a host.
+          }
+          return { name: room.name, viewers: Math.max(room.numParticipants - room.numPublishers, 0), hostId };
+        }),
+      );
+    });
     promise.catch(() => {
       if (roomsCache.promise === promise) roomsCache = { at: 0, promise: null };
     });
@@ -44,10 +61,29 @@ async function liveRoomsOr502(cfg) {
   }
 }
 
-/** GET /api/rooms: streams that are live right now. */
+/** GET /api/rooms: streams that are live right now, with who is hosting each one. */
 export async function rooms(request, env) {
   const live = await liveRoomsOr502(livekitConfig(env));
-  return json(live.map((r) => ({ name: r.name, viewers: Math.max(r.numParticipants - r.numPublishers, 0) })));
+  const ids = [...new Set(live.map((r) => r.hostId).filter(Boolean))];
+  const hosts = new Map();
+  if (ids.length) {
+    const { results } = await env.DB.prepare(
+      `SELECT id, name, shop_name, avatar_key FROM users WHERE id IN (${ids.map(() => '?').join(',')})`,
+    )
+      .bind(...ids)
+      .all();
+    for (const u of results) hosts.set(u.id, u);
+  }
+  return json(
+    live.map((r) => {
+      const h = hosts.get(r.hostId);
+      return {
+        name: r.name,
+        viewers: r.viewers,
+        host: h ? { id: h.id, name: h.shop_name || h.name, avatarUrl: h.avatar_key ? `/media/${h.avatar_key}` : null } : null,
+      };
+    }),
+  );
 }
 
 /**
