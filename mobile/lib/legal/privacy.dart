@@ -1,4 +1,5 @@
 /// Dobha Dobha's Privacy Policy, shown in the app and linked from Settings.
+/// After changing it, run `python tool/build_legal_pages.py` to update the public web page (web/privacy.html).
 library;
 
 import 'terms.dart';
@@ -15,7 +16,7 @@ const privacySections = [
     'Marketplace activity: listings and their photos and videos, likes, saves, comments, offers, carts, follows, reviews, chats, live streams you host or watch, and reports you make.',
     'Orders and money: what you buy and sell, delivery addresses, the payment option you choose, wallet activity, and the bank account details you give for withdrawals.',
     'Support: questions you send us and our answers.',
-    'Technical information: your IP address and basic device and app information, used to keep the service secure and working.',
+    'Technical information: your IP address, basic device and app information, and a push notification token for your phone if you allow notifications, used to keep the service secure and working and to send you alerts.',
   ]),
   TermsSection('3. How we use it', [
     'To run your account and the marketplace: showing listings, processing orders, holding and releasing payments, payouts, notifications and chat.',
@@ -26,7 +27,7 @@ const privacySections = [
   TermsSection('4. Who can see it', [
     'Other users see your public profile: name, username, picture, bio, area, shop details, listings, reviews and follower counts.',
     'When you buy, the seller sees your name and the delivery address for that order so they can send it.',
-    'We use service providers to run Dobha Dobha, such as Cloudflare (hosting, database and file storage), LiveKit (live streaming), Google (Continue with Google) and payment and delivery partners. They only get what they need to do that job.',
+    'We use service providers to run Dobha Dobha, such as Cloudflare (hosting, database and file storage), LiveKit (live streaming), Google (Continue with Google, and Firebase for push notifications), our email provider (password reset codes and support answers) and payment and delivery partners. They only get what they need to do that job.',
     'We may share information when the law requires it, or to protect people from fraud or harm.',
   ]),
   TermsSection('5. How long we keep it', [

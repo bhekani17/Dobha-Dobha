@@ -1,13 +1,20 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'firebase_options.dart';
 import 'screens/auth_screens.dart';
+import 'screens/chat_screens.dart';
 import 'screens/main_shell.dart';
+import 'screens/notifications_screen.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 
-void main() {
+Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   DobhaColors.isDark = binding.platformDispatcher.platformBrightness == Brightness.dark;
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const DobhaLiveApp());
 }
 
@@ -85,12 +92,26 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
+    AppState().onPushTap = _openPush;
     // Keep the splash up long enough to register, even when restoring is instant.
     Future.wait([
       AppState().restoreSession(),
       Future.delayed(const Duration(milliseconds: 1400)),
     ]).then((_) {
       if (mounted) setState(() => _splashDone = true);
+    });
+  }
+
+  /// A tapped push notification: chat messages open the inbox, everything else the notifications list.
+  void _openPush(Map<String, dynamic> data) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !AppState().isLoggedIn) return;
+      AppState().pollNotifications();
+      if (data['kind'] == 'message') {
+        ChatsScreen.open(context);
+      } else {
+        NotificationsScreen.open(context);
+      }
     });
   }
 

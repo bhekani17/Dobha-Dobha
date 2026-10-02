@@ -2,6 +2,7 @@
 // admins answer from the admin website, and the answer arrives as an in-app notification.
 import { isAdmin, requireUser } from './auth.js';
 import { HttpError, id, iso, json, limited, now, readJson, str } from './http.js';
+import { canSendEmail, sendEmail } from './mail.js';
 import { notify } from './notifications.js';
 
 const TOPICS = ['order', 'payment', 'selling', 'account', 'safety', 'bug', 'other'];
@@ -105,13 +106,9 @@ export async function answer(request, env, requestId, action) {
   await env.DB.batch(writes);
 
   // Someone who wrote in signed out only has their email; send the answer there when email is set up.
-  if (!row.user_id && env.EMAIL && env.EMAIL_FROM) {
-    await env.EMAIL.send({
-      to: row.email,
-      from: env.EMAIL_FROM,
-      subject: 'Dobha-Dobha support',
-      text: `${reply}\n\nYou wrote:\n${row.message}`,
-    });
+  const emailed = !row.user_id && canSendEmail(env);
+  if (emailed) {
+    await sendEmail(env, { to: row.email, subject: 'Dobha-Dobha support', text: `${reply}\n\nYou wrote:\n${row.message}` });
   }
-  return json({ ok: true, emailed: !row.user_id && Boolean(env.EMAIL && env.EMAIL_FROM) });
+  return json({ ok: true, emailed });
 }
