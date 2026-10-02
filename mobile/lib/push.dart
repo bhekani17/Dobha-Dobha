@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
 import 'api.dart';
+import 'firebase_options.dart';
 
 /// Push notifications (Firebase Cloud Messaging) on Android and iOS.
 ///
@@ -24,10 +25,10 @@ class Push {
     required VoidCallback onMessage,
     required void Function(Map<String, dynamic> data) onOpen,
   }) async {
-    if (kIsWeb) return;
+    if (kIsWeb || (defaultTargetPlatform != TargetPlatform.android && defaultTargetPlatform != TargetPlatform.iOS)) return;
     try {
       if (!_ready) {
-        await Firebase.initializeApp();
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
         _ready = true;
       }
       final messaging = FirebaseMessaging.instance;

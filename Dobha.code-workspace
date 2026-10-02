@@ -1,0 +1,10 @@
+{
+  "folders": [
+    { "name": "mobile", "path": "mobile" },
+    { "name": "Dobha-Dobha", "path": "." }
+  ],
+  "settings": {
+    "dart.flutterSdkPath": "C:\\Users\\bmbea\\flutter",
+    "flutterPhonePreview.device": "iphone_16_pro_max"
+  }
+}

@@ -1,7 +1,5 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
-import 'firebase_options.dart';
 import 'screens/auth_screens.dart';
 import 'screens/chat_screens.dart';
 import 'screens/main_shell.dart';
@@ -9,12 +7,10 @@ import 'screens/notifications_screen.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 
-Future<void> main() async {
+void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   DobhaColors.isDark = binding.platformDispatcher.platformBrightness == Brightness.dark;
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  // Firebase is only for push on phones, so it starts there (Push.start), never holding up the app.
   runApp(const DobhaLiveApp());
 }
 
