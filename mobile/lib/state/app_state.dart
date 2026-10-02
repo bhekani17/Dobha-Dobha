@@ -13,6 +13,7 @@ import '../models/social.dart';
 import '../models/support.dart';
 import '../models/thrift_item.dart';
 import '../models/user_profile.dart';
+import '../push.dart';
 
 /// A photo or video picked on the device, waiting to be uploaded with a listing.
 class PendingMedia {
@@ -123,6 +124,7 @@ class AppState extends ChangeNotifier {
         _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
         refreshAll();
         _startPolling();
+        _startPush();
       }
     } on ApiException catch (e) {
       if (e.isUnauthorized) await _clearSession();
@@ -166,6 +168,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await Push.stop(_api);
     try {
       await _api.post('/api/auth/logout');
     } catch (_) {
@@ -206,6 +209,15 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     refreshAll();
     _startPolling();
+    _startPush();
+  }
+
+  /// Set by the app shell: opens the screen a tapped push notification is about.
+  void Function(Map<String, dynamic> data)? onPushTap;
+
+  void _startPush() {
+    // Not awaited: the permission prompt shouldn't hold up the app.
+    Push.start(_api, onMessage: pollNotifications, onOpen: (data) => onPushTap?.call(data));
   }
 
   Future<void> _clearSession() async {

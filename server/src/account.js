@@ -1,6 +1,7 @@
 // "Forgot password" (an emailed 6-digit code) and deleting your own account.
 import { b64url, createSession, hashPassword, requireUser, same, sha256, withStats } from './auth.js';
 import { HttpError, json, limited, now, readJson, str } from './http.js';
+import { canSendEmail, sendEmail } from './mail.js';
 
 const CODE_MS = 15 * 60 * 1000;
 const WINDOW_MS = 60 * 60 * 1000;
@@ -18,11 +19,8 @@ function newCode() {
 }
 
 async function sendResetEmail(env, to, code) {
-  // Cloudflare Email Service binding (send_email "EMAIL" in wrangler.jsonc), sending from EMAIL_FROM.
-  if (!env.EMAIL || !env.EMAIL_FROM) throw new HttpError(503, 'Password reset by email is not available yet');
-  await env.EMAIL.send({
+  await sendEmail(env, {
     to,
-    from: env.EMAIL_FROM,
     subject: `Your Dobha-Dobha code: ${code}`,
     text:
       `Your code to reset your Dobha-Dobha password is ${code}\n\n` +
@@ -39,6 +37,8 @@ export async function forgotPassword(request, env) {
   await limited(env.AUTH_LIMIT, request);
   const body = await readJson(request);
   const email = str(body, 'email', { max: 120 }).toLowerCase();
+  // Say so up front, whether or not the email has an account, so the app can offer support instead.
+  if (!canSendEmail(env)) throw new HttpError(503, 'Password reset by email is not available yet');
 
   const user = await env.DB.prepare('SELECT id, email FROM users WHERE email = ? AND deleted_at IS NULL').bind(email).first();
   if (user) {
@@ -141,6 +141,7 @@ export async function deleteAccount(request, env) {
     run('DELETE FROM items WHERE seller_id = ?1 AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.item_id = items.id)'),
     run("UPDATE items SET status = 'removed' WHERE seller_id = ?1 AND status = 'available'"),
     run('DELETE FROM sessions WHERE user_id = ?1'),
+    run('DELETE FROM device_tokens WHERE user_id = ?1'),
     run('DELETE FROM password_resets WHERE user_id = ?1'),
     run('DELETE FROM likes WHERE user_id = ?1'),
     run('DELETE FROM saves WHERE user_id = ?1'),

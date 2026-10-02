@@ -9,6 +9,7 @@ import * as items from './items.js';
 import * as live from './live.js';
 import * as notifications from './notifications.js';
 import * as orders from './orders.js';
+import * as push from './push.js';
 import * as social from './social.js';
 import * as support from './support.js';
 
@@ -26,6 +27,8 @@ const ROUTES = [
   ['PATCH', '/api/me', auth.updateMe],
   ['DELETE', '/api/me', account.deleteAccount],
   ['POST', '/api/me/password', account.changePassword],
+  ['POST', '/api/me/devices', push.registerDevice],
+  ['DELETE', '/api/me/devices', push.unregisterDevice],
   ['PUT', '/api/me/avatar', auth.setAvatar],
   ['DELETE', '/api/me/avatar', auth.setAvatar],
 
@@ -107,7 +110,7 @@ async function handle(request, env) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     let res;
     try {
       res = await handle(request, env);
@@ -119,10 +122,14 @@ export default {
         res = json({ error: 'Something went wrong, please try again' }, 500);
       }
     }
+    // A change may have written notifications or chat messages; push them after responding.
+    if (request.method !== 'GET' && request.method !== 'HEAD' && res.ok) {
+      ctx.waitUntil(push.sendPending(env).catch((e) => console.error('Push failed', e)));
+    }
     return res;
   },
 
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(items.cleanup(env));
+    ctx.waitUntil(Promise.all([items.cleanup(env), push.skipStale(env)]));
   },
 };

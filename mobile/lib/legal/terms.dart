@@ -1,7 +1,8 @@
 /// Dobha Dobha's Terms and Conditions, shown in the app and accepted when registering.
 ///
 /// Bump [termsVersion] whenever the text changes in a way users should agree to again;
-/// the server records which version each account accepted.
+/// the server records which version each account accepted. After changing the text, run
+/// `python tool/build_legal_pages.py` to update the public web page (web/terms.html).
 library;
 
 const termsVersion = '2026-10-01';

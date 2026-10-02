@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tint for the push notification icon (the brand green). -->
+    <color name="notification_green">#00A93B</color>
+</resources>
