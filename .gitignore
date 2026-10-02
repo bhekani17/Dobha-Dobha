@@ -13,3 +13,6 @@ replay_pid*.log
 # Google OAuth credential downloads (contain client secrets)
 client_secret_*.json
 client_*.apps.googleusercontent.com.plist
+
+# Firebase / Google service account keys (server secrets, never commit)
+*-firebase-adminsdk-*.json
