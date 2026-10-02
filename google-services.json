@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "787923055628",
+    "project_id": "dobha-live",
+    "storage_bucket": "dobha-live.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:787923055628:android:4e2787b23f9f600c7f2a29",
+        "android_client_info": {
+          "package_name": "com.dobhadobha.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCz0j5paCdUVTYpZfmdKBgwVjuuj5OQrL4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "787923055628-gm7j2ss8g15o30drcdmls7ugsh2t22vq.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.dobhadobha.dobhaLive"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
