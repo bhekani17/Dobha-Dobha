@@ -11,12 +11,12 @@ RELEASE_NOTES=${2:-"Manual release from local build"}
 
 cd "$(dirname "$0")"
 
-echo "Building Flutter app ($BUILD_TYPE)..."
+echo "Building Flutter app ($BUILD_TYPE) with Google Sign-In config..."
 if [ "$BUILD_TYPE" = "aab" ]; then
-  flutter build appbundle --release
+  flutter build appbundle --release --dart-define-from-file=config/google.json
   OUTPUT_PATH="build/app/outputs/bundle/release/app-release.aab"
 else
-  flutter build apk --release
+  flutter build apk --release --dart-define-from-file=config/google.json
   OUTPUT_PATH="build/app/outputs/flutter-apk/app-release.apk"
 fi
 

@@ -71,11 +71,11 @@ jobs:
 
       - name: Build APK (release)
         working-directory: ./mobile
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define-from-file=config/google.json
 
       - name: Build AAB (release)
         working-directory: ./mobile
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --dart-define-from-file=config/google.json
 
       - name: Upload APK to Firebase App Distribution
         working-directory: ./mobile
