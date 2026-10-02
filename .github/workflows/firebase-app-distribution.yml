@@ -1,0 +1,101 @@
+name: Build and Distribute to Firebase App Distribution
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Release notes for this build'
+        required: false
+        default: 'Automated release'
+      testers:
+        description: 'Testers to distribute to (comma-separated emails)'
+        required: false
+        default: 'ndlovubhekani17@gmail.com'
+
+jobs:
+  build-and-distribute:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.19.0'
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Node.js and Firebase CLI
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Get Flutter dependencies
+        working-directory: ./mobile
+        run: flutter pub get
+
+      - name: Decode keystore
+        working-directory: ./mobile/android
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > upload-keystore.jks
+
+      - name: Create key.properties
+        working-directory: ./mobile/android
+        run: |
+          cat > key.properties << EOF
+          storeFile=upload-keystore.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          EOF
+
+      - name: Decode Firebase service account
+        working-directory: ./mobile
+        run: |
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" | base64 -d > firebase-service-account.json
+
+      - name: Build APK (release)
+        working-directory: ./mobile
+        run: flutter build apk --release
+
+      - name: Build AAB (release)
+        working-directory: ./mobile
+        run: flutter build appbundle --release
+
+      - name: Upload APK to Firebase App Distribution
+        working-directory: ./mobile
+        run: |
+          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
+            --app ${{ secrets.FIREBASE_APP_ID }} \
+            --release-notes "${{ github.event.inputs.release_notes || 'Automated release from GitHub Actions' }}" \
+            --testers "${{ github.event.inputs.testers || 'ndlovubhekani17@gmail.com' }}" \
+            --service-credentials-file firebase-service-account.json
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: mobile/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-release
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
