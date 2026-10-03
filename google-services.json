@@ -14,7 +14,23 @@
       },
       "oauth_client": [
         {
-          "client_id": "787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com",
+          "client_id": "787923055628-acp8hnjbf4fcfa5b7bo377h6on5noqek.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dobhadobha.app",
+            "certificate_hash": "501913997fcf1b85a888bfcbc09fa3d3c2d5fd83"
+          }
+        },
+        {
+          "client_id": "787923055628-ddbds2t1fost0v7bevonee186cmcek4r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dobhadobha.app",
+            "certificate_hash": "f0d5c8fba9336eb946a03f1a9921db37ed66e74c"
+          }
+        },
+        {
+          "client_id": "787923055628-lbq5notkv2hommeurvt6k7sp6o6slliu.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
