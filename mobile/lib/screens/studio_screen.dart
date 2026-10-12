@@ -311,7 +311,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
   final _quantity = TextEditingController(text: '1');
   String _category = ThriftItem.categories.first;
   String _condition = ThriftItem.conditions.first;
-  String _size = 'M';
+  String _size = 'N/A';
   final _media = <ListingMedia>[];
   bool _busy = false;
   String? _progress;
@@ -650,7 +650,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
           TextField(
             controller: _title,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'What is it? (e.g. 90s Carhartt Detroit Jacket)'),
+            decoration: const InputDecoration(labelText: 'What are you selling? (e.g. vintage jacket, desk lamp, tablet)'),
           ),
           const SizedBox(height: 14),
           Row(
@@ -680,7 +680,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
             children: [
               Expanded(child: _dropdown('Category', _category, ThriftItem.categories, (v) => _category = v)),
               const SizedBox(width: 12),
-              Expanded(child: _dropdown('Size', _size, {...ThriftItem.sizes, _size}.toList(), (v) => _size = v)),
+              Expanded(child: _dropdown('Size / details', _size, {...ThriftItem.sizes, _size}.toList(), (v) => _size = v)),
             ],
           ),
           const SizedBox(height: 14),
@@ -699,7 +699,7 @@ class _NewListingScreenState extends State<NewListingScreen> {
             maxLines: 4,
             minLines: 2,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Details: fit, flaws, measurements (optional)'),
+            decoration: const InputDecoration(labelText: 'Details: features, measurements, flaws (optional)'),
           ),
           const SizedBox(height: 18),
           if (_error != null)

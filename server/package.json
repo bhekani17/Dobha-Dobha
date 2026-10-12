@@ -5,7 +5,8 @@
   "scripts": {
     "build:web": "cd ../mobile && flutter build web --release --dart-define-from-file=config/google.json",
     "deploy": "npm run build:web && wrangler deploy",
-    "db:migrate": "wrangler d1 migrations apply dobha --remote"
+    "db:migrate": "wrangler d1 migrations apply dobha --remote",
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "livekit-server-sdk": "^2.7.0"

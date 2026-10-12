@@ -1,0 +1,470 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Dobha Dobha e-commerce marketplace website and serverless API.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+  AllowedOrigin:
+    Type: String
+    Default: '*'
+    Description: Set to the CloudFront website URL after the first deployment.
+  LiveKitUrl:
+    Type: String
+    Default: ''
+    Description: LiveKit Cloud WebSocket URL used only to view mobile-hosted streams.
+  LiveKitApiKey:
+    Type: String
+    Default: ''
+    NoEcho: true
+  LiveKitApiSecret:
+    Type: String
+    Default: ''
+    NoEcho: true
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    MemorySize: 512
+    Timeout: 30
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref MarketTable
+        MEDIA_BUCKET: !Ref MediaBucket
+        CLIENT_ID: !Ref UserPoolClient
+        ALLOWED_ORIGIN: !Ref AllowedOrigin
+        NOTIFICATIONS_QUEUE_URL: !Ref NotificationsQueue
+        LIVEKIT_URL: !Ref LiveKitUrl
+        LIVEKIT_API_KEY: !Ref LiveKitApiKey
+        LIVEKIT_API_SECRET: !Ref LiveKitApiSecret
+  Api:
+    Cors:
+      AllowMethods: "'GET,POST,PATCH,DELETE,OPTIONS'"
+      AllowHeaders: "'Content-Type,Authorization'"
+      AllowOrigin: !Sub "'${AllowedOrigin}'"
+    Auth:
+      DefaultAuthorizer: CognitoAuthorizer
+      AddDefaultAuthorizerToCorsPreflight: false
+      Authorizers:
+        CognitoAuthorizer:
+          UserPoolArn: !GetAtt UserPool.Arn
+          Identity:
+            Header: Authorization
+
+Resources:
+  MarketApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub dobha-marketplace-${Stage}
+      StageName: !Ref Stage
+
+  MarketTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub dobha-marketplace-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: MarketFeedIndex
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: SellerActivityIndex
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  MediaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub dobha-media-${AWS::AccountId}-${Stage}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - GET
+              - POST
+            AllowedHeaders:
+              - Content-Type
+            MaxAge: 300
+
+  WebBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub dobha-website-${AWS::AccountId}-${Stage}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  WebOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub dobha-website-oac-${Stage}
+        Description: CloudFront-only access to the private S3 website bucket.
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  NotificationsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub dobha-marketplace-notifications-${Stage}
+      VisibilityTimeout: 90
+      MessageRetentionPeriod: 345600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt NotificationsDeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  NotificationsDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub dobha-marketplace-notifications-dlq-${Stage}
+      MessageRetentionPeriod: 1209600
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub dobha-marketplace-users-${Stage}
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 10
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub dobha-marketplace-web-${Stage}
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  MarketFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub dobha-marketplace-api-${Stage}
+      CodeUri: .
+      Handler: src/app.handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:Query
+                - dynamodb:TransactWriteItems
+                - dynamodb:UpdateItem
+              Resource:
+                - !GetAtt MarketTable.Arn
+                - !Sub '${MarketTable.Arn}/index/*'
+            - Effect: Allow
+              Action:
+                - s3:GetObject
+              Resource: !Sub '${MediaBucket.Arn}/*'
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+              Resource: !Sub '${MediaBucket.Arn}/items/*'
+            - Effect: Allow
+              Action:
+                - cognito-idp:SignUp
+                - cognito-idp:ConfirmSignUp
+                - cognito-idp:InitiateAuth
+                - cognito-idp:ForgotPassword
+                - cognito-idp:ConfirmForgotPassword
+              Resource: !GetAtt UserPool.Arn
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt NotificationsQueue.Arn
+      Events:
+        Health:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/health
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        PublicAuth:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/auth/{proxy+}
+            Method: ANY
+            Auth:
+              Authorizer: NONE
+        PublicAuthRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/auth
+            Method: ANY
+            Auth:
+              Authorizer: NONE
+        PublicFeed:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/items
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        PublicItem:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/items/{itemId}
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        PublicMedia:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/media/{proxy+}
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        PublicRooms:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/rooms
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        PublicViewerToken:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/live/token
+            Method: GET
+            Auth:
+              Authorizer: NONE
+        PrivateApi:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/private/{proxy+}
+            Method: ANY
+        PrivateApiRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/private
+            Method: ANY
+
+  NotificationRelayFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub dobha-marketplace-notification-relay-${Stage}
+      CodeUri: .
+      Handler: src/notification_relay.handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:DescribeStream
+                - dynamodb:GetRecords
+                - dynamodb:GetShardIterator
+                - dynamodb:ListStreams
+              Resource: !GetAtt MarketTable.StreamArn
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt NotificationsQueue.Arn
+      Events:
+        OutboxStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt MarketTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 10
+            MaximumRetryAttempts: 5
+            BisectBatchOnFunctionError: true
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName":["INSERT"],"dynamodb":{"NewImage":{"pk":{"S":[{"prefix":"OUTBOX#"}]}}}}'
+
+  NotificationWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub dobha-marketplace-notification-worker-${Stage}
+      CodeUri: .
+      Handler: src/notification_worker.handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt MarketTable.Arn
+      Events:
+        NotificationMessages:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt NotificationsQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub Dobha marketplace website (${Stage})
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: WebsiteOrigin
+            DomainName: !GetAtt WebBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+            OriginAccessControlId: !GetAtt WebOriginAccessControl.Id
+          - Id: MarketplaceApiOrigin
+            DomainName: !Sub '${MarketApi}.execute-api.${AWS::Region}.amazonaws.com'
+            OriginPath: !Sub '/${Stage}'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: WebsiteOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: MarketplaceApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+              - PUT
+              - POST
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            CachePolicyId: 413f1608-7d4a-4f6a-9b72-7f8f0d1f7f2a
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+
+  WebBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${WebBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}'
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint; the website uses its CloudFront URL.
+    Value: !Sub https://${MarketApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}
+  UserPoolId:
+    Description: Cognito User Pool ID.
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Cognito web client ID.
+    Value: !Ref UserPoolClient
+  MarketTable:
+    Description: DynamoDB marketplace table.
+    Value: !Ref MarketTable
+  MediaBucket:
+    Description: Private S3 bucket for listing media.
+    Value: !Ref MediaBucket
+  WebBucket:
+    Description: Private S3 bucket for static website assets.
+    Value: !Ref WebBucket
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID.
+    Value: !Ref CloudFrontDistribution
+  WebsiteUrl:
+    Description: HTTPS marketplace website URL.
+    Value: !Sub https://${CloudFrontDistribution.DomainName}

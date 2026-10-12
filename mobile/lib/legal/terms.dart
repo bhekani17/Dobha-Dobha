@@ -5,8 +5,8 @@
 /// `python tool/build_legal_pages.py` to update the public web page (web/terms.html).
 library;
 
-const termsVersion = '2026-10-01';
-const termsUpdated = '1 October 2026';
+const termsVersion = '2026-10-02';
+const termsUpdated = '2 October 2026';
 
 class TermsSection {
   final String title;
@@ -17,7 +17,7 @@ class TermsSection {
 const termsSections = [
   TermsSection('1. Agreeing to these terms', [
     'These terms are an agreement between you and Dobha Dobha. By creating an account or using the app, you agree to them. If you do not agree, please do not use Dobha Dobha.',
-    'Dobha Dobha is a marketplace. We connect people buying and selling second-hand and thrift clothing. Unless we say otherwise, the seller of a piece is the person or stall that listed it, not Dobha Dobha.',
+    'Dobha Dobha is a marketplace. We connect people buying and selling goods across categories such as clothing, electronics, home goods, books, sports gear and collectibles. Unless we say otherwise, the seller of an item is the person or shop that listed it, not Dobha Dobha.',
   ]),
   TermsSection('2. Your account', [
     'You must be 18 or older, or have a parent or guardian\'s permission, to use Dobha Dobha.',
@@ -25,24 +25,24 @@ const termsSections = [
     'You may have one personal account. We may suspend or close accounts that break these terms.',
   ]),
   TermsSection('3. Buying', [
-    'Thrift pieces are usually pre-owned. Look carefully at the photos, size, condition and description before you buy, and ask the seller in chat if anything is unclear.',
+    'Items may be new or pre-owned. Look carefully at the photos, details, condition and description before you buy, and ask the seller in chat if anything is unclear.',
     'Prices are in South African rand. The total you pay is the price plus the delivery fee for the option you choose, shown before you pay.',
     'When you pay, we hold the money and only pay the seller once you confirm you received the piece as described. Please check it and confirm, or report a problem, soon after it arrives.',
     'Each purchase is a separate order with its own seller, even when you check out several pieces from your cart together.',
   ]),
   TermsSection('4. Selling', [
     'You can sell once you add your shop name and stall location. You must own what you list and have the right to sell it.',
-    'Listings must be honest: real photos of the actual piece, the correct size and condition, and any flaws described. The quantity you list must be what you actually have.',
-    'Once a piece sells, send it promptly (we expect within 3 business days) and add the courier tracking number when you mark it as sent, unless the buyer collects it at the Safe Hub.',
-    'You are paid when the buyer confirms they received the piece. Dobha Dobha keeps a fee of 5% of the item price from each sale. Delivery fees are not part of your payout.',
+    'Listings must be honest: use real photos, accurate details and condition, and describe any flaws. The quantity you list must be what you actually have.',
+    'Once an item sells, send it promptly (we expect within 3 business days) and add the courier tracking number when you mark it as sent, unless the buyer collects it at the Safe Hub.',
+    'The app currently simulates payment, wallet, escrow and payout flows for learning purposes. It does not charge real payment methods or hold or transfer real money. Do not enter real payment details or rely on demo order or payout states as financial transactions.',
   ]),
   TermsSection('5. Offers', [
     'Buyers can offer a lower price and sellers can accept, decline or counter. When an offer or counter is accepted, the buyer may buy the piece at that price within 48 hours, and the seller agrees to sell at that price during that time.',
   ]),
   TermsSection('6. Payments, payouts and problems', [
-    'Payment is taken through the payment option you choose in the app. Money held for an order is released to the seller when the buyer confirms, or as decided by Dobha support if there is a problem.',
-    'If something is wrong with an order, report a problem from the order before you confirm it. The money stays on hold while Dobha support looks into it with you and the other person. Support may refund the buyer or pay the seller depending on what happened, and will tell you both.',
-    'Withdrawals go to the South African bank account you give us. Make sure the details are correct.',
+    'The app currently simulates payment, wallet, escrow and payout flows for learning purposes. No real payment is collected, held, refunded or paid out. Do not enter real payment details.',
+    'You can submit a demo order issue through the app, but its order and support status do not represent a real payment dispute or settlement.',
+    'Demo withdrawals do not transfer money. Bank name and account information entered into a demo withdrawal form should not be real.',
     'Nothing in these terms takes away your rights under the Consumer Protection Act or other South African law.',
   ]),
   TermsSection('7. Things you may not sell', [
@@ -50,7 +50,7 @@ const termsSections = [
   ]),
   TermsSection('8. Live streams, chat and comments', [
     'Be respectful. Harassment, threats, hate speech, sexual content, spam and scams are not allowed in live streams, chats, comments or listings.',
-    'Do not share other people\'s personal information, and keep payments inside Dobha Dobha. Deals taken off the app are not protected by our payment hold or support.',
+    'Do not share other people\'s personal information. Payment functionality in this learning version is simulated and does not protect or settle off-app deals. The website can watch live streams hosted from the mobile app; it cannot host a stream.',
     'You can report a listing from its menu. We may remove content, end live streams, and limit or close accounts that break these rules.',
   ]),
   TermsSection('9. Your content', [
@@ -59,7 +59,7 @@ const termsSections = [
   ]),
   TermsSection('10. Privacy', [
     'We collect what we need to run Dobha Dobha: your name, username, email address and phone number, your profile, delivery addresses you enter, your listings, orders, offers, messages, comments and live stream activity, and basic device and usage information.',
-    'We use it to run your account, process orders and payouts, deliver notifications, keep the marketplace safe, and handle problems. Sellers see the name and delivery address you give for their order so they can send it. We do not sell your personal information.',
+    'We use it to run your account, create order records, simulate wallet activity, deliver notifications, keep the marketplace safe, and handle questions. Sellers see the name and delivery address you give for an order. We do not sell your personal information.',
     'We protect your information under the Protection of Personal Information Act (POPIA). You can ask to see, correct or delete your personal information, subject to records we must keep by law, such as order history.',
   ]),
   TermsSection('11. Our responsibility', [

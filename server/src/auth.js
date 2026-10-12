@@ -82,6 +82,20 @@ export async function requireUser(request, env) {
   return row;
 }
 
+/** The signed-in user when a bearer token is supplied, or null for public reads. */
+export async function optionalUser(request, env) {
+  const header = request.headers.get('authorization') || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+  if (!token) return null;
+  const row = await env.DB.prepare(
+    'SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?',
+  )
+    .bind(await sha256(token), now())
+    .first();
+  if (!row) throw new HttpError(401, 'Your session has expired, please log in again');
+  return row;
+}
+
 export async function register(request, env) {
   await limited(env.AUTH_LIMIT, request);
   const body = await readJson(request);
@@ -209,4 +223,3 @@ export async function updateMe(request, env) {
     .run();
   return json({ user: await withStats(env, next) });
 }
-

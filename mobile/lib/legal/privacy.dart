@@ -8,18 +8,18 @@ const privacyUpdated = '2 October 2026';
 
 const privacySections = [
   TermsSection('1. Who we are', [
-    'Dobha Dobha is a South African marketplace for second-hand and thrift clothing. This policy explains what personal information we collect, why, and the choices you have. We follow the Protection of Personal Information Act (POPIA).',
+    'Dobha Dobha is a South African marketplace for goods across categories such as clothing, electronics, home goods, books, sports gear and collectibles. This policy explains what personal information we collect, why, and the choices you have. We follow the Protection of Personal Information Act (POPIA).',
   ]),
   TermsSection('2. What we collect', [
     'Account details: your name, username, email address, phone number if you give it, password (stored only in a scrambled form we cannot read), and your Google account id if you use Continue with Google.',
     'Profile and shop details: your picture, bio, area, shop name and stall location.',
     'Marketplace activity: listings and their photos and videos, likes, saves, comments, offers, carts, follows, reviews, chats, live streams you host or watch, and reports you make.',
-    'Orders and money: what you buy and sell, delivery addresses, the payment option you choose, wallet activity, and the bank account details you give for withdrawals.',
+    'Orders and demo money features: order details, delivery addresses, the payment option you select, simulated wallet activity, and the bank name and last four account digits entered for a demo withdrawal.',
     'Support: questions you send us and our answers.',
     'Technical information: your IP address, basic device and app information, and a push notification token for your phone if you allow notifications, used to keep the service secure and working and to send you alerts.',
   ]),
   TermsSection('3. How we use it', [
-    'To run your account and the marketplace: showing listings, processing orders, holding and releasing payments, payouts, notifications and chat.',
+    'To run your account and the marketplace: showing listings, creating order records, simulating wallet actions, notifications and chat.',
     'To keep people safe: preventing fraud and abuse, limiting repeated requests, reviewing reports and settling problems with orders.',
     'To answer you when you contact support, and to tell you about important changes such as updates to our terms.',
     'We do not sell your personal information, and we do not use it for advertising by other companies.',
@@ -27,7 +27,7 @@ const privacySections = [
   TermsSection('4. Who can see it', [
     'Other users see your public profile: name, username, picture, bio, area, shop details, listings, reviews and follower counts.',
     'When you buy, the seller sees your name and the delivery address for that order so they can send it.',
-    'We use service providers to run Dobha Dobha, such as Cloudflare (hosting, database and file storage), LiveKit (live streaming), Google (Continue with Google, and Firebase for push notifications), our email provider (password reset codes and support answers) and payment and delivery partners. They only get what they need to do that job.',
+    'We use service providers to run Dobha Dobha, such as Cloudflare (API, database and file storage), AWS (website hosting when deployed there), LiveKit (live streaming), Google (Continue with Google), Firebase (mobile push notifications), and our email provider (password reset codes and support answers). They only get what they need to do that job. This learning version does not integrate real payment processing or delivery partners.',
     'We may share information when the law requires it, or to protect people from fraud or harm.',
   ]),
   TermsSection('5. How long we keep it', [
