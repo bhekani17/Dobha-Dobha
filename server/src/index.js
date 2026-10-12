@@ -3,6 +3,7 @@
 // served by Workers assets before this runs.
 import * as account from './account.js';
 import * as auth from './auth.js';
+import { applyCors } from './cors.mjs';
 import * as google from './google.js';
 import { HttpError, json } from './http.js';
 import * as items from './items.js';
@@ -111,6 +112,9 @@ async function handle(request, env) {
 
 export default {
   async fetch(request, env, ctx) {
+    if (request.method === 'OPTIONS') {
+      return applyCors(request, env, new Response(null, { status: 204 }));
+    }
     let res;
     try {
       res = await handle(request, env);
@@ -126,7 +130,7 @@ export default {
     if (request.method !== 'GET' && request.method !== 'HEAD' && res.ok) {
       ctx.waitUntil(push.sendPending(env).catch((e) => console.error('Push failed', e)));
     }
-    return res;
+    return applyCors(request, env, res);
   },
 
   async scheduled(event, env, ctx) {

@@ -1,9 +1,26 @@
 // Listings, their photos and videos, likes, saves and comments.
-import { isAdmin, requireUser } from './auth.js';
+import { isAdmin, optionalUser, requireUser } from './auth.js';
 import { HttpError, id, iso, json, limited, now, rands, readJson, str, zar } from './http.js';
 import { notify } from './notifications.js';
 
-const CATEGORIES = ['Jackets', 'Denim', 'Sneakers', 'Workwear', 'Vintage Tees', 'Knitwear', 'Other'];
+const CATEGORIES = [
+  'Jackets',
+  'Denim',
+  'Sneakers',
+  'Workwear',
+  'Vintage Tees',
+  'Knitwear',
+  'Clothing & Accessories',
+  'Shoes',
+  'Electronics',
+  'Home & Living',
+  'Books & Media',
+  'Sports & Outdoors',
+  'Toys & Games',
+  'Beauty & Personal Care',
+  'Collectibles',
+  'Other',
+];
 const MEDIA_TYPES = {
   'image/jpeg': ['image', 'jpg'],
   'image/png': ['image', 'png'],
@@ -79,12 +96,13 @@ async function loadItem(env, itemId, viewerId) {
 /**
  * GET /api/items: available pieces, newest first, minus ones the viewer reported.
  * Optional filters: q (title, description, caption, seller), category, location (stall area).
- * `before` pages by created time.
+ * `before` pages by creation time; `offset` supports bounded offset pagination for the website.
  */
 export async function listItems(request, env) {
-  const user = await requireUser(request, env);
+  const user = await optionalUser(request, env);
   const q = new URL(request.url).searchParams;
   const limit = Math.min(Number(q.get('limit')) || 30, 50);
+  const offset = Math.min(Math.max(Number(q.get('offset')) || 0, 0), 10_000);
   const before = Number(q.get('before')) || Number.MAX_SAFE_INTEGER;
 
   const where = [
@@ -92,7 +110,7 @@ export async function listItems(request, env) {
     'i.created_at < ?2',
     'NOT EXISTS (SELECT 1 FROM reports r WHERE r.item_id = i.id AND r.user_id = ?1)',
   ];
-  const binds = [user.id, before, limit];
+  const binds = [user?.id ?? null, before, limit + 1, offset];
   // instr() rather than LIKE, so % and _ in a search are matched literally.
   const contains = (expr, value) => {
     binds.push(value.toLowerCase());
@@ -108,16 +126,20 @@ export async function listItems(request, env) {
   const location = (q.get('location') || '').trim().slice(0, 60);
   if (location) contains('u.stall_location', location);
 
-  const { results } = await env.DB.prepare(`${ITEM_SELECT} WHERE ${where.join(' AND ')} ORDER BY i.created_at DESC LIMIT ?3`)
+  const { results } = await env.DB.prepare(`${ITEM_SELECT} WHERE ${where.join(' AND ')} ORDER BY i.created_at DESC, i.id DESC LIMIT ?3 OFFSET ?4`)
     .bind(...binds)
     .all();
-  return json({ items: results.map(itemJson) });
+  const hasMore = results.length > limit;
+  return json({
+    items: results.slice(0, limit).map(itemJson),
+    nextCursor: hasMore ? String(offset + limit) : null,
+  });
 }
 
 /** GET /api/items/:id */
 export async function getItem(request, env, itemId) {
-  const user = await requireUser(request, env);
-  return json({ item: itemJson(await loadItem(env, itemId, user.id)) });
+  const user = await optionalUser(request, env);
+  return json({ item: itemJson(await loadItem(env, itemId, user?.id ?? null)) });
 }
 
 /** GET /api/items/mine: a vendor's own listings, sold ones included. */
@@ -206,7 +228,7 @@ export async function createItem(request, env) {
       `${item.title} for R ${(item.price / 100).toFixed(0)}`,
       item.id,
       now(),
-      user.id,
+      user?.id ?? null,
     ),
     ...media.map((m, position) =>
       env.DB.prepare('INSERT INTO item_media (id, item_id, kind, media_key, position) VALUES (?, ?, ?, ?, ?)').bind(

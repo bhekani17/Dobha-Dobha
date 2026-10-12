@@ -13,9 +13,36 @@ class ItemMedia {
 }
 
 class ThriftItem {
-  static const categories = ['Jackets', 'Denim', 'Sneakers', 'Workwear', 'Vintage Tees', 'Knitwear', 'Other'];
-  static const conditions = ['Grade A Vintage', '90s Deadstock', 'Lightly Worn', 'Distressed Classic'];
-  static const sizes = ['XS', 'S', 'M', 'L', 'XL', '2XL', 'Free Size'];
+  static const categories = [
+    'Jackets',
+    'Denim',
+    'Sneakers',
+    'Workwear',
+    'Vintage Tees',
+    'Knitwear',
+    'Clothing & Accessories',
+    'Shoes',
+    'Electronics',
+    'Home & Living',
+    'Books & Media',
+    'Sports & Outdoors',
+    'Toys & Games',
+    'Beauty & Personal Care',
+    'Collectibles',
+    'Other',
+  ];
+  static const conditions = [
+    'New',
+    'Like new',
+    'Good',
+    'Fair',
+    'Needs repair',
+    'Grade A Vintage',
+    '90s Deadstock',
+    'Lightly Worn',
+    'Distressed Classic',
+  ];
+  static const sizes = ['N/A', 'One size', 'XS', 'S', 'M', 'L', 'XL', '2XL', 'Free Size'];
 
   final String id;
   final String title;
