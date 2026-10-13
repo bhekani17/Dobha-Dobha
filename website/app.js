@@ -44,6 +44,7 @@ const state = {
   query: '',
   location: 'All Joburg',
   page: 'home',
+  inlineStream: false,
   authMode: 'login',
   stream: null,
   cart: [],
@@ -363,7 +364,7 @@ async function loadLiveRooms() {
     lists.forEach((list) => {
       list.innerHTML = cards;
       list.querySelectorAll('.live-avatar img').forEach((image) => image.addEventListener('error', () => image.remove(), { once: true }));
-      list.querySelectorAll('[data-room]').forEach((button) => button.addEventListener('click', () => watchStream(button.dataset.room)));
+      list.querySelectorAll('[data-room]').forEach((button) => button.addEventListener('click', () => watchStream(button.dataset.room, list.id === 'live-list')));
     });
   } catch (error) {
     lists.forEach((list) => {
@@ -371,13 +372,24 @@ async function loadLiveRooms() {
     });
   }
 }
-async function watchStream(room) {
+async function watchStream(room, inline = false) {
   if (!requireSignIn()) return;
-  byId('live-title').textContent = 'Join the stream';
-  byId('live-placeholder').classList.remove('hidden');
-  byId('live-video').srcObject = null;
-  setMessage('live-message', '');
-  openDialog('live-dialog');
+  await stopStream();
+  const player = inline
+    ? { frame: byId('inline-video-frame'), video: byId('inline-live-video'), placeholder: byId('inline-live-placeholder'), message: 'inline-live-message' }
+    : { frame: byId('video-frame'), video: byId('live-video'), placeholder: byId('live-placeholder'), message: 'live-message' };
+  if (inline) {
+    state.inlineStream = true;
+    byId('inline-live-title').textContent = 'Live stream';
+    byId('inline-live-player').classList.remove('hidden');
+  } else {
+    byId('live-title').textContent = 'Join the stream';
+    openDialog('live-dialog');
+  }
+  player.placeholder.textContent = 'Connecting to the live stream…';
+  player.placeholder.classList.remove('hidden');
+  player.video.srcObject = null;
+  setMessage(player.message, '');
   try {
     const result = await api(`/api/token?room=${encodeURIComponent(room)}&role=viewer`);
     const Room = window.LivekitClient?.Room;
@@ -388,32 +400,41 @@ async function watchStream(room) {
     state.stream = liveRoom;
     liveRoom.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind === Track.Kind.Video) {
-        track.attach(byId('live-video'));
-        byId('live-placeholder').classList.add('hidden');
+        track.attach(player.video);
+        player.placeholder.classList.add('hidden');
       } else {
         const audio = track.attach();
         audio.className = 'stream-audio';
-        byId('video-frame').append(audio);
+        player.frame.append(audio);
       }
     });
     liveRoom.on(RoomEvent.TrackUnsubscribed, (track) => track.detach().forEach((element) => {
-      if (element !== byId('live-video')) element.remove();
+      if (element !== player.video) element.remove();
       else element.srcObject = null;
     }));
     liveRoom.on(RoomEvent.Disconnected, () => {
-      byId('live-placeholder').textContent = 'This stream has ended.';
-      byId('live-placeholder').classList.remove('hidden');
+      player.placeholder.textContent = 'This stream has ended.';
+      player.placeholder.classList.remove('hidden');
     });
     await liveRoom.connect(result.url, result.token);
+    if (inline) byId('inline-live-title').textContent = `Watching ${room}`;
   } catch (error) {
-    setMessage('live-message', error.message, true);
-    byId('live-placeholder').textContent = 'The stream could not be joined.';
+    setMessage(player.message, error.message, true);
+    player.placeholder.textContent = 'The stream could not be joined.';
+    player.placeholder.classList.remove('hidden');
   }
 }
 async function stopStream() {
   if (state.stream) {
     await state.stream.disconnect();
     state.stream = null;
+  }
+  if (state.inlineStream) {
+    state.inlineStream = false;
+    byId('inline-live-player').classList.add('hidden');
+    byId('inline-live-video').srcObject = null;
+    byId('inline-live-placeholder').textContent = 'Connecting to the live stream…';
+    setMessage('inline-live-message', '');
   }
 }
 async function loadOrders() {
@@ -464,6 +485,7 @@ function renderPage() {
   const requested = location.hash.slice(1).split('?')[0] || 'home';
   const page = ['home', 'shop', 'live', 'sell', 'orders', 'cart', 'saved', 'offers', 'wallet', 'messages', 'notifications', 'account', 'support', 'people', 'profile', 'about'].includes(requested) ? requested : 'home';
   state.page = page;
+  if (state.inlineStream && page !== 'live') stopStream();
   clearInterval(state.chatPoll);
   state.chatPoll = null;
   clearInterval(state.roomPoll);
@@ -1191,6 +1213,7 @@ function init() {
   byId('delete-account-form').addEventListener('submit', deleteAccount);
   byId('support-form').addEventListener('submit', submitSupport);
   byId('people-search-form').addEventListener('submit', searchPeople);
+  byId('stop-inline-stream').addEventListener('click', stopStream);
   document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
   document.querySelectorAll('dialog').forEach((dialog) => dialog.addEventListener('click', (event) => {
     if (event.target === dialog) dialog.close();
