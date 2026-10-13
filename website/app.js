@@ -346,13 +346,23 @@ async function loadLiveRooms() {
       });
       return;
     }
-    const cards = rooms.map((room) => `<article class="live-card">
-      <div class="live-avatar">${escapeHtml((room.host?.name || 'D').slice(0, 1).toUpperCase())}</div>
-      <div class="live-info"><strong>${escapeHtml(room.host?.name || 'Dobha seller')}</strong><span>${Number(room.viewers) || 0} watching · live now</span></div>
-      <button class="button button-dark" data-room="${escapeHtml(room.name)}">Watch</button>
-    </article>`).join('');
+    const cards = rooms.map((room) => {
+      const hostName = room.host?.name || 'Dobha seller';
+      const avatar = room.host?.avatarUrl
+        ? `<img src="${escapeHtml(resolveMedia(room.host.avatarUrl))}" alt="">`
+        : '';
+      return `<article class="live-card">
+        <div class="live-card-top">
+          <div class="live-avatar">${avatar}<span>${escapeHtml(hostName.slice(0, 1).toUpperCase())}</span></div>
+          <span class="live-status"><span class="live-status-dot"></span>Live now</span>
+        </div>
+        <div class="live-info"><strong>${escapeHtml(hostName)}</strong><span>${Number(room.viewers) || 0} watching · Join the stream</span></div>
+        <button class="button button-dark" data-room="${escapeHtml(room.name)}" aria-label="Watch ${escapeHtml(hostName)} live">Watch live <span aria-hidden="true">↗</span></button>
+      </article>`;
+    }).join('');
     lists.forEach((list) => {
       list.innerHTML = cards;
+      list.querySelectorAll('.live-avatar img').forEach((image) => image.addEventListener('error', () => image.remove(), { once: true }));
       list.querySelectorAll('[data-room]').forEach((button) => button.addEventListener('click', () => watchStream(button.dataset.room)));
     });
   } catch (error) {
