@@ -673,17 +673,15 @@ textarea {
 }
 
 .live-list {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 270px), 1fr));
   gap: 14px;
-  overflow-x: auto;
   margin-top: 24px;
-  padding-bottom: 5px;
 }
 
 .live-card {
   display: flex;
-  min-width: 230px;
-  flex: 1;
+  min-width: 0;
   align-items: center;
   gap: 12px;
   padding: 16px;
@@ -1688,10 +1686,6 @@ footer .brand-symbol img {
 
   .product-copy {
     padding: 4px;
-  }
-
-  .live-card {
-    min-width: 210px;
   }
 
   .category-grid {
