@@ -76,6 +76,11 @@
       <section class="page-intro"><p class="eyebrow">WATCH LIVE</p><h1>From their phone<br><span>to your screen.</span></h1><p>Join sellers showing what they have right now. This website is for watching streams; to go live, use the mobile app.</p></section>
       <section class="live-strip live-page-section">
         <div class="section-heading live-heading"><div><p class="eyebrow">HAPPENING RIGHT NOW</p><h2>Live from the market</h2></div><button class="text-button" id="refresh-live">Refresh streams ↻</button></div>
+        <section id="inline-live-player" class="inline-live-player hidden" aria-label="Live stream player">
+          <div class="inline-player-heading"><div><p class="eyebrow">NOW PLAYING</p><h3 id="inline-live-title">Live stream</h3></div><button class="text-button" id="stop-inline-stream">Stop watching ×</button></div>
+          <div class="video-frame inline-video-frame" id="inline-video-frame"><video id="inline-live-video" autoplay playsinline controls></video><p id="inline-live-placeholder">Connecting to the live stream…</p></div>
+          <p class="form-message" id="inline-live-message" role="status"></p>
+        </section>
         <div id="live-list" class="live-list"><p class="muted">Checking who's live...</p></div>
       </section>
     </section>
