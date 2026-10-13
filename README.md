@@ -1,15 +1,27 @@
-# Dobha Dobha
+# Dobha-Dobha
 
-Dobha Dobha is a general buy-and-sell marketplace. Sellers publish listings and may host live streams from the mobile app; website visitors can browse, buy/request items, and watch active streams, but cannot start a live stream from the website.
+Dobha-Dobha is a buy-and-sell marketplace with a Flutter mobile app and a static website.
 
-## AWS website branch
+## Project structure
 
-The `aws` branch contains the AWS-hosted marketplace website and Flutter mobile app. The website calls the same Cloudflare Worker API as the mobile app so accounts, listings, orders, and marketplace activity are shared. See [aws/README.md](./aws/README.md) for architecture, deployment, configuration, and limitations.
+```text
+server/   Backend services, AWS infrastructure, and backend tests
+mobile/   Flutter application
+website/  Static marketplace website
+```
 
-## Existing application
+- [server/](./server/) contains the current marketplace API, AWS infrastructure, an incomplete AWS marketplace API prototype, and the separate self-storage elective capstone.
+- [mobile/](./mobile/) contains the Flutter application.
+- [website/](./website/) contains the marketplace website hosted as static assets.
 
-The Flutter app remains in `mobile/`, its shared API is in `server/`, and its Firebase distribution workflow is in `.github/workflows/`. The AWS SAM API under `aws/` is a separate learning prototype and is not the source of website marketplace data.
+## AWS migration status
 
-## Proof-of-work note
+The website's static hosting is configured for Amazon S3 and CloudFront in [server/infrastructure/website.yaml](./server/infrastructure/website.yaml). The marketplace API and mobile app have **not** completed their AWS migration: they still use the existing Cloudflare Worker in `server/`. The AWS marketplace API in [server/marketplace-prototype/](./server/marketplace-prototype/) is incomplete and is not a drop-in replacement.
 
-Code in this repository does not replace AWS Educate course certificates, required LinkedIn/Drive evidence, an actual AWS deployment, or a steady and authentic commit history. Do not submit course completion or deployment claims until they are true and verifiable.
+Keep the current API running until AWS feature parity, data and media migration, and web/mobile cutover have been implemented and verified. Do not point the clients at the prototype or remove the current backend yet.
+
+For server and AWS deployment instructions, see [server/README.md](./server/README.md). The Flutter application has its own setup instructions in `mobile/`.
+
+## Proof of work
+
+This repository does not substitute for AWS Educate course certificates, required LinkedIn/Drive evidence, a verified AWS deployment, or a steady and authentic commit history. Submit only work and evidence that are your own.

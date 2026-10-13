@@ -1,0 +1,410 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless self-storage capstone with authenticated reservations and queued notifications.
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedPattern: '^[a-zA-Z0-9-]+$'
+  AdminEmails:
+    Type: String
+    Default: ''
+    Description: Verified Cognito email addresses allowed to add storage units. Leave empty to disable unit creation.
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    MemorySize: 256
+    Timeout: 15
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref StorageTable
+        NOTIFICATIONS_QUEUE_URL: !Ref NotificationsQueue
+        ADMIN_EMAILS: !Ref AdminEmails
+  Api:
+    Auth:
+      DefaultAuthorizer: CognitoAuthorizer
+      AddDefaultAuthorizerToCorsPreflight: false
+      Authorizers:
+        CognitoAuthorizer:
+          UserPoolArn: !GetAtt UserPool.Arn
+          Identity:
+            Header: Authorization
+
+Resources:
+  StorageApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub dobha-self-storage-${Stage}
+      StageName: !Ref Stage
+
+  StorageTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub dobha-self-storage-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: UnitsByName
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  NotificationsDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub dobha-self-storage-notifications-dlq-${Stage}
+      MessageRetentionPeriod: 1209600
+
+  NotificationsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub dobha-self-storage-notifications-${Stage}
+      VisibilityTimeout: 90
+      MessageRetentionPeriod: 345600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt NotificationsDeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub dobha-self-storage-users-${Stage}
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 10
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub dobha-self-storage-web-${Stage}
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  StorageApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub dobha-self-storage-api-${Stage}
+      CodeUri: .
+      Handler: src/api.handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:Query
+                - dynamodb:TransactWriteItems
+              Resource:
+                - !GetAtt StorageTable.Arn
+                - !Sub '${StorageTable.Arn}/index/*'
+      Events:
+        ListUnits:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StorageApi
+            Path: /units
+            Method: GET
+        CreateUnit:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StorageApi
+            Path: /units
+            Method: POST
+        ListReservations:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StorageApi
+            Path: /reservations
+            Method: GET
+        CreateReservation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StorageApi
+            Path: /reservations
+            Method: POST
+        ReleaseReservation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StorageApi
+            Path: /reservations/{reservationId}
+            Method: DELETE
+        ListNotifications:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StorageApi
+            Path: /notifications
+            Method: GET
+
+  NotificationRelayFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub dobha-self-storage-notification-relay-${Stage}
+      CodeUri: .
+      Handler: src/notification_relay.handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:DescribeStream
+                - dynamodb:GetRecords
+                - dynamodb:GetShardIterator
+              Resource: !GetAtt StorageTable.StreamArn
+            - Effect: Allow
+              Action:
+                - dynamodb:ListStreams
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt NotificationsQueue.Arn
+      Events:
+        OutboxStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt StorageTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 10
+            MaximumRetryAttempts: 5
+            BisectBatchOnFunctionError: true
+            FilterCriteria:
+              Filters:
+                - Pattern: '{"eventName":["INSERT"],"dynamodb":{"NewImage":{"pk":{"S":[{"prefix":"OUTBOX#"}]}}}}'
+
+  NotificationWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub dobha-self-storage-notification-worker-${Stage}
+      CodeUri: .
+      Handler: src/notification_worker.handler
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:PutItem
+              Resource: !GetAtt StorageTable.Arn
+      Events:
+        NotificationMessages:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt NotificationsQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  WebsiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub dobha-self-storage-oac-${Stage}
+        Description: CloudFront-only access to the self-storage web app.
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  ApiNoCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub dobha-self-storage-api-no-cache-${Stage}
+        Comment: Disable caching for authenticated API requests.
+        MinTTL: 0
+        DefaultTTL: 0
+        MaxTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  ApiOriginRequestPolicy:
+    Type: AWS::CloudFront::OriginRequestPolicy
+    Properties:
+      OriginRequestPolicyConfig:
+        Name: !Sub dobha-self-storage-api-origin-${Stage}
+        Comment: Forward Cognito ID tokens and JSON content type.
+        HeadersConfig:
+          HeaderBehavior: allowlist
+          Headers:
+            - Authorization
+            - Content-Type
+        CookiesConfig:
+          CookieBehavior: none
+        QueryStringsConfig:
+          QueryStringBehavior: none
+
+  WebsiteSecurityHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub dobha-self-storage-security-headers-${Stage}
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: true
+            Override: true
+
+  WebsiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub Dobha self-storage capstone (${Stage})
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        Origins:
+          - Id: PrivateWebsiteBucket
+            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+            OriginAccessControlId: !GetAtt WebsiteOriginAccessControl.Id
+          - Id: StorageApiOrigin
+            DomainName: !Sub '${StorageApi}.execute-api.${AWS::Region}.amazonaws.com'
+            OriginPath: !Sub '/${Stage}'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        DefaultCacheBehavior:
+          TargetOriginId: PrivateWebsiteBucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+          CachedMethods:
+            - GET
+            - HEAD
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: !Ref WebsiteSecurityHeaders
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: StorageApiOrigin
+            ViewerProtocolPolicy: https-only
+            AllowedMethods:
+              - GET
+              - HEAD
+              - PUT
+              - POST
+              - PATCH
+              - DELETE
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            CachePolicyId: !Ref ApiNoCachePolicy
+            OriginRequestPolicyId: !Ref ApiOriginRequestPolicy
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${WebsiteBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${WebsiteDistribution}'
+
+Outputs:
+  WebsiteUrl:
+    Description: HTTPS URL for the self-storage web app.
+    Value: !Sub 'https://${WebsiteDistribution.DomainName}'
+  WebsiteBucket:
+    Description: Private S3 bucket for static web assets.
+    Value: !Ref WebsiteBucket
+  CloudFrontDistributionId:
+    Description: CloudFront distribution ID for website invalidations.
+    Value: !Ref WebsiteDistribution
+  ApiUrl:
+    Description: API Gateway URL; requests use the CloudFront /api path in production.
+    Value: !Sub 'https://${StorageApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
+  UserPoolId:
+    Description: Cognito user pool ID.
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Public web app Cognito client ID.
+    Value: !Ref UserPoolClient
+  StorageTableName:
+    Description: DynamoDB table holding units, reservations, outbox events, and notifications.
+    Value: !Ref StorageTable
+  NotificationsQueueUrl:
+    Description: SQS queue for asynchronous notification processing.
+    Value: !Ref NotificationsQueue

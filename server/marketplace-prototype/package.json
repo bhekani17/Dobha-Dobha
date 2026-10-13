@@ -1,13 +1,13 @@
 {
-  "name": "dobha-aws-serverless",
+  "name": "dobha-marketplace-aws-prototype",
   "version": "1.0.0",
   "private": true,
-  "description": "AWS serverless marketplace API for the Cloud Computing 2 elective.",
+  "description": "Partial AWS SAM marketplace API migration prototype.",
   "scripts": {
-    "test": "node --check src/app.js && node --check src/notification_relay.js && node --check src/notification_worker.js && node --check web/app.js && node --test test/*.test.js",
+    "test": "node --check src/app.js && node --check src/notification_relay.js && node --check src/notification_worker.js && node --test test/*.test.js",
     "sam:validate": "sam validate --template-file template.yaml",
     "sam:build": "sam build --template-file template.yaml",
-    "deploy": "sam deploy --guided --template-file template.yaml --stack-name dobha-aws-dev"
+    "deploy": "sam deploy --guided --template-file template.yaml --stack-name dobha-marketplace-prototype-dev"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.800.0",
