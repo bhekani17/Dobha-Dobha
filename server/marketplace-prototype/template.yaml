@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Dobha Dobha e-commerce marketplace website and serverless API.
+Description: Separate Dobha-Dobha AWS marketplace API prototype; not used by the website.
 
 Parameters:
   Stage:
