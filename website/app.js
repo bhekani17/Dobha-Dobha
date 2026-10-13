@@ -339,7 +339,7 @@ async function loadLiveRooms() {
     list.innerHTML = '<p class="muted">Checking who is live…</p>';
   });
   try {
-    const { rooms } = await api('/api/rooms');
+    const rooms = await api('/api/rooms');
     if (!rooms.length) {
       lists.forEach((list) => {
         list.innerHTML = '<p class="muted">No one is live right now. Check back soon.</p>';
