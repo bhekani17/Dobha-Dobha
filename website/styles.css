@@ -512,7 +512,9 @@ textarea {
   line-height: 1.5;
 }
 
-#page-shop .page-intro {
+#page-shop .page-intro,
+#page-live .page-intro,
+#page-sell .page-intro {
   position: relative;
   overflow: hidden;
   padding: 70px 10vw 58px;
@@ -524,7 +526,9 @@ textarea {
   color: #f3fff7;
 }
 
-#page-shop .page-intro::before {
+#page-shop .page-intro::before,
+#page-live .page-intro::before,
+#page-sell .page-intro::before {
   position: absolute;
   inset: 0;
   background:
@@ -536,7 +540,9 @@ textarea {
   pointer-events: none;
 }
 
-#page-shop .page-intro::after {
+#page-shop .page-intro::after,
+#page-live .page-intro::after,
+#page-sell .page-intro::after {
   position: absolute;
   right: 8%;
   bottom: -62px;
@@ -554,15 +560,27 @@ textarea {
 #page-shop .page-intro .eyebrow,
 #page-shop .page-intro h1,
 #page-shop .page-intro h1 span,
-#page-shop .page-intro > p:last-child {
+#page-shop .page-intro > p:last-child,
+#page-live .page-intro .eyebrow,
+#page-live .page-intro h1,
+#page-live .page-intro h1 span,
+#page-live .page-intro > p:last-child,
+#page-sell .page-intro .eyebrow,
+#page-sell .page-intro h1,
+#page-sell .page-intro h1 span,
+#page-sell .page-intro > p:last-child {
   color: inherit;
 }
 
-#page-shop .page-intro .eyebrow {
+#page-shop .page-intro .eyebrow,
+#page-live .page-intro .eyebrow,
+#page-sell .page-intro .eyebrow {
   color: rgb(255 255 255 / 78%);
 }
 
-#page-shop .page-intro > p:last-child {
+#page-shop .page-intro > p:last-child,
+#page-live .page-intro > p:last-child,
+#page-sell .page-intro > p:last-child {
   max-width: 620px;
   color: rgb(255 255 255 / 86%);
 }
