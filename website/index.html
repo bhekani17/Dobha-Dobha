@@ -17,7 +17,10 @@
   <header class="topbar">
     <a class="brand page-link" href="#home" data-page-link="home" aria-label="Dobha-Dobha home"><span class="brand-symbol"><img src="assets/images/logo-light.png" alt=""></span><span>Dobha-Dobha</span></a>
     <label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search pieces, sellers, style..." aria-label="Search listings"><kbd>/</kbd></label>
-    <nav class="top-actions" aria-label="Main navigation">
+    <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="top-actions">
+      <span class="mobile-menu-icon" aria-hidden="true">☰</span><span class="visually-hidden">Toggle navigation</span>
+    </button>
+    <nav class="top-actions" id="top-actions" aria-label="Main navigation">
       <a class="text-button page-link" href="#shop" data-page-link="shop">Shop</a>
       <a class="text-button page-link" href="#live" data-page-link="live">Live <span class="live-dot"></span></a>
       <a class="text-button page-link" href="#sell" data-page-link="sell">Sell</a>
@@ -73,7 +76,7 @@
     </section>
 
     <section class="page hidden" id="page-live" data-page="live">
-      <section class="page-intro"><p class="eyebrow">WATCH LIVE</p><h1>Live from the market</h1><p>See what sellers are sharing right now.</p></section>
+      <section class="page-intro"><p class="eyebrow">WATCH LIVE</p><h1>Live from the market</h1><p>Watch sellers live for free. No account needed.</p></section>
       <section class="live-strip live-page-section">
         <div class="section-heading live-heading"><div><p class="eyebrow">HAPPENING RIGHT NOW</p><h2>Live from the market</h2></div><button class="text-button" id="refresh-live">Refresh streams ↻</button></div>
         <section id="inline-live-player" class="inline-live-player hidden" aria-label="Live stream player">

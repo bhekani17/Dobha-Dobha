@@ -373,7 +373,6 @@ async function loadLiveRooms() {
   }
 }
 async function watchStream(room, inline = false) {
-  if (!requireSignIn()) return;
   await stopStream();
   const player = inline
     ? { frame: byId('inline-video-frame'), video: byId('inline-live-video'), placeholder: byId('inline-live-placeholder'), message: 'inline-live-message' }
@@ -1162,6 +1161,17 @@ function init() {
     localStorage.setItem('dobha-theme', theme);
     applyTheme(theme);
   });
+  byId('mobile-menu-toggle').addEventListener('click', () => {
+    const expanded = byId('mobile-menu-toggle').getAttribute('aria-expanded') === 'true';
+    byId('mobile-menu-toggle').setAttribute('aria-expanded', String(!expanded));
+    byId('top-actions').classList.toggle('mobile-open', !expanded);
+  });
+  byId('top-actions').querySelectorAll('[data-page-link]').forEach((link) => {
+    link.addEventListener('click', () => {
+      byId('mobile-menu-toggle').setAttribute('aria-expanded', 'false');
+      byId('top-actions').classList.remove('mobile-open');
+    });
+  });
   byId('signout-button').addEventListener('click', () => {
     api('/api/auth/logout', { method: 'POST' }).catch((error) => console.error('Sign-out failed:', error));
     signOut();
@@ -1219,7 +1229,11 @@ function init() {
     if (event.target === dialog) dialog.close();
   }));
   byId('live-dialog').addEventListener('close', stopStream);
-  window.addEventListener('hashchange', renderPage);
+  window.addEventListener('hashchange', () => {
+    byId('mobile-menu-toggle').setAttribute('aria-expanded', 'false');
+    byId('top-actions').classList.remove('mobile-open');
+    renderPage();
+  });
   document.addEventListener('keydown', (event) => {
     if (event.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
       event.preventDefault();
