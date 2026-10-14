@@ -2,7 +2,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 
-import { requireUser } from './auth.js';
+import { optionalUser, requireUser } from './auth.js';
 import { HttpError, json, limited } from './http.js';
 
 const ROOM_RE = /^[a-zA-Z0-9_-]{1,40}$/;
@@ -88,17 +88,17 @@ export async function rooms(request, env) {
 
 /**
  * GET /api/token?room=bale-1&role=host|viewer
- * Signed-in users only. Hosts must be vendors. The LiveKit identity is the
- * user's handle plus a random suffix so two devices never kick each other out.
+ * Viewers may join as guests. Hosts must be signed-in vendors. Authenticated
+ * LiveKit identities use the user's handle plus a random suffix so devices do
+ * not kick each other out.
  */
 export async function token(request, env) {
   await limited(env.TOKEN_LIMIT, request);
-  const user = await requireUser(request, env);
-  const cfg = livekitConfig(env);
-
   const q = new URL(request.url).searchParams;
   const room = (q.get('room') || '').trim();
   const role = q.get('role') === 'host' ? 'host' : 'viewer';
+  const user = role === 'host' ? await requireUser(request, env) : await optionalUser(request, env);
+  const cfg = livekitConfig(env);
 
   if (!ROOM_RE.test(room)) throw new HttpError(400, 'Stream name can only use letters, numbers, - and _ (max 40)');
   if (role === 'host' && user.role !== 'vendor') throw new HttpError(403, 'Switch to vendor mode to go live');
@@ -114,12 +114,18 @@ export async function token(request, env) {
   }
 
   const at = new AccessToken(cfg.key, cfg.secret, {
-    identity: `${user.handle}#${crypto.randomUUID().slice(0, 8)}`,
-    name: user.name,
+    identity: user ? `${user.handle}#${crypto.randomUUID().slice(0, 8)}` : `guest-${crypto.randomUUID()}`,
+    name: user?.name || 'Guest viewer',
     ttl: '2h',
-    metadata: JSON.stringify({ role, userId: user.id }),
+    metadata: JSON.stringify({ role, ...(user ? { userId: user.id } : {}) }),
   });
-  at.addGrant({ roomJoin: true, room, canPublish: role === 'host', canSubscribe: true, canPublishData: true });
+  at.addGrant({
+    roomJoin: true,
+    room,
+    canPublish: role === 'host',
+    canSubscribe: true,
+    canPublishData: role === 'host',
+  });
 
   return json({ url: cfg.url, token: await at.toJwt(), role });
 }
