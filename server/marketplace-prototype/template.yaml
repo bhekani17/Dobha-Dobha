@@ -159,7 +159,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: !Sub dobha-website-oac-${Stage}
+        Name: !Sub dobha-marketplace-website-oac-${Stage}
         Description: CloudFront-only access to the private S3 website bucket.
         OriginAccessControlOriginType: s3
         SigningBehavior: always
