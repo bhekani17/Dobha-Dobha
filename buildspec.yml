@@ -5,6 +5,7 @@ env:
     AWS_DEFAULT_REGION: af-south-1
     SAM_CLI_TELEMETRY: "0"
     STACK_NAME: dobha-marketplace-prototype-dev
+    SAM_BUCKET: codepipeline-af-south-1-fc9cd7e8f409-4408-9c6f-03596954b7f4
 
 phases:
   install:
@@ -12,15 +13,14 @@ phases:
       nodejs: 22
       python: 3.11
     commands:
-      - python3 -m venv /tmp/sam-cli
-      - /tmp/sam-cli/bin/pip install --upgrade aws-sam-cli
+      - python3 -m venv /tmp/sam-cli && /tmp/sam-cli/bin/pip install --upgrade aws-sam-cli
   pre_build:
     commands:
-      - cd server/marketplace-prototype && npm ci && npm test
+      - npm --prefix "$CODEBUILD_SRC_DIR/server/marketplace-prototype" ci
+      - npm --prefix "$CODEBUILD_SRC_DIR/server/marketplace-prototype" test
   build:
     commands:
-      - /tmp/sam-cli/bin/sam validate --lint --template-file server/marketplace-prototype/template.yaml
-      - /tmp/sam-cli/bin/sam build --template-file server/marketplace-prototype/template.yaml --build-dir .aws-sam/build
-  post_build:
-    commands:
-      - /tmp/sam-cli/bin/sam deploy --debug --template-file .aws-sam/build/template.yaml --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION" --resolve-s3 --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides Stage=dev AllowedOrigin='*'
+      - cd "$CODEBUILD_SRC_DIR" && /tmp/sam-cli/bin/sam validate --lint --template-file server/marketplace-prototype/template.yaml
+      - cd "$CODEBUILD_SRC_DIR" && /tmp/sam-cli/bin/sam build --template-file server/marketplace-prototype/template.yaml --build-dir .aws-sam/build
+      - cd "$CODEBUILD_SRC_DIR" && /tmp/sam-cli/bin/sam deploy --template-file .aws-sam/build/template.yaml --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION" --s3-bucket "$SAM_BUCKET" --s3-prefix "$STACK_NAME" --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides Stage=dev AllowedOrigin='*'
+
