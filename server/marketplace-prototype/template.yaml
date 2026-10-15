@@ -119,6 +119,9 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub dobha-media-${AWS::AccountId}-${Stage}
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -136,13 +139,16 @@ Resources:
               - GET
               - POST
             AllowedHeaders:
-              - Content-Type
+              - '*'
             MaxAge: 300
 
   WebBucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub dobha-website-${AWS::AccountId}-${Stage}
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -250,6 +256,7 @@ Resources:
                 - cognito-idp:InitiateAuth
                 - cognito-idp:ForgotPassword
                 - cognito-idp:ConfirmForgotPassword
+                - cognito-idp:ChangePassword
                 - cognito-idp:AdminDeleteUser
               Resource: !GetAtt UserPool.Arn
             - Effect: Allow
@@ -383,8 +390,11 @@ Resources:
                 - dynamodb:DescribeStream
                 - dynamodb:GetRecords
                 - dynamodb:GetShardIterator
-                - dynamodb:ListStreams
               Resource: !GetAtt MarketTable.StreamArn
+            - Effect: Allow
+              Action:
+                - dynamodb:ListStreams
+              Resource: '*'
             - Effect: Allow
               Action:
                 - sqs:SendMessage
