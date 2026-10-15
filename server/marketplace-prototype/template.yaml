@@ -41,10 +41,6 @@ Globals:
         LIVEKIT_API_KEY: !Ref LiveKitApiKey
         LIVEKIT_API_SECRET: !Ref LiveKitApiSecret
   Api:
-    Cors:
-      AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
-      AllowHeaders: "'Content-Type,Authorization'"
-      AllowOrigin: !Sub "'${AllowedOrigin}'"
     Auth:
       DefaultAuthorizer: CognitoAuthorizer
       AddDefaultAuthorizerToCorsPreflight: false
