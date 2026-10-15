@@ -17,6 +17,16 @@ The active marketplace API is still the service in `src/`, deployed using its cu
 
 The website's static assets can be hosted in a private Amazon S3 bucket behind CloudFront. That does not, by itself, migrate the API: the website configuration currently still points to the existing API. Keep that service available until the AWS API, data/media migration, and both client cutovers have passed parity testing.
 
+The Flutter app can be built against a future AWS CloudFront/API origin without changing its production default:
+
+```powershell
+Push-Location .\mobile
+flutter build web --release --dart-define-from-file=config/google.json --dart-define=API_BASE_URL=https://<CloudFront-domain>
+Pop-Location
+```
+
+For Android/iOS builds, pass the same `--dart-define=API_BASE_URL=...` option along with the Google sign-in configuration. Leave `API_BASE_URL` unset until the AWS API implements and passes parity tests; otherwise the app continues to use the current API (or the current web origin).
+
 ## Deploy static website hosting to AWS
 
 Requirements: AWS CLI configured for the intended account and region, Node.js/npm only if needed for local website tooling, and permissions to manage CloudFormation, S3, and CloudFront. Provision the private bucket and CloudFront distribution:
@@ -39,6 +49,8 @@ The website uses the public browser configuration in `website/config.js`. It con
 ## AWS marketplace API prototype
 
 `marketplace-prototype/` contains a separate SAM/Cognito/DynamoDB implementation for evaluating the AWS migration. It does not share data with the current marketplace service, and it does not yet implement all current marketplace functionality.
+
+The prototype's `DELETE /api/me` requires a fresh password check (or a typed `DELETE` confirmation for passwordless accounts), refuses unsettled or unknown order statuses, removes personal buyer delivery addresses, deletes unsold listings and personal media, and anonymizes the profile while retaining settled order history and sold listings. The prototype does not yet implement wallet balances; add and test the equivalent available/locked/pending balance safeguard before migrating wallet data or treating account deletion as production-ready.
 
 ```powershell
 Push-Location .\server\marketplace-prototype

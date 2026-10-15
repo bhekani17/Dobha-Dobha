@@ -34,6 +34,7 @@ Globals:
         TABLE_NAME: !Ref MarketTable
         MEDIA_BUCKET: !Ref MediaBucket
         CLIENT_ID: !Ref UserPoolClient
+        USER_POOL_ID: !Ref UserPool
         ALLOWED_ORIGIN: !Ref AllowedOrigin
         NOTIFICATIONS_QUEUE_URL: !Ref NotificationsQueue
         LIVEKIT_URL: !Ref LiveKitUrl
@@ -41,7 +42,7 @@ Globals:
         LIVEKIT_API_SECRET: !Ref LiveKitApiSecret
   Api:
     Cors:
-      AllowMethods: "'GET,POST,PATCH,DELETE,OPTIONS'"
+      AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
       AllowHeaders: "'Content-Type,Authorization'"
       AllowOrigin: !Sub "'${AllowedOrigin}'"
     Auth:
@@ -59,6 +60,10 @@ Resources:
     Properties:
       Name: !Sub dobha-marketplace-${Stage}
       StageName: !Ref Stage
+      BinaryMediaTypes:
+        - image~1jpeg
+        - image~1png
+        - image~1webp
 
   MarketTable:
     Type: AWS::DynamoDB::Table
@@ -218,6 +223,7 @@ Resources:
                 - dynamodb:GetItem
                 - dynamodb:PutItem
                 - dynamodb:Query
+                - dynamodb:DeleteItem
                 - dynamodb:TransactWriteItems
                 - dynamodb:UpdateItem
               Resource:
@@ -230,7 +236,13 @@ Resources:
             - Effect: Allow
               Action:
                 - s3:PutObject
+                - s3:DeleteObject
               Resource: !Sub '${MediaBucket.Arn}/items/*'
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                - s3:DeleteObject
+              Resource: !Sub '${MediaBucket.Arn}/avatars/*'
             - Effect: Allow
               Action:
                 - cognito-idp:SignUp
@@ -238,6 +250,7 @@ Resources:
                 - cognito-idp:InitiateAuth
                 - cognito-idp:ForgotPassword
                 - cognito-idp:ConfirmForgotPassword
+                - cognito-idp:AdminDeleteUser
               Resource: !GetAtt UserPool.Arn
             - Effect: Allow
               Action:
@@ -308,6 +321,42 @@ Resources:
             Method: GET
             Auth:
               Authorizer: NONE
+        MyProfile:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/me
+            Method: GET
+        UpdateMyProfile:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/me
+            Method: PATCH
+        ChangeMyPassword:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/me/password
+            Method: POST
+        SetMyAvatar:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/me/avatar
+            Method: PUT
+        RemoveMyAvatar:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/me/avatar
+            Method: DELETE
+        DeleteMyAccount:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/me
+            Method: DELETE
         PrivateApi:
           Type: Api
           Properties:
