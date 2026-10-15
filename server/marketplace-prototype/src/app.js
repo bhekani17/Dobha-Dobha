@@ -38,7 +38,7 @@ const response = (statusCode, body, extra = {}) => ({
     'content-type': 'application/json; charset=utf-8',
     'access-control-allow-origin': process.env.ALLOWED_ORIGIN || '*',
     'access-control-allow-headers': 'Content-Type,Authorization',
-    'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
+    'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     ...extra,
   },
   body: statusCode === 204 ? '' : JSON.stringify(body),
@@ -48,19 +48,19 @@ let sdk;
 function clients() {
   if (sdk) return sdk;
   const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-  const { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
-  const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+  const { DynamoDBDocumentClient, DeleteCommand, GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand } = require('@aws-sdk/lib-dynamodb');
+  const { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
   const { createPresignedPost } = require('@aws-sdk/s3-presigned-post');
   const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-  const { CognitoIdentityProviderClient, SignUpCommand, ConfirmSignUpCommand, InitiateAuthCommand, ForgotPasswordCommand, ConfirmForgotPasswordCommand } = require('@aws-sdk/client-cognito-identity-provider');
+  const { CognitoIdentityProviderClient, SignUpCommand, ConfirmSignUpCommand, InitiateAuthCommand, ForgotPasswordCommand, ConfirmForgotPasswordCommand, ChangePasswordCommand, AdminDeleteUserCommand } = require('@aws-sdk/client-cognito-identity-provider');
   sdk = {
     db: DynamoDBDocumentClient.from(new DynamoDBClient({}), { marshallOptions: { removeUndefinedValues: true } }),
     s3: new S3Client({}),
     cognito: new CognitoIdentityProviderClient({}),
-    dbCommands: { GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand },
-    s3Commands: { GetObjectCommand },
+    dbCommands: { DeleteCommand, GetCommand, PutCommand, QueryCommand, TransactWriteCommand, UpdateCommand },
+    s3Commands: { GetObjectCommand, PutObjectCommand, DeleteObjectCommand },
     s3Presign: { createPresignedPost, getSignedUrl },
-    authCommands: { SignUpCommand, ConfirmSignUpCommand, InitiateAuthCommand, ForgotPasswordCommand, ConfirmForgotPasswordCommand },
+    authCommands: { SignUpCommand, ConfirmSignUpCommand, InitiateAuthCommand, ForgotPasswordCommand, ConfirmForgotPasswordCommand, ChangePasswordCommand, AdminDeleteUserCommand },
   };
   return sdk;
 }
@@ -128,6 +128,25 @@ async function get(pk, sk) {
 async function put(item, conditionExpression) {
   const { db, dbCommands: { PutCommand } } = clients();
   await db.send(new PutCommand({ TableName: table(), Item: item, ...(conditionExpression ? { ConditionExpression: conditionExpression } : {}) }));
+}
+async function deleteItem(pk, sk) {
+  const { db, dbCommands: { DeleteCommand } } = clients();
+  await db.send(new DeleteCommand({ TableName: table(), Key: key(pk, sk) }));
+}
+async function queryAll(params) {
+  const { db, dbCommands: { QueryCommand } } = clients();
+  const items = [];
+  let ExclusiveStartKey = params.ExclusiveStartKey;
+  do {
+    const result = await db.send(new QueryCommand({
+      TableName: table(),
+      ...params,
+      ...(ExclusiveStartKey ? { ExclusiveStartKey } : {}),
+    }));
+    items.push(...(result.Items || []));
+    ExclusiveStartKey = result.LastEvaluatedKey;
+  } while (ExclusiveStartKey);
+  return items;
 }
 async function transact(items) {
   const { db, dbCommands: { TransactWriteCommand } } = clients();
@@ -273,12 +292,16 @@ async function login(body) {
   const auth = result.AuthenticationResult;
   if (!auth?.IdToken) throw new HttpError(401, 'Complete the requested sign-in challenge');
   const claims = tokenClaims(auth.IdToken);
-  const profile = await get(`USER#${claims.sub}`, 'PROFILE');
+  const profile = await ensureProfile({
+    id: claims.sub,
+    email: claims.email,
+    name: claims.name || claims.email,
+  });
   return response(200, {
     token: auth.IdToken,
     refreshToken: auth.RefreshToken,
     expiresIn: auth.ExpiresIn,
-    user: { id: claims.sub, email: claims.email, name: profile?.name || claims.name || claims.email, role: profile?.role || 'shopper' },
+    user: publicProfile(profile),
   });
 }
 async function refresh(body) {
@@ -312,10 +335,280 @@ async function reset(body) {
   }));
   return login(body);
 }
+async function changePassword(event, user, body) {
+  const current = str(body, 'current', { min: 1, max: 256 });
+  const password = str(body, 'password', { min: 10, max: 256 });
+  const { cognito, authCommands: { InitiateAuthCommand, ChangePasswordCommand } } = clients();
+  let auth;
+  try {
+    const result = await cognito.send(new InitiateAuthCommand({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: process.env.CLIENT_ID,
+      AuthParameters: {
+        USERNAME: str(user, 'email', { max: 120 }).toLowerCase(),
+        PASSWORD: current,
+      },
+    }));
+    auth = result.AuthenticationResult;
+  } catch (error) {
+    if (error.name === 'NotAuthorizedException' || error.name === 'UserNotFoundException') {
+      throw new HttpError(401, 'Current password is incorrect.');
+    }
+    if (error.name === 'UserNotConfirmedException') throw new HttpError(403, 'Confirm your email before changing your password.');
+    throw error;
+  }
+  if (!auth?.AccessToken || !auth.IdToken || tokenClaims(auth.IdToken).sub !== user.id) {
+    throw new HttpError(401, 'Could not verify the signed-in account.');
+  }
+  try {
+    await cognito.send(new ChangePasswordCommand({
+      AccessToken: auth.AccessToken,
+      PreviousPassword: current,
+      ProposedPassword: password,
+    }));
+  } catch (error) {
+    if (error.name === 'InvalidPasswordException') {
+      throw new HttpError(400, 'Password must be 10+ characters and include uppercase, lowercase, a number, and a symbol.');
+    }
+    if (error.name === 'NotAuthorizedException') throw new HttpError(401, 'Current password is incorrect.');
+    throw error;
+  }
+  return response(200, { ok: true });
+}
 
 async function me(user) {
+  return response(200, { user: publicProfile(await ensureProfile(user)) });
+}
+async function assertAccountActive(user) {
   const profile = await get(`USER#${user.id}`, 'PROFILE');
-  return response(200, { user: { id: user.id, email: user.email, name: profile?.name || user.name, role: profile?.role || 'shopper', shopName: profile?.shopName || '', stallLocation: profile?.stallLocation || '' } });
+  if (profile?.deletedAt) throw new HttpError(410, 'This account is being deleted and can no longer be used.');
+}
+function publicProfile(profile) {
+  return {
+    id: profile.id,
+    email: profile.email,
+    name: profile.name,
+    handle: profile.handle.startsWith('@') ? profile.handle : `@${profile.handle}`,
+    phone: profile.phone || '',
+    role: profile.role || 'shopper',
+    shopName: profile.shopName || '',
+    stallLocation: profile.stallLocation || '',
+    avatarUrl: profile.avatarKey ? mediaUrl(profile.avatarKey) : null,
+    bio: profile.bio || '',
+    location: profile.location || '',
+    createdAt: profile.createdAt,
+    salesCount: profile.salesCount || 0,
+    hasPassword: profile.hasPassword !== false,
+  };
+}
+async function ensureProfile(user) {
+  let profile = await get(`USER#${user.id}`, 'PROFILE');
+  if (profile) return {
+    ...profile,
+    email: profile.email || user.email || '',
+    name: profile.name || user.name || user.email || 'Dobha User',
+    handle: profile.handle || `user_${user.id.slice(-8)}`,
+    createdAt: profile.createdAt || new Date().toISOString(),
+  };
+  profile = {
+    ...profileKey(user.id),
+    id: user.id,
+    email: user.email || '',
+    name: user.name || user.email || 'Dobha User',
+    handle: `user_${user.id.slice(-8)}`,
+    phone: '',
+    role: 'shopper',
+    shopName: '',
+    stallLocation: '',
+    bio: '',
+    location: '',
+    createdAt: new Date().toISOString(),
+    hasPassword: true,
+  };
+  try {
+    await put(profile, 'attribute_not_exists(pk)');
+  } catch (error) {
+    if (error.name !== 'ConditionalCheckFailedException') throw error;
+    profile = await get(`USER#${user.id}`, 'PROFILE');
+    if (!profile) throw error;
+  }
+  return profile;
+}
+async function updateMe(user, body) {
+  const current = await ensureProfile(user);
+  const next = { ...current };
+  if ('name' in body) next.name = str(body, 'name', { min: 2, max: 40 });
+  if ('phone' in body) next.phone = str(body, 'phone', { max: 20, optional: true });
+  if ('bio' in body) next.bio = str(body, 'bio', { max: 160, optional: true });
+  if ('location' in body) next.location = str(body, 'location', { max: 60, optional: true });
+  if ('shopName' in body) next.shopName = str(body, 'shopName', { min: 2, max: 50, optional: true });
+  if ('stallLocation' in body) next.stallLocation = str(body, 'stallLocation', { min: 2, max: 100, optional: true });
+  if ('role' in body) {
+    if (body.role !== 'shopper' && body.role !== 'vendor') throw new HttpError(400, 'Unknown role');
+    next.role = body.role;
+  }
+  if (next.role === 'vendor' && (!next.shopName || !next.stallLocation)) {
+    throw new HttpError(400, 'Add your shop name and stall location to start selling');
+  }
+  await put(next);
+  return response(200, { user: publicProfile(next) });
+}
+async function setAvatar(event, user) {
+  const profile = await ensureProfile(user);
+  const oldKey = profile.avatarKey;
+  let updated;
+  if (event.httpMethod === 'DELETE') {
+    updated = { ...profile };
+    delete updated.avatarKey;
+    await put(updated);
+  } else {
+    const headers = event.headers || {};
+    const contentType = String(headers['content-type'] || headers['Content-Type'] || '')
+      .split(';')[0].trim().toLowerCase();
+    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[contentType];
+    if (!ext) throw new HttpError(415, 'Profile pictures must be JPEG, PNG or WebP.');
+    if (!event.body) throw new HttpError(400, 'A profile picture is required.');
+    const bytes = event.isBase64Encoded
+      ? Buffer.from(event.body, 'base64')
+      : Buffer.from(event.body, 'binary');
+    if (bytes.length === 0 || bytes.length > 5 * 1024 * 1024) {
+      throw new HttpError(413, 'Profile pictures must be no larger than 5 MB.');
+    }
+    const keyValue = `avatars/${user.id}/${randomUUID()}.${ext}`;
+    const { s3, s3Commands: { PutObjectCommand } } = clients();
+    await s3.send(new PutObjectCommand({
+      Bucket: process.env.MEDIA_BUCKET,
+      Key: keyValue,
+      Body: bytes,
+      ContentType: contentType,
+    }));
+    updated = { ...profile, avatarKey: keyValue };
+    await put(updated);
+  }
+  if (oldKey) {
+    const { s3, s3Commands: { DeleteObjectCommand } } = clients();
+    await s3.send(new DeleteObjectCommand({ Bucket: process.env.MEDIA_BUCKET, Key: oldKey }));
+  }
+  return response(200, { user: publicProfile(updated) });
+}
+async function deleteAccount(user, body) {
+  const profile = await get(`USER#${user.id}`, 'PROFILE');
+  if (!profile) throw new HttpError(404, 'Profile not found');
+
+  const { cognito, authCommands: { InitiateAuthCommand, AdminDeleteUserCommand } } = clients();
+  if (profile.hasPassword !== false) {
+    const password = str(body, 'password', { min: 1, max: 256 });
+    let auth;
+    try {
+      const result = await cognito.send(new InitiateAuthCommand({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: process.env.CLIENT_ID,
+        AuthParameters: { USERNAME: str(user, 'email', { max: 120 }).toLowerCase(), PASSWORD: password },
+      }));
+      auth = result.AuthenticationResult;
+    } catch (error) {
+      if (error.name === 'NotAuthorizedException' || error.name === 'UserNotFoundException') {
+        throw new HttpError(401, 'Current password is incorrect.');
+      }
+      if (error.name === 'UserNotConfirmedException') throw new HttpError(403, 'Confirm your email before deleting your account.');
+      throw error;
+    }
+    if (!auth?.IdToken || tokenClaims(auth.IdToken).sub !== user.id) {
+      throw new HttpError(401, 'Could not verify the signed-in account.');
+    }
+  } else if (body.confirm !== 'DELETE') {
+    throw new HttpError(400, 'Type DELETE to confirm');
+  }
+
+  const buyerOrders = await queryAll({
+    IndexName: 'MarketFeedIndex',
+    KeyConditionExpression: 'GSI1PK = :user AND begins_with(GSI1SK, :prefix)',
+    ExpressionAttributeValues: { ':user': `BUYER#${user.id}`, ':prefix': 'ORDER#' },
+  });
+  const sellerOrders = await queryAll({
+    IndexName: 'SellerActivityIndex',
+    KeyConditionExpression: 'GSI2PK = :user AND begins_with(GSI2SK, :prefix)',
+    ExpressionAttributeValues: { ':user': `SELLER#${user.id}`, ':prefix': 'ORDER#' },
+  });
+  const orders = [...new Map([...buyerOrders, ...sellerOrders].map((order) => [order.id, order])).values()];
+  const settledStatuses = new Set(['payoutReleased', 'refunded', 'cancelled']);
+  if (orders.some((order) => !settledStatuses.has(order.status))) {
+    throw new HttpError(409, 'Finish or settle all orders before deleting your account.');
+  }
+
+  const listings = await queryAll({
+    IndexName: 'SellerActivityIndex',
+    KeyConditionExpression: 'GSI2PK = :seller AND begins_with(GSI2SK, :prefix)',
+    ExpressionAttributeValues: { ':seller': `SELLER#${user.id}`, ':prefix': 'ITEM#' },
+  });
+  const orderedItemIds = new Set(orders.map((order) => order.itemId));
+  const mediaToDelete = new Set(profile.avatarKey ? [profile.avatarKey] : []);
+  const retainedListings = [];
+  const listingsToDelete = [];
+  for (const item of listings) {
+    if (orderedItemIds.has(item.id)) {
+      retainedListings.push(item);
+      continue;
+    }
+    if (item.photoKey) mediaToDelete.add(item.photoKey);
+    for (const media of item.media || []) {
+      if (media.key) mediaToDelete.add(media.key);
+    }
+    listingsToDelete.push(item);
+  }
+  const { s3, s3Commands: { DeleteObjectCommand } } = clients();
+  for (const mediaKey of mediaToDelete) {
+    await s3.send(new DeleteObjectCommand({ Bucket: process.env.MEDIA_BUCKET, Key: mediaKey }));
+  }
+
+  const notifications = await queryAll({
+    KeyConditionExpression: 'pk = :user AND begins_with(sk, :prefix)',
+    ExpressionAttributeValues: { ':user': `USER#${user.id}`, ':prefix': 'NOTIFICATION#' },
+  });
+  for (const item of retainedListings) await put({ ...item, sellerName: 'Deleted account' });
+  for (const item of listingsToDelete) await deleteItem(item.pk, item.sk);
+  for (const notification of notifications) await deleteItem(notification.pk, notification.sk);
+
+  const { db, dbCommands: { UpdateCommand } } = clients();
+  for (const order of orders) {
+    if (order.buyerId === user.id && order.deliveryAddress) {
+      await db.send(new UpdateCommand({
+        TableName: table(),
+        Key: key(order.pk, order.sk),
+        UpdateExpression: 'REMOVE deliveryAddress',
+      }));
+    }
+  }
+
+  const deletedId = randomUUID();
+  const anonymizedProfile = {
+    ...profile,
+    email: `deleted-${deletedId}@deleted.invalid`,
+    name: 'Deleted account',
+    handle: `deleted_${deletedId.replaceAll('-', '').slice(0, 12)}`,
+    phone: '',
+    role: 'shopper',
+    shopName: '',
+    stallLocation: '',
+    bio: '',
+    location: '',
+    deletedAt: new Date().toISOString(),
+  };
+  delete anonymizedProfile.avatarKey;
+  await put(anonymizedProfile);
+
+  try {
+    await cognito.send(new AdminDeleteUserCommand({
+      UserPoolId: process.env.USER_POOL_ID,
+      Username: user.email || user.id,
+    }));
+  } catch (error) {
+    if (error.name === 'AccessDeniedException' || error.name === 'NotAuthorizedException') {
+      throw new HttpError(502, 'The AWS sign-in account could not be removed. Retry account deletion or contact support.');
+    }
+    throw error;
+  }
+  return response(200, { ok: true });
 }
 async function becomeVendor(user, body) {
   const shopName = str(body, 'shopName', { min: 2, max: 60 });
@@ -508,7 +801,9 @@ async function myNotifications(user) {
 }
 
 async function readMedia(keyValue) {
-  if (!keyValue.startsWith('items/') || keyValue.includes('..')) throw new HttpError(404, 'Media not found');
+  if ((!keyValue.startsWith('items/') && !keyValue.startsWith('avatars/')) || keyValue.includes('..')) {
+    throw new HttpError(404, 'Media not found');
+  }
   const { s3, s3Commands: { GetObjectCommand }, s3Presign: { getSignedUrl } } = clients();
   const url = await getSignedUrl(s3, new GetObjectCommand({ Bucket: process.env.MEDIA_BUCKET, Key: keyValue }), { expiresIn: 300 });
   return response(302, {}, { location: url, 'cache-control': 'private, max-age=0' });
@@ -577,7 +872,10 @@ async function route(event) {
   const method = event.httpMethod || event.requestContext?.http?.method || 'GET';
   if (method === 'OPTIONS') return response(204, {});
   const path = pathOf(event);
-  const body = ['POST', 'PATCH', 'PUT'].includes(method) ? bodyOf(event) : {};
+  const body = (['POST', 'PATCH', 'PUT'].includes(method) && !(method === 'PUT' && path === '/me/avatar')) ||
+    (method === 'DELETE' && path === '/me')
+    ? bodyOf(event)
+    : {};
   if (method === 'GET' && path === '/health') return response(200, { status: 'healthy', service: 'dobha-marketplace' });
   if (method === 'POST' && path === '/auth/register') return register(body);
   if (method === 'POST' && path === '/auth/confirm') return confirmRegistration(body);
@@ -585,6 +883,7 @@ async function route(event) {
   if (method === 'POST' && path === '/auth/refresh') return refresh(body);
   if (method === 'POST' && path === '/auth/forgot') return forgot(body);
   if (method === 'POST' && path === '/auth/reset') return reset(body);
+  if (method === 'POST' && path === '/me/password') return changePassword(event, getUser(event), body);
   if (method === 'GET' && path === '/items') return feed(event);
   const mediaMatch = /^\/media\/(.+)$/.exec(path);
   if (method === 'GET' && mediaMatch) return readMedia(mediaMatch[1]);
@@ -594,7 +893,11 @@ async function route(event) {
   if (method === 'GET' && itemMatch && itemMatch[1] !== 'mine') return response(200, { item: await itemJson(await itemById(itemMatch[1])) });
 
   const user = getUser(event);
+  if (method !== 'DELETE' || path !== '/me') await assertAccountActive(user);
   if (method === 'GET' && path === '/me') return me(user);
+  if (method === 'PATCH' && path === '/me') return updateMe(user, body);
+  if (method === 'DELETE' && path === '/me') return deleteAccount(user, body);
+  if ((method === 'PUT' || method === 'DELETE') && path === '/me/avatar') return setAvatar(event, user);
   if (method === 'PATCH' && path === '/me/vendor') return becomeVendor(user, body);
   if (method === 'POST' && path === '/uploads') return uploadUrl(user, body);
   if (method === 'GET' && path === '/items/mine') return myListings(user);

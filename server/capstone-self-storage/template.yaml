@@ -144,37 +144,37 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref StorageApi
-            Path: /units
+            Path: /api/units
             Method: GET
         CreateUnit:
           Type: Api
           Properties:
             RestApiId: !Ref StorageApi
-            Path: /units
+            Path: /api/units
             Method: POST
         ListReservations:
           Type: Api
           Properties:
             RestApiId: !Ref StorageApi
-            Path: /reservations
+            Path: /api/reservations
             Method: GET
         CreateReservation:
           Type: Api
           Properties:
             RestApiId: !Ref StorageApi
-            Path: /reservations
+            Path: /api/reservations
             Method: POST
         ReleaseReservation:
           Type: Api
           Properties:
             RestApiId: !Ref StorageApi
-            Path: /reservations/{reservationId}
+            Path: /api/reservations/{reservationId}
             Method: DELETE
         ListNotifications:
           Type: Api
           Properties:
             RestApiId: !Ref StorageApi
-            Path: /notifications
+            Path: /api/notifications
             Method: GET
 
   NotificationRelayFunction:

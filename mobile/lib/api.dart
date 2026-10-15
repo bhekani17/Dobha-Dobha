@@ -5,9 +5,14 @@ import 'package:http/http.dart' as http;
 
 /// The live Dobha server (the Cloudflare Worker in `server/`).
 const liveServerUrl = 'https://dobha-live.ndlovubhekani17.workers.dev';
+const deploymentApiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
-/// On web the Worker serves the app and the API from one origin; phones use [liveServerUrl].
-String defaultServerUrl() => kIsWeb ? Uri.base.origin : liveServerUrl;
+/// Use the deployed API when configured; otherwise preserve the current live setup.
+/// Web deployments normally use their own origin for same-origin API routing.
+String defaultServerUrl() {
+  if (deploymentApiBaseUrl.isNotEmpty) return deploymentApiBaseUrl;
+  return kIsWeb ? Uri.base.origin : liveServerUrl;
+}
 
 /// A failed request, with the server's message ready to show to the user.
 class ApiException implements Exception {

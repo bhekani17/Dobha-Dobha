@@ -2,8 +2,22 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const { DynamoDBDocumentClient } = require('@aws-sdk/lib-dynamodb');
 const { handler } = require('../src/api');
+
+test('SAM API routes match the /api paths forwarded by CloudFront', () => {
+  const template = fs.readFileSync(path.join(__dirname, '..', 'template.yaml'), 'utf8');
+  for (const route of [
+    '/api/units',
+    '/api/reservations',
+    '/api/reservations/{reservationId}',
+    '/api/notifications',
+  ]) {
+    assert.ok(template.includes(`Path: ${route}`), `Missing API Gateway route ${route}`);
+  }
+});
 
 function event({ method = 'GET', path = '/dev/api/units', claims, body } = {}) {
   return {
