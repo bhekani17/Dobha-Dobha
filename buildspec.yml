@@ -5,7 +5,7 @@ env:
     AWS_DEFAULT_REGION: af-south-1
     SAM_CLI_TELEMETRY: "0"
     STACK_NAME: dobha-marketplace-prototype-dev
-    SAM_BUCKET: codepipeline-af-south-1-fc9cd7e8f409-4408-9c6f-03596954b7f4
+    SAM_BUCKET: dobha-sam-artifacts-807701355530-af-south-1
 
 phases:
   install:
@@ -16,6 +16,7 @@ phases:
       - python3 -m venv /tmp/sam-cli && /tmp/sam-cli/bin/pip install --upgrade aws-sam-cli
   pre_build:
     commands:
+      - aws s3api head-bucket --bucket "$SAM_BUCKET" --region "$AWS_DEFAULT_REGION" 2>/dev/null || aws s3 mb "s3://$SAM_BUCKET" --region "$AWS_DEFAULT_REGION"
       - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server/marketplace-prototype" ci
       - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server/marketplace-prototype" test
   build:
