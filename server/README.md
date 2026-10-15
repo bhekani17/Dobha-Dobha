@@ -62,6 +62,12 @@ Pop-Location
 
 Only deploy this prototype to an AWS account you are authorized to use. It can create billable resources. Do not direct production clients or migrate production data to it until its features, authorization, storage, and operational behavior have been reviewed and tested.
 
+### Deploying from CodePipeline
+
+The repository-root `buildspec.yml` runs the marketplace prototype tests, validates and builds its SAM template, then deploys it to `af-south-1`. To use it, configure the CodePipeline build action as an AWS CodeBuild project that uses the source artifact's `buildspec.yml`; the current inline Commands action does not read this file. Configure the CodeBuild project and its service role in the AWS Console. The role needs narrowly scoped access to the SAM deployment artifact bucket, CloudFormation, the resources in `marketplace-prototype/template.yaml`, and `iam:PassRole` for the Lambda execution roles. Do not grant administrator permissions as a workaround. The first deployment may fail until the account's CloudFormation/SAM managed deployment resources and required permissions are set up.
+
+The buildspec deploys automatically on every pipeline execution. Review the pipeline branch and AWS account/region before enabling it. The SAM template includes CloudFront and website S3 resources in addition to the API; this build does not upload website assets.
+
 ## Self-storage elective capstone
 
 The independent [self-storage capstone](./capstone-self-storage/README.md) is not part of the marketplace. Its Cognito-authenticated SAM application uses API Gateway, Lambda, DynamoDB, S3/CloudFront, and SQS-backed notifications. Follow its README for prerequisites and deployment. Review AWS pricing and create a budget alert before provisioning resources.
