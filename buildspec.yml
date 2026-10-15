@@ -17,6 +17,14 @@ phases:
   pre_build:
     commands:
       - aws s3api head-bucket --bucket "$SAM_BUCKET" --region "$AWS_DEFAULT_REGION" 2>/dev/null || aws s3 mb "s3://$SAM_BUCKET" --region "$AWS_DEFAULT_REGION"
+      - |
+        STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+        if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+          echo "Stack $STACK_NAME is in ROLLBACK_COMPLETE state. Deleting dead stack before deploying..."
+          aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION"
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION"
+          echo "Dead stack deleted successfully."
+        fi
       - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server/marketplace-prototype" ci
       - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server/marketplace-prototype" test
   build:
