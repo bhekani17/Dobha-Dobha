@@ -4,7 +4,7 @@
   "private": true,
   "description": "Partial AWS SAM marketplace API migration prototype.",
   "scripts": {
-    "test": "node --check src/app.js && node --check src/notification_relay.js && node --check src/notification_worker.js && node --test test/*.test.js",
+    "test": "node --check src/app.js && node --check src/orders.js && node --check src/notification_relay.js && node --check src/notification_worker.js && node --test test/*.test.js",
     "sam:validate": "sam validate --template-file template.yaml",
     "sam:build": "sam build --template-file template.yaml",
     "deploy": "sam deploy --guided --template-file template.yaml --stack-name dobha-marketplace-prototype-dev"

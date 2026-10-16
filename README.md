@@ -14,6 +14,13 @@ website/  Static marketplace website
 - [mobile/](./mobile/) contains the Flutter application.
 - [website/](./website/) contains the marketplace website hosted as static assets.
 
+## AWS branch direction
+
+The `aws` branch targets AWS services for the marketplace. The AWS backend now
+includes transactional order/wallet handling and verified Cognito administrator
+authorization. See [the migration tracker](server/marketplace-prototype/MIGRATION.md)
+for implemented features and the remaining release gates.
+
 ## AWS migration status
 
 The website's static hosting is configured for Amazon S3 and CloudFront in [server/infrastructure/website.yaml](./server/infrastructure/website.yaml). The marketplace API and mobile app have **not** completed their AWS migration: they still use the existing Cloudflare Worker in `server/`. The AWS marketplace API in [server/marketplace-prototype/](./server/marketplace-prototype/) is incomplete and is not a drop-in replacement.

@@ -124,7 +124,7 @@ test('password change verifies the current account before changing the Cognito p
   const commands = [];
   const originalClientId = process.env.CLIENT_ID;
   process.env.CLIENT_ID = 'test-client';
-  await withClientMocks([[CognitoIdentityProviderClient, async (command) => {
+  await withClientMocks([[DynamoDBDocumentClient, async () => ({ Item: { id: 'user-1' } })], [CognitoIdentityProviderClient, async (command) => {
     commands.push(command);
     if (command.constructor.name === 'InitiateAuthCommand') {
       const claims = Buffer.from(JSON.stringify({ sub: 'user-1' })).toString('base64url');

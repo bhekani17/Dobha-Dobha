@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Separate Dobha-Dobha AWS marketplace API prototype; not used by the website.
+Description: Dobha-Dobha AWS marketplace migration backend.
 
 Parameters:
   Stage:
@@ -9,8 +9,13 @@ Parameters:
     AllowedPattern: '^[a-zA-Z0-9-]+$'
   AllowedOrigin:
     Type: String
-    Default: '*'
-    Description: Set to the CloudFront website URL after the first deployment.
+    Default: ''
+    Description: Optional exact external browser origin; CloudFront uses same-origin API requests.
+  EnableSimulatedPayments:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Enable only for development; no real money is collected or paid out.
   LiveKitUrl:
     Type: String
     Default: ''
@@ -31,6 +36,7 @@ Globals:
     Timeout: 30
     Environment:
       Variables:
+        ENABLE_SIMULATED_PAYMENTS: !Ref EnableSimulatedPayments
         TABLE_NAME: !Ref MarketTable
         MEDIA_BUCKET: !Ref MediaBucket
         CLIENT_ID: !Ref UserPoolClient
@@ -42,8 +48,6 @@ Globals:
         LIVEKIT_API_SECRET: !Ref LiveKitApiSecret
   Api:
     Auth:
-      DefaultAuthorizer: CognitoAuthorizer
-      AddDefaultAuthorizerToCorsPreflight: false
       Authorizers:
         CognitoAuthorizer:
           UserPoolArn: !GetAtt UserPool.Arn
@@ -56,12 +60,29 @@ Resources:
     Properties:
       Name: !Sub dobha-marketplace-${Stage}
       StageName: !Ref Stage
+      MergeDefinitions: true
+      DefinitionBody:
+        swagger: '2.0'
+        info:
+          title: Dobha marketplace
+          version: '1.0'
+        # Keep a path here so SAM 1.155.2 merges event methods into this body.
+        paths:
+          /api/health: {}
+      MethodSettings:
+        - ResourcePath: '/*'
+          HttpMethod: '*'
+          ThrottlingRateLimit: 50
+          ThrottlingBurstLimit: 100
+          MetricsEnabled: true
       BinaryMediaTypes:
         - image~1jpeg
         - image~1png
         - image~1webp
 
   MarketTable:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: !Sub dobha-marketplace-${Stage}
@@ -112,6 +133,8 @@ Resources:
         Enabled: true
 
   MediaBucket:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub dobha-media-${AWS::AccountId}-${Stage}
@@ -182,6 +205,8 @@ Resources:
       MessageRetentionPeriod: 1209600
 
   UserPool:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: !Sub dobha-marketplace-users-${Stage}
@@ -200,6 +225,13 @@ Resources:
         RecoveryMechanisms:
           - Name: verified_email
             Priority: 1
+
+  AdministratorsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: administrators
+      Description: Explicitly provisioned marketplace administrators; verified email is also required.
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
@@ -260,118 +292,168 @@ Resources:
                 - sqs:SendMessage
               Resource: !GetAtt NotificationsQueue.Arn
       Events:
+        MarketplaceGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/{proxy+}
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
+        MarketplacePost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/{proxy+}
+            Method: POST
+            Auth:
+              Authorizer: CognitoAuthorizer
+        MarketplacePatch:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/{proxy+}
+            Method: PATCH
+            Auth:
+              Authorizer: CognitoAuthorizer
+        MarketplacePut:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/{proxy+}
+            Method: PUT
+            Auth:
+              Authorizer: CognitoAuthorizer
+        MarketplaceDelete:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/{proxy+}
+            Method: DELETE
+            Auth:
+              Authorizer: CognitoAuthorizer
         Health:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/health
             Method: GET
-            Auth:
-              Authorizer: NONE
         PublicAuth:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/auth/{proxy+}
-            Method: ANY
-            Auth:
-              Authorizer: NONE
-        PublicAuthRoot:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MarketApi
-            Path: /api/auth
-            Method: ANY
-            Auth:
-              Authorizer: NONE
+            Method: POST
         PublicFeed:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/items
             Method: GET
-            Auth:
-              Authorizer: NONE
         PublicItem:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/items/{itemId}
             Method: GET
+        CreateListing:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/items
+            Method: POST
             Auth:
-              Authorizer: NONE
+              Authorizer: CognitoAuthorizer
+        MyListings:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/items/mine
+            Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
+        UpdateListing:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/items/{itemId}
+            Method: PATCH
+            Auth:
+              Authorizer: CognitoAuthorizer
+        DeleteListing:
+          Type: Api
+          Properties:
+            RestApiId: !Ref MarketApi
+            Path: /api/items/{itemId}
+            Method: DELETE
+            Auth:
+              Authorizer: CognitoAuthorizer
         PublicMedia:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/media/{proxy+}
             Method: GET
-            Auth:
-              Authorizer: NONE
         PublicRooms:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/rooms
             Method: GET
-            Auth:
-              Authorizer: NONE
         PublicViewerToken:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/live/token
             Method: GET
-            Auth:
-              Authorizer: NONE
         MyProfile:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/me
             Method: GET
+            Auth:
+              Authorizer: CognitoAuthorizer
         UpdateMyProfile:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/me
             Method: PATCH
+            Auth:
+              Authorizer: CognitoAuthorizer
         ChangeMyPassword:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/me/password
             Method: POST
+            Auth:
+              Authorizer: CognitoAuthorizer
         SetMyAvatar:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/me/avatar
             Method: PUT
+            Auth:
+              Authorizer: CognitoAuthorizer
         RemoveMyAvatar:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/me/avatar
             Method: DELETE
+            Auth:
+              Authorizer: CognitoAuthorizer
         DeleteMyAccount:
           Type: Api
           Properties:
             RestApiId: !Ref MarketApi
             Path: /api/me
             Method: DELETE
-        PrivateApi:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MarketApi
-            Path: /api/private/{proxy+}
-            Method: ANY
-        PrivateApiRoot:
-          Type: Api
-          Properties:
-            RestApiId: !Ref MarketApi
-            Path: /api/private
-            Method: ANY
+            Auth:
+              Authorizer: CognitoAuthorizer
 
   NotificationRelayFunction:
     Type: AWS::Serverless::Function
@@ -429,6 +511,43 @@ Resources:
             FunctionResponseTypes:
               - ReportBatchItemFailures
 
+  ApiCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: !Sub dobha-marketplace-api-${Stage}
+        MinTTL: 0
+        DefaultTTL: 0
+        MaxTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: false
+          EnableAcceptEncodingBrotli: false
+          CookiesConfig:
+            CookieBehavior: none
+          HeadersConfig:
+            HeaderBehavior: none
+          QueryStringsConfig:
+            QueryStringBehavior: none
+
+  WebsiteSecurityHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub dobha-marketplace-security-${Stage}
+        SecurityHeadersConfig:
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Override: true
+
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -462,6 +581,7 @@ Resources:
             - HEAD
           Compress: true
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: !Ref WebsiteSecurityHeaders
         CacheBehaviors:
           - PathPattern: /api/*
             TargetOriginId: MarketplaceApiOrigin
@@ -478,7 +598,7 @@ Resources:
               - GET
               - HEAD
             Compress: true
-            CachePolicyId: 413f1608-7d4a-4f6a-9b72-7f8f0d1f7f2a
+            CachePolicyId: !Ref ApiCachePolicy
             OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
 
   WebBucketPolicy:

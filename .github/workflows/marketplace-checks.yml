@@ -1,0 +1,53 @@
+name: Marketplace checks
+
+on:
+  push:
+    branches: [aws]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            server/marketplace-prototype/package-lock.json
+            server/capstone-self-storage/package-lock.json
+      - run: npm test
+        working-directory: server
+      - run: npm ci --ignore-scripts
+        working-directory: server/marketplace-prototype
+      - run: npm test
+        working-directory: server/marketplace-prototype
+      - run: npm ci --ignore-scripts
+        working-directory: server/capstone-self-storage
+      - run: npm test
+        working-directory: server/capstone-self-storage
+      - run: node --check website/app.js
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install aws-sam-cli==1.155.2
+      - run: sam validate --lint --region af-south-1 --template-file server/marketplace-prototype/template.yaml
+      - run: python server/marketplace-prototype/tool/verify_template.py
+        env:
+          AWS_DEFAULT_REGION: af-south-1
+          AWS_EC2_METADATA_DISABLED: 'true'
+      - run: sam build --template-file server/marketplace-prototype/template.yaml

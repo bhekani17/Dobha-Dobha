@@ -36,7 +36,8 @@ const response = (statusCode, body, extra = {}) => ({
   statusCode,
   headers: {
     'content-type': 'application/json; charset=utf-8',
-    'access-control-allow-origin': process.env.ALLOWED_ORIGIN || '*',
+    ...(process.env.ALLOWED_ORIGIN ? { 'access-control-allow-origin': process.env.ALLOWED_ORIGIN, vary: 'Origin' } : {}),
+    'cache-control': 'no-store',
     'access-control-allow-headers': 'Content-Type,Authorization',
     'access-control-allow-methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
     ...extra,
@@ -88,7 +89,7 @@ function str(body, key, { min = 1, max = 500, optional = false } = {}) {
 
 function money(body, key, max = 100000) {
   const value = Number(body[key]);
-  if (!Number.isFinite(value) || value <= 0 || value > max) throw new HttpError(400, `${key} must be a valid positive amount`);
+  if (!Number.isFinite(value) || Math.round(value * 100) < 1 || value > max) throw new HttpError(400, `${key} must be a valid positive amount`);
   return Math.round(value * 100);
 }
 
@@ -98,7 +99,21 @@ function getUser(event, required = true) {
     if (required) throw new HttpError(401, 'Please sign in');
     return null;
   }
-  return { id: claims.sub, email: claims.email || '', name: claims.name || '' };
+  let groups = claims['cognito:groups'] || [];
+  if (typeof groups === 'string') {
+    try { groups = JSON.parse(groups); } catch {
+      groups = groups.replace(/^\[|\]$/g, '').split(',').map((value) => value.trim());
+    }
+  }
+  return { id: claims.sub, email: claims.email || '', name: claims.name || '',
+    emailVerified: claims.email_verified === true || claims.email_verified === 'true',
+    groups: Array.isArray(groups) ? groups : [] };
+}
+
+function requireAdmin(user) {
+  if (!user.emailVerified || !user.groups.includes('administrators')) {
+    throw new HttpError(403, 'A verified administrator account is required');
+  }
 }
 
 function pathOf(event) {
@@ -119,7 +134,6 @@ function key(pk, sk) {
 }
 const itemKey = (id) => key(`ITEM#${id}`, 'META');
 const profileKey = (id) => key(`USER#${id}`, 'PROFILE');
-const orderKey = (id) => key(`ORDER#${id}`, 'META');
 
 async function get(pk, sk) {
   const { db, dbCommands: { GetCommand } } = clients();
@@ -301,7 +315,7 @@ async function login(body) {
     token: auth.IdToken,
     refreshToken: auth.RefreshToken,
     expiresIn: auth.ExpiresIn,
-    user: publicProfile(profile),
+    user: publicProfile(profile, getUser({ requestContext: { authorizer: { claims } } })),
   });
 }
 async function refresh(body) {
@@ -377,13 +391,13 @@ async function changePassword(event, user, body) {
 }
 
 async function me(user) {
-  return response(200, { user: publicProfile(await ensureProfile(user)) });
+  return response(200, { user: publicProfile(await ensureProfile(user), user) });
 }
 async function assertAccountActive(user) {
   const profile = await get(`USER#${user.id}`, 'PROFILE');
-  if (profile?.deletedAt) throw new HttpError(410, 'This account is being deleted and can no longer be used.');
+  if (profile?.deletedAt || profile?.deletingAt) throw new HttpError(410, 'This account is being deleted and can no longer be used.');
 }
-function publicProfile(profile) {
+function publicProfile(profile, user) {
   return {
     id: profile.id,
     email: profile.email,
@@ -399,6 +413,7 @@ function publicProfile(profile) {
     createdAt: profile.createdAt,
     salesCount: profile.salesCount || 0,
     hasPassword: profile.hasPassword !== false,
+    isAdmin: Boolean(user?.emailVerified && user.groups?.includes('administrators')),
   };
 }
 async function ensureProfile(user) {
@@ -450,8 +465,8 @@ async function updateMe(user, body) {
   if (next.role === 'vendor' && (!next.shopName || !next.stallLocation)) {
     throw new HttpError(400, 'Add your shop name and stall location to start selling');
   }
-  await put(next);
-  return response(200, { user: publicProfile(next) });
+  await put(next, 'attribute_not_exists(deletingAt) AND attribute_not_exists(deletedAt)');
+  return response(200, { user: publicProfile(next, user) });
 }
 async function setAvatar(event, user) {
   const profile = await ensureProfile(user);
@@ -460,7 +475,7 @@ async function setAvatar(event, user) {
   if (event.httpMethod === 'DELETE') {
     updated = { ...profile };
     delete updated.avatarKey;
-    await put(updated);
+    await put(updated, 'attribute_not_exists(deletingAt) AND attribute_not_exists(deletedAt)');
   } else {
     const headers = event.headers || {};
     const contentType = String(headers['content-type'] || headers['Content-Type'] || '')
@@ -483,13 +498,13 @@ async function setAvatar(event, user) {
       ContentType: contentType,
     }));
     updated = { ...profile, avatarKey: keyValue };
-    await put(updated);
+    await put(updated, 'attribute_not_exists(deletingAt) AND attribute_not_exists(deletedAt)');
   }
   if (oldKey) {
     const { s3, s3Commands: { DeleteObjectCommand } } = clients();
     await s3.send(new DeleteObjectCommand({ Bucket: process.env.MEDIA_BUCKET, Key: oldKey }));
   }
-  return response(200, { user: publicProfile(updated) });
+  return response(200, { user: publicProfile(updated, user) });
 }
 async function deleteAccount(user, body) {
   const profile = await get(`USER#${user.id}`, 'PROFILE');
@@ -520,6 +535,11 @@ async function deleteAccount(user, body) {
     throw new HttpError(400, 'Type DELETE to confirm');
   }
 
+  const wallet = await get(`USER#${user.id}`, 'WALLET');
+  if (wallet && ['availableCents', 'lockedCents', 'pendingCents'].some((field) => Number(wallet[field] || 0) !== 0)) {
+    throw new HttpError(409, 'Settle orders and withdraw your wallet balance before deleting your account.');
+  }
+
   const buyerOrders = await queryAll({
     IndexName: 'MarketFeedIndex',
     KeyConditionExpression: 'GSI1PK = :user AND begins_with(GSI1SK, :prefix)',
@@ -530,11 +550,25 @@ async function deleteAccount(user, body) {
     KeyConditionExpression: 'GSI2PK = :user AND begins_with(GSI2SK, :prefix)',
     ExpressionAttributeValues: { ':user': `SELLER#${user.id}`, ':prefix': 'ORDER#' },
   });
-  const orders = [...new Map([...buyerOrders, ...sellerOrders].map((order) => [order.id, order])).values()];
+  // Base-table references are written with every new order, so deletion does
+  // not depend on eventually consistent GSIs finding newly settled history.
+  const references = await queryAll({
+    KeyConditionExpression: 'pk = :user AND begins_with(sk, :prefix)',
+    ExpressionAttributeValues: { ':user': `USER#${user.id}`, ':prefix': 'ORDER#' }, ConsistentRead: true,
+  });
+  const referencedOrders = await Promise.all(references.map((entry) => get(`ORDER#${entry.orderId}`, 'META')));
+  const orders = [...new Map([...buyerOrders, ...sellerOrders, ...referencedOrders.filter(Boolean)].map((order) => [order.id, order])).values()];
   const settledStatuses = new Set(['payoutReleased', 'refunded', 'cancelled']);
   if (orders.some((order) => !settledStatuses.has(order.status))) {
     throw new HttpError(409, 'Finish or settle all orders before deleting your account.');
   }
+
+  await transact([
+    updateTx(profileKey(user.id), 'SET deletingAt = :now', 'attribute_exists(pk)', { ':now': new Date().toISOString() }),
+    { ConditionCheck: { TableName: table(), Key: { pk: `USER#${user.id}`, sk: 'WALLET' },
+      ConditionExpression: 'attribute_not_exists(pk) OR (availableCents = :zero AND lockedCents = :zero AND pendingCents = :zero)',
+      ExpressionAttributeValues: { ':zero': 0 } } },
+  ]);
 
   const listings = await queryAll({
     IndexName: 'SellerActivityIndex',
@@ -616,7 +650,7 @@ async function becomeVendor(user, body) {
   const profile = await get(`USER#${user.id}`, 'PROFILE');
   if (!profile) throw new HttpError(404, 'Profile not found');
   const updated = { ...profile, role: 'vendor', shopName, stallLocation };
-  await put(updated);
+  await put(updated, 'attribute_not_exists(deletingAt) AND attribute_not_exists(deletedAt)');
   return response(200, { user: { id: user.id, email: user.email, name: updated.name, role: 'vendor', shopName, stallLocation } });
 }
 
@@ -677,6 +711,8 @@ async function createListing(user, body) {
     GSI2PK: `SELLER#${user.id}`, GSI2SK: `ITEM#${createdAt}#${id}`,
   };
   await transact([
+    { ConditionCheck: { TableName: table(), Key: profileKey(user.id),
+      ConditionExpression: 'attribute_exists(pk) AND attribute_not_exists(deletingAt) AND attribute_not_exists(deletedAt)' } },
     putTx(item, 'attribute_not_exists(pk)'),
     userOutbox(user.id, { kind: 'listing', title: 'Listing published', body: `${item.title} is now available in the marketplace.`, itemId: id }),
   ]);
@@ -699,9 +735,9 @@ async function updateListing(user, id, body) {
   const { db, dbCommands: { PutCommand } } = clients();
   await db.send(new PutCommand({
     TableName: table(), Item: next,
-    ConditionExpression: '#status = :available AND sellerId = :seller',
+    ConditionExpression: '#status = :available AND sellerId = :seller AND quantity = :quantity AND priceCents = :price',
     ExpressionAttributeNames: { '#status': 'status' },
-    ExpressionAttributeValues: { ':available': 'available', ':seller': user.id },
+    ExpressionAttributeValues: { ':available': 'available', ':seller': user.id, ':quantity': item.quantity, ':price': item.priceCents },
   }));
   return response(200, { item: await itemJson(next) });
 }
@@ -730,60 +766,6 @@ async function myListings(user) {
     ScanIndexForward: false, Limit: 100,
   }));
   return response(200, { items: await Promise.all((result.Items || []).map((item) => itemJson(item))) });
-}
-
-async function createOrder(user, body) {
-  const item = await itemById(str(body, 'itemId', { max: 80 }), false);
-  if (item.sellerId === user.id) throw new HttpError(400, "You can't buy your own listing");
-  const quantity = body.quantity == null ? 1 : Number(body.quantity);
-  if (!Number.isInteger(quantity) || quantity < 1 || quantity > item.quantity) throw new HttpError(409, 'That quantity is no longer available');
-  const orderId = `DB-${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}`;
-  const createdAt = new Date().toISOString();
-  const order = {
-    pk: `ORDER#${orderId}`, sk: 'META', id: orderId, itemId: item.id,
-    itemTitle: item.title, itemPhotoKey: item.photoKey, buyerId: user.id,
-    sellerId: item.sellerId, quantity, amountCents: item.priceCents * quantity,
-    status: 'paymentPending', deliveryAddress: str(body, 'deliveryAddress', { min: 5, max: 200 }),
-    createdAt, GSI1PK: `BUYER#${user.id}`, GSI1SK: `ORDER#${createdAt}#${orderId}`,
-    GSI2PK: `SELLER#${item.sellerId}`, GSI2SK: `ORDER#${createdAt}#${orderId}`,
-  };
-  const remaining = item.quantity - quantity;
-  const writes = [
-    updateTx(itemKey(item.id), remaining === 0
-      ? 'SET quantity = :quantity, #status = :status REMOVE GSI1PK, GSI1SK'
-      : 'SET quantity = :quantity, #status = :status', '#status = :available AND quantity >= :requested', {
-      ':quantity': remaining, ':status': remaining === 0 ? 'sold' : 'available',
-      ':available': 'available', ':requested': quantity,
-    }, { '#status': 'status' }),
-    putTx(order, 'attribute_not_exists(pk)'),
-    userOutbox(item.sellerId, { kind: 'sale', title: 'New order', body: `${user.name || 'A customer'} ordered ${quantity} × ${item.title}.`, orderId }),
-  ];
-  await transact(writes);
-  return response(201, { order: orderView(order) });
-}
-
-function orderView(order) {
-  return {
-    id: order.id,
-    item: { id: order.itemId, title: order.itemTitle, photoUrl: order.itemPhotoKey ? mediaUrl(order.itemPhotoKey) : null },
-    quantity: order.quantity,
-    amountZar: order.amountCents / 100,
-    status: order.status,
-    deliveryAddress: order.deliveryAddress,
-    createdAt: order.createdAt,
-  };
-}
-
-async function myOrders(user) {
-  const { db, dbCommands: { QueryCommand } } = clients();
-  const [buyer, seller] = await Promise.all(['BUYER', 'SELLER'].map((role) => db.send(new QueryCommand({
-    TableName: table(), IndexName: role === 'BUYER' ? 'MarketFeedIndex' : 'SellerActivityIndex',
-    KeyConditionExpression: `${role === 'BUYER' ? 'GSI1PK' : 'GSI2PK'} = :user AND begins_with(${role === 'BUYER' ? 'GSI1SK' : 'GSI2SK'}, :prefix)`,
-    ExpressionAttributeValues: { ':user': `${role}#${user.id}`, ':prefix': 'ORDER#' },
-    ScanIndexForward: false, Limit: 100,
-  }))));
-  const distinct = new Map([...(buyer.Items || []), ...(seller.Items || [])].map((order) => [order.id, order]));
-  return response(200, { orders: [...distinct.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(orderView) });
 }
 
 async function myNotifications(user) {
@@ -868,6 +850,11 @@ async function liveViewerToken(event) {
   }
 }
 
+const orders = require('./orders').createOrders({
+  get, queryAll, transact, putTx, updateTx, userOutbox, itemById, publicItem,
+  response, HttpError, str, money, table, requireAdmin,
+});
+
 async function route(event) {
   const method = event.httpMethod || event.requestContext?.http?.method || 'GET';
   if (method === 'OPTIONS') return response(204, {});
@@ -883,7 +870,6 @@ async function route(event) {
   if (method === 'POST' && path === '/auth/refresh') return refresh(body);
   if (method === 'POST' && path === '/auth/forgot') return forgot(body);
   if (method === 'POST' && path === '/auth/reset') return reset(body);
-  if (method === 'POST' && path === '/me/password') return changePassword(event, getUser(event), body);
   if (method === 'GET' && path === '/items') return feed(event);
   const mediaMatch = /^\/media\/(.+)$/.exec(path);
   if (method === 'GET' && mediaMatch) return readMedia(mediaMatch[1]);
@@ -902,8 +888,14 @@ async function route(event) {
   if (method === 'POST' && path === '/uploads') return uploadUrl(user, body);
   if (method === 'GET' && path === '/items/mine') return myListings(user);
   if (method === 'POST' && path === '/items') return createListing(user, body);
-  if (method === 'GET' && path === '/orders') return myOrders(user);
-  if (method === 'POST' && path === '/orders') return createOrder(user, body);
+  if (method === 'POST' && path === '/me/password') return changePassword(event, user, body);
+  if (method === 'GET' && path === '/orders') return orders.myOrders(user);
+  if (method === 'POST' && path === '/orders') return orders.createOrder(user, body);
+  if (method === 'GET' && path === '/wallet') return orders.wallet(user);
+  if (method === 'POST' && path === '/wallet/topup') return orders.topUp(user, body);
+  if (method === 'POST' && path === '/wallet/withdraw') return orders.withdraw(user, body);
+  const orderAction = /^\/orders\/([^/]+)\/(dispatch|confirm|dispute|resolve)$/.exec(path);
+  if (method === 'POST' && orderAction) return orders.transition(user, orderAction[1], orderAction[2], body);
   if (method === 'GET' && path === '/notifications/unread') {
     const result = await myNotifications(user);
     const data = JSON.parse(result.body);
@@ -948,16 +940,3 @@ exports.handler = async (event) => {
     return response(500, { error: 'Something went wrong. Please try again.' });
   }
 };
-
-function orderView(order) {
-  return {
-    id: order.id,
-    itemId: order.itemId,
-    itemTitle: order.itemTitle,
-    photoUrl: order.itemPhotoKey ? mediaUrl(order.itemPhotoKey) : null,
-    quantity: order.quantity,
-    amountZar: order.amountCents / 100,
-    status: order.status,
-    createdAt: order.createdAt,
-  };
-}
