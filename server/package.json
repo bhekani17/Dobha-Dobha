@@ -2,14 +2,16 @@
   "name": "dobha-server",
   "version": "1.0.0",
   "private": true,
-  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "livekit": "%LOCALAPPDATA%\\livekit\\livekit-server.exe --dev --bind 0.0.0.0"
+    "build:web": "cd ../mobile && flutter build web --release --dart-define-from-file=config/google.json",
+    "deploy": "npm run build:web && wrangler deploy",
+    "db:migrate": "wrangler d1 migrations apply dobha --remote",
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.21.0",
     "livekit-server-sdk": "^2.7.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.144.0"
   }
 }

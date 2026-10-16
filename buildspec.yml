@@ -1,0 +1,35 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: af-south-1
+    SAM_CLI_TELEMETRY: "0"
+    STACK_NAME: dobha-marketplace-prototype-dev
+    SAM_BUCKET: dobha-sam-artifacts-807701355530-af-south-1
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+      python: 3.11
+    commands:
+      - python3 -m venv /tmp/sam-cli && /tmp/sam-cli/bin/pip install --upgrade aws-sam-cli
+  pre_build:
+    commands:
+      - aws s3api head-bucket --bucket "$SAM_BUCKET" --region "$AWS_DEFAULT_REGION" 2>/dev/null || aws s3 mb "s3://$SAM_BUCKET" --region "$AWS_DEFAULT_REGION"
+      - |
+        STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "DOES_NOT_EXIST")
+        if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
+          echo "Stack $STACK_NAME is in ROLLBACK_COMPLETE state. Deleting dead stack before deploying..."
+          aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION"
+          aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION"
+          echo "Dead stack deleted successfully."
+        fi
+      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server/marketplace-prototype" ci
+      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server/marketplace-prototype" test
+  build:
+    commands:
+      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam validate --template-file server/marketplace-prototype/template.yaml
+      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam build --template-file server/marketplace-prototype/template.yaml --build-dir .aws-sam/build
+      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam deploy --template-file .aws-sam/build/template.yaml --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION" --s3-bucket "$SAM_BUCKET" --s3-prefix "$STACK_NAME" --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides Stage=dev AllowedOrigin='*'
+
