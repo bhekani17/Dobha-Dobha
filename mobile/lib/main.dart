@@ -1,210 +1,140 @@
-import 'dart:async';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-import 'api.dart';
-import 'live_screen.dart';
+import 'screens/auth_screens.dart';
+import 'screens/chat_screens.dart';
+import 'screens/main_shell.dart';
+import 'screens/notifications_screen.dart';
+import 'state/app_state.dart';
 import 'theme.dart';
 
-void main() => runApp(const DobhaLiveApp());
+void main() {
+  final binding = WidgetsFlutterBinding.ensureInitialized();
+  DobhaColors.isDark = binding.platformDispatcher.platformBrightness == Brightness.dark;
+  // Firebase is only for push on phones, so it starts there (Push.start), never holding up the app.
+  runApp(const DobhaLiveApp());
+}
 
-class DobhaLiveApp extends StatelessWidget {
+/// Follows the phone's light/dark setting.
+class DobhaLiveApp extends StatefulWidget {
   const DobhaLiveApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Dobha Dobha Live',
-      debugShowCheckedModeBanner: false,
-      theme: dobhaTheme(),
-      home: const HomeScreen(),
-    );
-  }
+  State<DobhaLiveApp> createState() => _DobhaLiveAppState();
 }
 
-/// Lists streams that are live right now, and lets a seller start one.
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  final _serverController = TextEditingController(text: defaultServerUrl());
-  final _nameController = TextEditingController();
-  final _streamController = TextEditingController();
-
-  List<LiveRoom>? _rooms;
-  String? _error;
-  Timer? _poll;
-  bool _showServer = false;
-
-  Api get _api => Api(_serverController.text.trim());
+class _DobhaLiveAppState extends State<DobhaLiveApp> with WidgetsBindingObserver {
+  final _light = dobhaTheme(Brightness.light);
+  final _dark = dobhaTheme(Brightness.dark);
 
   @override
   void initState() {
     super.initState();
-    _startPolling();
-  }
-
-  void _startPolling() {
-    _poll?.cancel();
-    _loadRooms();
-    _poll = Timer.periodic(const Duration(seconds: 5), (_) => _loadRooms());
-  }
-
-  Future<void> _loadRooms() async {
-    try {
-      final rooms = await _api.rooms();
-      if (!mounted) return;
-      setState(() {
-        _rooms = rooms;
-        _error = null;
-      });
-    } catch (e) {
-      if (mounted) setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
-    }
-  }
-
-  Future<void> _open({required String room, required bool host}) async {
-    final identity = _nameController.text.trim();
-    if (identity.isEmpty) {
-      setState(() => _error = 'Enter your name first');
-      return;
-    }
-    if (room.isEmpty) {
-      setState(() => _error = 'Enter a stream name');
-      return;
-    }
-    _poll?.cancel();
-    await Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => LiveScreen(api: _api, roomName: room, identity: identity, host: host),
-    ));
-    _startPolling();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    _poll?.cancel();
-    _serverController.dispose();
-    _nameController.dispose();
-    _streamController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Catch up on sales and dispatches that happened while the app was in the background.
+    if (state == AppLifecycleState.resumed) AppState().pollNotifications();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    final dark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+    if (dark == DobhaColors.isDark) return;
+    DobhaColors.isDark = dark;
+    // Screens read DobhaColors directly, so rebuild everything in place (routes and state are kept).
+    void rebuild(Element e) {
+      e.markNeedsBuild();
+      e.visitChildren(rebuild);
+    }
+
+    (context as Element).visitChildren(rebuild);
+    setState(() {});
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadRooms,
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Row(
-                children: [
-                  const Text.rich(
-                    TextSpan(children: [
-                      TextSpan(text: 'Dobha '),
-                      TextSpan(text: 'Live', style: TextStyle(color: DobhaColors.green)),
-                    ]),
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                  ),
-                  const Spacer(),
-                  // Dev-only: lets you point the app at your PC's current Wi-Fi IP.
-                  // Release builds use SERVER_URL only.
-                  if (kDebugMode)
-                    TextButton(
-                      onPressed: () => setState(() => _showServer = !_showServer),
-                      child: const Text('Server'),
-                    ),
-                ],
-              ),
-              if (_showServer) ...[
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _serverController,
-                  keyboardType: TextInputType.url,
-                  autocorrect: false,
-                  decoration: const InputDecoration(hintText: 'http://192.168.1.19:3000'),
-                  onSubmitted: (_) => _startPolling(),
-                ),
-              ],
-              const SizedBox(height: 16),
-              TextField(
-                controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(hintText: 'Your name'),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                Text(_error!, style: const TextStyle(color: DobhaColors.red, fontSize: 14)),
-              ],
-              const SizedBox(height: 16),
-              _card(Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text('Go live', style: TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _streamController,
-                    autocorrect: false,
-                    decoration: const InputDecoration(hintText: 'Stream name (e.g. bale-1)'),
-                  ),
-                  const SizedBox(height: 10),
-                  FilledButton(
-                    onPressed: () => _open(room: _streamController.text.trim(), host: true),
-                    child: const Text('Go live'),
-                  ),
-                ],
-              )),
-              const SizedBox(height: 24),
-              const Text('Live now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              ..._roomList(),
-            ],
-          ),
-        ),
-      ),
+    return MaterialApp(
+      title: 'Dobha Dobha',
+      debugShowCheckedModeBanner: false,
+      theme: _light,
+      darkTheme: _dark,
+      themeMode: DobhaColors.isDark ? ThemeMode.dark : ThemeMode.light,
+      home: const AuthGate(),
     );
   }
+}
 
-  List<Widget> _roomList() {
-    final rooms = _rooms;
-    if (rooms == null) {
-      return [_card(const Text('Loading...', style: TextStyle(color: DobhaColors.muted)))];
-    }
-    if (rooms.isEmpty) {
-      return [_card(const Text('Nobody is live right now.', style: TextStyle(color: DobhaColors.muted)))];
-    }
-    return [
-      for (final r in rooms)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _card(Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(r.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    Text(r.viewers == 1 ? '1 viewer' : '${r.viewers} viewers',
-                        style: const TextStyle(color: DobhaColors.muted, fontSize: 14)),
-                  ],
-                ),
-              ),
-              FilledButton(onPressed: () => _open(room: r.name, host: false), child: const Text('Watch')),
-            ],
-          )),
-        ),
-    ];
+/// Splash while the saved session is restored, then the welcome flow or the app.
+/// Logging out (or an expired session) drops back to the welcome screen.
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _splashDone = false;
+  bool _wasLoggedIn = false;
+
+  @override
+  void initState() {
+    super.initState();
+    AppState().onPushTap = _openPush;
+    // Keep the splash up long enough to register, even when restoring is instant.
+    Future.wait([
+      AppState().restoreSession(),
+      Future.delayed(const Duration(milliseconds: 1400)),
+    ]).then((_) {
+      if (mounted) setState(() => _splashDone = true);
+    });
   }
 
-  Widget _card(Widget child) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: DobhaColors.card, borderRadius: BorderRadius.circular(12)),
-        child: child,
-      );
+  /// A tapped push notification: chat messages open the inbox, everything else the notifications list.
+  void _openPush(Map<String, dynamic> data) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !AppState().isLoggedIn) return;
+      AppState().pollNotifications();
+      if (data['kind'] == 'message') {
+        ChatsScreen.open(context);
+      } else {
+        NotificationsScreen.open(context);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppState(),
+      builder: (context, _) {
+        final state = AppState();
+        // Signing in (including from Google's callback) closes any open login/register screens.
+        // Signing out (or deleting the account) from a pushed screen like Settings closes it too.
+        if (state.isLoggedIn != _wasLoggedIn) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+          });
+        }
+        _wasLoggedIn = state.isLoggedIn;
+        final Widget child;
+        if (!_splashDone || !state.restored) {
+          child = const SplashScreen(key: ValueKey('splash'));
+        } else if (!state.isLoggedIn) {
+          child = const WelcomeScreen(key: ValueKey('welcome'));
+        } else {
+          child = const MainShell(key: ValueKey('app'));
+        }
+        return AnimatedSwitcher(duration: const Duration(milliseconds: 400), child: child);
+      },
+    );
+  }
 }

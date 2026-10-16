@@ -1,18 +1,34 @@
-# Dobha Dobha Live
+# Dobha-Dobha
 
+Dobha-Dobha is a buy-and-sell marketplace with a Flutter mobile app and a static website.
+
+## Project structure
+
+```text
+server/   Backend services, AWS infrastructure, and backend tests
+mobile/   Flutter application
+website/  Static marketplace website
 ```
-Dobha-Dobha/
-  server/       Node/Express token server for LiveKit (+ web host/viewer pages in public/)
-  mobile/       Flutter app (Android + iOS)
-```
 
-## Run locally
+- [server/](./server/) contains the current marketplace API, AWS infrastructure, an incomplete AWS marketplace API prototype, and the separate self-storage elective capstone.
+- [mobile/](./mobile/) contains the Flutter application.
+- [website/](./website/) contains the marketplace website hosted as static assets.
 
-1. LiveKit (terminal 1): `cd server` then `npm run livekit`
-2. Token server (terminal 2): `cd server` then `npm start`, which serves http://localhost:3000
-3. App: press F5 in VS Code ("Dobha Live (phone)"), or
-   `cd mobile` then `flutter run --dart-define=SERVER_URL=http://<your-pc-ip>:3000`
+## AWS migration status
 
-The phone must be on the same Wi-Fi as the PC. Find the PC's IP with `ipconfig`.
+The website's static hosting is configured for Amazon S3 and CloudFront in [server/infrastructure/website.yaml](./server/infrastructure/website.yaml). The marketplace API and mobile app have **not** completed their AWS migration: they still use the existing Cloudflare Worker in `server/`. The AWS marketplace API in [server/marketplace-prototype/](./server/marketplace-prototype/) is incomplete and is not a drop-in replacement.
 
-Config lives in `server/.env` (copy from `server/.env.example`).
+Keep the current API running until AWS feature parity, data and media migration, and web/mobile cutover have been implemented and verified. Do not point the clients at the prototype or remove the current backend yet.
+
+For server and AWS deployment instructions, see [server/README.md](./server/README.md). The Flutter application has its own setup instructions in `mobile/`.
+
+## Proof of work
+
+This repository does not substitute for AWS Educate course certificates, required LinkedIn/Drive evidence, a verified AWS deployment, or a steady and authentic commit history. Submit only work and evidence that are your own.
+
+
+
+
+
+#DO NOT REMOVE :
+WTC-VKUSCGQL

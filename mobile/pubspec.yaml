@@ -1,5 +1,5 @@
 name: dobha_live
-description: "A new Flutter project."
+description: "Dobha Dobha: Joburg street thrifting with live drops and escrow."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -36,6 +36,13 @@ dependencies:
   cupertino_icons: ^1.0.8
   livekit_client: ^2.13.0
   http: ^1.6.0
+  shared_preferences: ^2.5.5
+  image_picker: ^1.2.3
+  google_sign_in: ^7.2.0
+  google_sign_in_web: ^1.1.3
+  video_player: ^2.14.0
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
 
 dev_dependencies:
   flutter_test:
@@ -58,6 +65,25 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  # logo.png: original (black tile), used in light mode and for app icons.
+  # logo01.png: transparent, used in dark mode.
+  assets:
+    - assets/images/logo.png
+    - assets/images/logo01.png
+
+  # Plus Jakarta Sans (SIL Open Font License, see assets/fonts/OFL.txt).
+  fonts:
+    - family: PlusJakartaSans
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-400.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-500.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-600.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-700.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

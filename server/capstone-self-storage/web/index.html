@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102a2a">
+  <title>Dobha Storage | Self-storage reservations</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="config.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" aria-label="Dobha Storage home">
+      <span class="brand-mark" aria-hidden="true">D</span>
+      <span>dobha<span class="brand-light">storage</span></span>
+    </a>
+    <span class="secure-label"><span aria-hidden="true">●</span> Secure self-storage</span>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">SPACE THAT FITS YOUR NEXT CHAPTER</p>
+        <h1>Find a little more<br>room to live.</h1>
+        <p class="hero-copy">Browse available storage, reserve a unit, and manage your space from one simple dashboard.</p>
+      </div>
+      <div class="hero-note"><span aria-hidden="true">↗</span><p>Book a unit in minutes.<br>Manage it whenever you need.</p></div>
+    </section>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <section id="auth-panel" class="panel auth-panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">YOUR STORAGE SPACE</p><h2>Sign in or get started</h2></div>
+        <span class="lock-icon" aria-hidden="true">⌑</span>
+      </div>
+      <form id="sign-in-form" class="form-grid">
+        <label>Email address<input name="email" type="email" autocomplete="email" required></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" minlength="10" required></label>
+        <button class="button button-primary" type="submit">Sign in</button>
+      </form>
+      <div class="divider"><span>New to Dobha Storage?</span></div>
+      <form id="sign-up-form" class="form-grid">
+        <label>Email address<input name="email" type="email" autocomplete="email" required></label>
+        <label>Create a password<input name="password" type="password" autocomplete="new-password" minlength="10" required></label>
+        <p class="form-hint">Use at least 10 characters, including uppercase, lowercase, a number, and a symbol.</p>
+        <button class="button button-outline" type="submit">Create account</button>
+      </form>
+      <form id="confirm-form" class="form-grid hidden">
+        <p class="form-hint">Enter the verification code sent to your email to activate your account.</p>
+        <label>Email address<input name="email" type="email" autocomplete="email" required></label>
+        <label>Verification code<input name="code" inputmode="numeric" autocomplete="one-time-code" required></label>
+        <button class="button button-primary" type="submit">Verify email</button>
+      </form>
+    </section>
+
+    <section id="dashboard" class="dashboard hidden">
+      <div class="dashboard-heading">
+        <div><p class="eyebrow">YOUR ACCOUNT</p><h2>Storage dashboard</h2><p id="signed-in-email" class="muted"></p></div>
+        <button id="sign-out" class="button button-outline" type="button">Sign out</button>
+      </div>
+
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">MAKE ROOM FOR MORE</p><h2>Available units</h2></div></div>
+        <div id="units" class="card-grid"><p class="muted">Loading storage units…</p></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">YOUR SPACE</p><h2>Reservations</h2></div></div>
+        <div id="reservations" class="list"><p class="muted">Loading reservations…</p></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">ACCOUNT ACTIVITY</p><h2>Notifications</h2></div></div>
+        <div id="notifications" class="list"><p class="muted">Loading notifications…</p></div>
+      </section>
+
+      <section class="panel admin-panel">
+        <div class="panel-heading"><div><p class="eyebrow">FACILITY MANAGEMENT</p><h2>Add a storage unit</h2></div></div>
+        <p class="form-hint">This action is limited to administrator emails configured when the stack is deployed.</p>
+        <form id="unit-form" class="form-grid form-grid-inline">
+          <label>Unit name<input name="name" maxlength="80" placeholder="Unit A-12" required></label>
+          <label>Unit size<input name="size" maxlength="60" placeholder="5 × 5 ft" required></label>
+          <label>Monthly price (ZAR)<input name="monthlyPrice" type="number" min="0.01" max="1000000" step="0.01" required></label>
+          <button class="button button-primary" type="submit">Add unit</button>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <footer>
+    <span>Dobha Storage · AWS serverless capstone</span>
+    <span>Demo project only. No real payments or storage services are provided.</span>
+  </footer>
+</body>
+</html>
