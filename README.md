@@ -25,3 +25,10 @@ For server and AWS deployment instructions, see [server/README.md](./server/READ
 ## Proof of work
 
 This repository does not substitute for AWS Educate course certificates, required LinkedIn/Drive evidence, a verified AWS deployment, or a steady and authentic commit history. Submit only work and evidence that are your own.
+
+
+
+
+
+#DO NOT REMOVE :
+WTC-VKUSCGQL
