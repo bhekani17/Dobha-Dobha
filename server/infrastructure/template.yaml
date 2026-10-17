@@ -525,6 +525,7 @@ Resources:
   # ============================================
   PhotosBucket:
     Type: AWS::S3::Bucket
+    Properties:
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -543,6 +544,7 @@ Resources:
 
   WebsiteBucket:
     Type: AWS::S3::Bucket
+    Properties:
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false

@@ -3,12 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build:web": "cd ../mobile && flutter build web --release --dart-define-from-file=config/google.json",
-    "deploy:cloudflare": "npm run build:web && wrangler deploy",
-    "db:migrate:cloudflare": "wrangler d1 migrations apply dobha --remote",
-    "deploy:aws": "sam build --template-file infrastructure/template-rds.yaml && sam deploy --template-file infrastructure/template-rds.yaml",
-    "deploy:aws:dynamodb": "sam build --template-file infrastructure/template.yaml && sam deploy --template-file infrastructure/template.yaml",
-    "db:migrate:aws": "aws lambda invoke --function-name dev-dobha-db-migration response.json && cat response.json",
+    "deploy:aws": "sam build --template-file infrastructure/template.yaml && sam deploy --template-file infrastructure/template.yaml",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
@@ -21,10 +16,6 @@
     "@aws-sdk/client-sqs": "^3.600.0",
     "@aws-sdk/client-secrets-manager": "^3.600.0",
     "@aws-sdk/lib-dynamodb": "^3.600.0",
-    "jsonwebtoken": "^9.0.2",
-    "pg": "^8.11.3"
-  },
-  "devDependencies": {
-    "wrangler": "^4.144.0"
+    "jsonwebtoken": "^9.0.2"
   }
 }
