@@ -10,4 +10,4 @@ CREATE INDEX item_media_item ON item_media(item_id, position);
 
 -- Carry over the single photo existing listings already have.
 INSERT INTO item_media (id, item_id, kind, media_key, position)
-SELECT 'med_' || lower(hex(randomblob(10))), id, 'image', photo_key, 0 FROM items WHERE photo_key IS NOT NULL;
+SELECT 'med_' || encode(gen_random_bytes(10), 'hex'), id, 'image', photo_key, 0 FROM items WHERE photo_key IS NOT NULL;

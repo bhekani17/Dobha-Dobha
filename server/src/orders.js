@@ -4,7 +4,7 @@
 import { isAdmin, requireUser } from './auth.js';
 import { HttpError, id, iso, json, now, rands, readJson, str, zar } from './http.js';
 import { itemJson, loadItem } from './items.js';
-import { notify } from './notifications.js';
+import { withDatabase } from './db-adapter.js';
 
 const DELIVERY = {
   'PUDO Locker-to-Locker': 5000,
@@ -18,21 +18,23 @@ const COMMISSION = 0.05;
 
 const rand = (n) => Math.floor(Math.random() * n);
 const money = (cents) => `R ${(cents / 100).toFixed(0)}`;
-const txn = (env, userId, t) =>
-  env.DB.prepare(
+const txn = (db, userId, t) =>
+  db.prepare(
     'INSERT INTO transactions (id, user_id, title, subtitle, amount_cents, type, status, reference, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
   ).bind(id('txn'), userId, t.title, t.subtitle, t.amount, t.type, t.status, t.reference, now());
 
 export async function orderJson(env, o, viewerId) {
-  const [item, review] = await Promise.all([
-    env.DB.prepare(
-      `SELECT i.*, u.name AS seller_name, u.handle AS seller_handle, u.shop_name, u.stall_location
-       FROM items i JOIN users u ON u.id = i.seller_id WHERE i.id = ?`,
-    )
-      .bind(o.item_id)
-      .first(),
-    env.DB.prepare('SELECT rating, text FROM reviews WHERE order_id = ?').bind(o.id).first(),
-  ]);
+  const [item, review] = await withDatabase(env.DB, async (db) => {
+    return await Promise.all([
+      db.prepare(
+        `SELECT i.*, u.name AS seller_name, u.handle AS seller_handle, u.shop_name, u.stall_location
+         FROM items i JOIN users u ON u.id = i.seller_id WHERE i.id = ?`,
+      )
+        .bind(o.item_id)
+        .first(),
+      db.prepare('SELECT rating, text FROM reviews WHERE order_id = ?').bind(o.id).first(),
+    ]);
+  });
   return {
     review: review ? { rating: review.rating, text: review.text } : null,
     canReview: !review && o.buyer_id === viewerId && o.status === 'payoutReleased',
@@ -55,12 +57,14 @@ export async function orderJson(env, o, viewerId) {
 }
 
 async function loadOrder(env, orderId) {
-  const o = await env.DB.prepare(
-    `SELECT o.*, b.name AS buyer_name, i.title AS item_title FROM orders o
-     JOIN users b ON b.id = o.buyer_id JOIN items i ON i.id = o.item_id WHERE o.id = ?`,
-  )
-    .bind(orderId)
-    .first();
+  const o = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `SELECT o.*, b.name AS buyer_name, i.title AS item_title FROM orders o
+       JOIN users b ON b.id = o.buyer_id JOIN items i ON i.id = o.item_id WHERE o.id = ?`,
+    )
+      .bind(orderId)
+      .first();
+  });
   if (!o) throw new HttpError(404, 'Order not found');
   return o;
 }
@@ -68,12 +72,14 @@ async function loadOrder(env, orderId) {
 /** GET /api/orders: purchases and sales, newest first. */
 export async function listOrders(request, env) {
   const user = await requireUser(request, env);
-  const { results } = await env.DB.prepare(
-    `SELECT o.*, b.name AS buyer_name FROM orders o JOIN users b ON b.id = o.buyer_id
-     WHERE o.buyer_id = ?1 OR o.seller_id = ?1 ORDER BY o.created_at DESC LIMIT 100`,
-  )
-    .bind(user.id)
-    .all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `SELECT o.*, b.name AS buyer_name FROM orders o JOIN users b ON b.id = o.buyer_id
+       WHERE o.buyer_id = ?1 OR o.seller_id = ?1 ORDER BY o.created_at DESC LIMIT 100`,
+    )
+      .bind(user.id)
+      .all();
+  });
   return json({ orders: await Promise.all(results.map((o) => orderJson(env, o, user.id))) });
 }
 
@@ -99,11 +105,13 @@ async function placeOrder(env, user, itemId, { deliveryMethod, paymentMethod, ad
 
   let price = item.price_cents;
   if (offerId) {
-    const offer = await env.DB.prepare(
-      "SELECT * FROM offers WHERE id = ? AND buyer_id = ? AND item_id = ? AND status = 'accepted' AND expires_at > ?",
-    )
-      .bind(offerId, user.id, itemId, now())
-      .first();
+    const offer = await withDatabase(env.DB, async (db) => {
+      return await db.prepare(
+        "SELECT * FROM offers WHERE id = ? AND buyer_id = ? AND item_id = ? AND status = 'accepted' AND expires_at > ?",
+      )
+        .bind(offerId, user.id, itemId, now())
+        .first();
+    });
     if (!offer) throw new HttpError(409, 'That offer is no longer valid');
     price = offer.amount_cents;
   }
@@ -113,22 +121,28 @@ async function placeOrder(env, user, itemId, { deliveryMethod, paymentMethod, ad
 
   // Wallet payments need the balance; other methods are simulated as paid.
   if (paymentMethod === WALLET) {
-    const res = await env.DB.prepare('UPDATE wallets SET available_cents = available_cents - ?1 WHERE user_id = ?2 AND available_cents >= ?1')
-      .bind(total, user.id)
-      .run();
+    const res = await withDatabase(env.DB, async (db) => {
+      return await db.prepare('UPDATE wallets SET available_cents = available_cents - ?1 WHERE user_id = ?2 AND available_cents >= ?1')
+        .bind(total, user.id)
+        .run();
+    });
     if (!res.meta.changes) throw new HttpError(402, 'Not enough in your wallet, top up or pick another payment method');
   }
 
   // Take one from stock in a single statement, so two buyers can't get the last one.
-  const claimed = await env.DB.prepare(
-    `UPDATE items SET quantity = quantity - 1, status = CASE WHEN quantity = 1 THEN 'sold' ELSE 'available' END, buyer_id = ?
-     WHERE id = ? AND status = 'available' AND quantity >= 1 RETURNING quantity`,
-  )
-    .bind(user.id, itemId)
-    .first();
+  const claimed = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `UPDATE items SET quantity = quantity - 1, status = CASE WHEN quantity = 1 THEN 'sold' ELSE 'available' END, buyer_id = ?
+       WHERE id = ? AND status = 'available' AND quantity >= 1 RETURNING quantity`,
+    )
+      .bind(user.id, itemId)
+      .first();
+  });
   if (!claimed) {
     if (paymentMethod === WALLET) {
-      await env.DB.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(total, user.id).run();
+      await withDatabase(env.DB, async (db) => {
+        await db.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(total, user.id).run();
+      });
     }
     throw new HttpError(409, 'Someone already bought the last one');
   }
@@ -143,45 +157,64 @@ async function placeOrder(env, user, itemId, { deliveryMethod, paymentMethod, ad
   // The batch is one transaction; if it fails, undo the claim and the wallet charge above
   // so the item isn't left sold with no order.
   try {
-    await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO orders (id, item_id, buyer_id, seller_id, amount_cents, shipping_cents, delivery_method, delivery_address, payment_method, status, vault_ref, tracking, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paymentHeld', ?, ?, ?)`,
-      ).bind(order.id, itemId, user.id, item.seller_id, price, shipping, deliveryMethod, address, paymentMethod, order.vault, order.tracking, now()),
-      env.DB.prepare('UPDATE wallets SET locked_cents = locked_cents + ? WHERE user_id = ?').bind(total, user.id),
-      env.DB.prepare('UPDATE wallets SET pending_cents = pending_cents + ? WHERE user_id = ?').bind(price, item.seller_id),
-      txn(env, user.id, {
-        title: `Paid for ${item.title}`,
-        subtitle: `On hold until you have it (${paymentMethod})`,
-        amount: total,
-        type: 'escrowHold',
-        status: 'Held in escrow',
-        reference: order.vault,
-      }),
-      notify(env, item.seller_id, {
-        kind: 'sale',
-        title: 'You made a sale',
-        body: `${user.name} bought "${item.title}" for ${money(price)}. Send it, then tap "I've sent it" in Orders.`,
-        orderId: order.id,
-        itemId,
-      }),
-      // It leaves this buyer's cart; once the last one sells it leaves every cart and open offers close.
-      soldOut
-        ? env.DB.prepare('DELETE FROM cart_items WHERE item_id = ?').bind(itemId)
-        : env.DB.prepare('DELETE FROM cart_items WHERE item_id = ? AND user_id = ?').bind(itemId, user.id),
-      soldOut
-        ? env.DB.prepare(
+    await withDatabase(env.DB, async (db) => {
+      const statements = [
+        db.prepare(
+          `INSERT INTO orders (id, item_id, buyer_id, seller_id, amount_cents, shipping_cents, delivery_method, delivery_address, payment_method, status, vault_ref, tracking, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'paymentHeld', ?, ?, ?)`,
+        ).bind(order.id, itemId, user.id, item.seller_id, price, shipping, deliveryMethod, address, paymentMethod, order.vault, order.tracking, now()),
+        db.prepare('UPDATE wallets SET locked_cents = locked_cents + ? WHERE user_id = ?').bind(total, user.id),
+        db.prepare('UPDATE wallets SET pending_cents = pending_cents + ? WHERE user_id = ?').bind(price, item.seller_id),
+        txn(db, user.id, {
+          title: `Paid for ${item.title}`,
+          subtitle: `On hold until you have it (${paymentMethod})`,
+          amount: total,
+          type: 'escrowHold',
+          status: 'Held in escrow',
+          reference: order.vault,
+        }),
+        db.prepare(
+          'INSERT INTO notifications (id, user_id, kind, title, body, order_id, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ).bind(
+          id('ntf'),
+          item.seller_id,
+          'sale',
+          'You made a sale',
+          `${user.name} bought "${item.title}" for ${money(price)}. Send it, then tap "I've sent it" in Orders.`,
+          order.id,
+          itemId,
+          now(),
+        ),
+        // It leaves this buyer's cart; once the last one sells it leaves every cart and open offers close.
+        soldOut
+          ? db.prepare('DELETE FROM cart_items WHERE item_id = ?').bind(itemId)
+          : db.prepare('DELETE FROM cart_items WHERE item_id = ? AND user_id = ?').bind(itemId, user.id),
+      ];
+      if (soldOut) {
+        statements.push(
+          db.prepare(
             "UPDATE offers SET status = CASE WHEN id = ?2 THEN 'used' ELSE 'declined' END, updated_at = ?3 WHERE item_id = ?1 AND status IN ('pending', 'countered', 'accepted')",
-          ).bind(itemId, offerId, now())
-        : env.DB.prepare("UPDATE offers SET status = 'used', updated_at = ? WHERE id = ?").bind(now(), offerId),
-    ]);
+          ).bind(itemId, offerId, now()),
+        );
+      } else if (offerId) {
+        statements.push(
+          db.prepare("UPDATE offers SET status = 'used', updated_at = ? WHERE id = ?").bind(now(), offerId),
+        );
+      }
+      await db.batch(statements);
+    });
   } catch (e) {
-    await env.DB.batch([
-      env.DB.prepare("UPDATE items SET quantity = quantity + 1, status = 'available' WHERE id = ?").bind(itemId),
-      ...(paymentMethod === WALLET
-        ? [env.DB.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(total, user.id)]
-        : []),
-    ]);
+    await withDatabase(env.DB, async (db) => {
+      const rollbackStatements = [
+        db.prepare("UPDATE items SET quantity = quantity + 1, status = 'available' WHERE id = ?").bind(itemId),
+      ];
+      if (paymentMethod === WALLET) {
+        rollbackStatements.push(
+          db.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(total, user.id),
+        );
+      }
+      await db.batch(rollbackStatements);
+    });
     throw e;
   }
   return order.id;
@@ -205,9 +238,11 @@ export async function createOrder(request, env) {
 export async function checkoutCart(request, env) {
   const user = await requireUser(request, env);
   const details = checkoutDetails(await readJson(request));
-  const { results } = await env.DB.prepare('SELECT item_id FROM cart_items WHERE user_id = ? ORDER BY created_at')
-    .bind(user.id)
-    .all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT item_id FROM cart_items WHERE user_id = ? ORDER BY created_at')
+      .bind(user.id)
+      .all();
+  });
   if (!results.length) throw new HttpError(400, 'Your cart is empty');
 
   const orders = [];
@@ -235,23 +270,31 @@ export async function dispatchOrder(request, env, orderId) {
     const body = await request.json().catch(() => null);
     tracking = str(body && typeof body === 'object' ? body : {}, 'trackingNumber', { min: 4, max: 40 });
   }
-  const res = await env.DB.prepare(
-    "UPDATE orders SET status = 'vendorDispatched', dispatched_at = ?, tracking = ? WHERE id = ? AND status = 'paymentHeld'",
-  )
-    .bind(now(), tracking, orderId)
-    .run();
+  const res = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      "UPDATE orders SET status = 'vendorDispatched', dispatched_at = ?, tracking = ? WHERE id = ? AND status = 'paymentHeld'",
+    )
+      .bind(now(), tracking, orderId)
+      .run();
+  });
   if (!res.meta.changes) throw new HttpError(409, 'This order cannot be marked as dispatched');
 
-  await notify(env, o.buyer_id, {
-    kind: 'dispatched',
-    title: `"${o.item_title}" is on its way`,
-    body:
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare(
+      'INSERT INTO notifications (id, user_id, kind, title, body, order_id, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(
+      id('ntf'),
+      o.buyer_id,
+      'dispatched',
+      `"${o.item_title}" is on its way`,
       o.delivery_method === SAFE_HUB
         ? 'It is ready to collect at the Downtown Joburg Safe Hub.'
         : `Sent with ${o.delivery_method}, tracking number ${tracking}.`,
-    orderId,
-    itemId: o.item_id,
-  }).run();
+      orderId,
+      o.item_id,
+      now(),
+    ).run();
+  });
   return json({ order: await orderJson(env, await loadOrder(env, orderId), user.id) });
 }
 
@@ -261,29 +304,33 @@ export async function confirmOrder(request, env, orderId) {
   const o = await loadOrder(env, orderId);
   if (o.buyer_id !== user.id) throw new HttpError(403, 'Only the buyer can confirm');
 
-  const res = await env.DB.prepare(
-    "UPDATE orders SET status = 'payoutReleased', confirmed_at = ? WHERE id = ? AND status = 'vendorDispatched'",
-  )
-    .bind(now(), orderId)
-    .run();
+  const res = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      "UPDATE orders SET status = 'payoutReleased', confirmed_at = ? WHERE id = ? AND status = 'vendorDispatched'",
+    )
+      .bind(now(), orderId)
+      .run();
+  });
   if (!res.meta.changes) throw new HttpError(409, 'This order cannot be confirmed yet');
 
-  await env.DB.batch(releaseToSeller(env, o, 'The buyer received it'));
+  await withDatabase(env.DB, async (db) => {
+    await db.batch(releaseToSeller(db, o, 'The buyer received it'));
+  });
   return json({ order: await orderJson(env, await loadOrder(env, orderId), user.id) });
 }
 
 /** Wallet moves (and the seller's notification) that pay the seller out of escrow, minus commission. */
-function releaseToSeller(env, o, reason) {
+function releaseToSeller(db, o, reason) {
   const total = o.amount_cents + o.shipping_cents;
   const payout = Math.round(o.amount_cents * (1 - COMMISSION));
   return [
-    env.DB.prepare('UPDATE wallets SET locked_cents = MAX(locked_cents - ?, 0) WHERE user_id = ?').bind(total, o.buyer_id),
-    env.DB.prepare('UPDATE wallets SET pending_cents = MAX(pending_cents - ?, 0), available_cents = available_cents + ? WHERE user_id = ?').bind(
+    db.prepare('UPDATE wallets SET locked_cents = MAX(locked_cents - ?, 0) WHERE user_id = ?').bind(total, o.buyer_id),
+    db.prepare('UPDATE wallets SET pending_cents = MAX(pending_cents - ?, 0), available_cents = available_cents + ? WHERE user_id = ?').bind(
       o.amount_cents,
       payout,
       o.seller_id,
     ),
-    txn(env, o.seller_id, {
+    txn(db, o.seller_id, {
       title: `Sold ${o.item_title}`,
       subtitle: `${reason} (after the 5% Dobha fee)`,
       amount: payout,
@@ -291,33 +338,47 @@ function releaseToSeller(env, o, reason) {
       status: 'Paid out',
       reference: o.vault_ref,
     }),
-    notify(env, o.seller_id, {
-      kind: 'payout',
-      title: 'You have been paid',
-      body: `${money(payout)} for "${o.item_title}" is now in your wallet.`,
-      orderId: o.id,
-      itemId: o.item_id,
-    }),
+    db.prepare(
+      'INSERT INTO notifications (id, user_id, kind, title, body, order_id, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(
+      id('ntf'),
+      o.seller_id,
+      'payout',
+      'You have been paid',
+      `${money(payout)} for "${o.item_title}" is now in your wallet.`,
+      o.id,
+      o.item_id,
+      now(),
+    ),
   ];
 }
 
 /** POST /api/orders/:id/dispute (buyer): freezes the order until an admin settles it. */
 export async function disputeOrder(request, env, orderId) {
   const user = await requireUser(request, env);
-  const res = await env.DB.prepare(
-    "UPDATE orders SET status = 'disputed' WHERE id = ? AND buyer_id = ? AND status IN ('paymentHeld', 'vendorDispatched')",
-  )
-    .bind(orderId, user.id)
-    .run();
+  const res = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      "UPDATE orders SET status = 'disputed' WHERE id = ? AND buyer_id = ? AND status IN ('paymentHeld', 'vendorDispatched')",
+    )
+      .bind(orderId, user.id)
+      .run();
+  });
   if (!res.meta.changes) throw new HttpError(409, 'This order cannot be disputed');
   const o = await loadOrder(env, orderId);
-  await notify(env, o.seller_id, {
-    kind: 'disputed',
-    title: 'Buyer reported a problem',
-    body: `The payment for "${o.item_title}" is on hold while Dobha support sorts it out.`,
-    orderId,
-    itemId: o.item_id,
-  }).run();
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare(
+      'INSERT INTO notifications (id, user_id, kind, title, body, order_id, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(
+      id('ntf'),
+      o.seller_id,
+      'disputed',
+      'Buyer reported a problem',
+      `The payment for "${o.item_title}" is on hold while Dobha support sorts it out.`,
+      orderId,
+      o.item_id,
+      now(),
+    ).run();
+  });
   return json({ order: await orderJson(env, o, user.id) });
 }
 
@@ -330,10 +391,12 @@ async function requireAdmin(request, env) {
 /** GET /api/admin/disputes (admins), oldest first. */
 export async function listDisputes(request, env) {
   const admin = await requireAdmin(request, env);
-  const { results } = await env.DB.prepare(
-    `SELECT o.*, b.name AS buyer_name FROM orders o JOIN users b ON b.id = o.buyer_id
-     WHERE o.status = 'disputed' ORDER BY o.created_at`,
-  ).all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `SELECT o.*, b.name AS buyer_name FROM orders o JOIN users b ON b.id = o.buyer_id
+       WHERE o.status = 'disputed' ORDER BY o.created_at`,
+    ).all();
+  });
   return json({ orders: await Promise.all(results.map((o) => orderJson(env, o, admin.id))) });
 }
 
@@ -347,63 +410,87 @@ export async function resolveDispute(request, env, orderId) {
   if (outcome !== 'refund' && outcome !== 'release') throw new HttpError(400, 'Outcome must be refund or release');
 
   const o = await loadOrder(env, orderId);
-  const res = await env.DB.prepare("UPDATE orders SET status = ?, confirmed_at = ? WHERE id = ? AND status = 'disputed'")
-    .bind(outcome === 'refund' ? 'refunded' : 'payoutReleased', now(), orderId)
-    .run();
+  const res = await withDatabase(env.DB, async (db) => {
+    return await db.prepare("UPDATE orders SET status = ?, confirmed_at = ? WHERE id = ? AND status = 'disputed'")
+      .bind(outcome === 'refund' ? 'refunded' : 'payoutReleased', now(), orderId)
+      .run();
+  });
   if (!res.meta.changes) throw new HttpError(409, 'This order is not in dispute');
 
   const total = o.amount_cents + o.shipping_cents;
-  if (outcome === 'release') {
-    await env.DB.batch([
-      ...releaseToSeller(env, o, 'Dobha support settled the problem for you'),
-      notify(env, o.buyer_id, {
-        kind: 'resolved',
-        title: 'Problem sorted',
-        body: `Dobha support looked into "${o.item_title}" and paid the seller.`,
-        orderId,
-        itemId: o.item_id,
-      }),
-    ]);
-  } else {
-    await env.DB.batch([
-      env.DB.prepare(
-        'UPDATE wallets SET locked_cents = MAX(locked_cents - ?1, 0), available_cents = available_cents + ?1 WHERE user_id = ?2',
-      ).bind(total, o.buyer_id),
-      env.DB.prepare('UPDATE wallets SET pending_cents = MAX(pending_cents - ?, 0) WHERE user_id = ?').bind(o.amount_cents, o.seller_id),
-      txn(env, o.buyer_id, {
-        title: `Refund for ${o.item_title}`,
-        subtitle: 'Dobha support settled the problem for you',
-        amount: total,
-        type: 'refund',
-        status: 'Refunded',
-        reference: o.vault_ref,
-      }),
-      notify(env, o.buyer_id, {
-        kind: 'resolved',
-        title: 'You have been refunded',
-        body: `${money(total)} for "${o.item_title}" is back in your wallet.`,
-        orderId,
-        itemId: o.item_id,
-      }),
-      notify(env, o.seller_id, {
-        kind: 'resolved',
-        title: 'Buyer refunded',
-        body: `Dobha support refunded the buyer for "${o.item_title}".`,
-        orderId,
-        itemId: o.item_id,
-      }),
-    ]);
-  }
+  await withDatabase(env.DB, async (db) => {
+    if (outcome === 'release') {
+      const statements = [
+        ...releaseToSeller(db, o, 'Dobha support settled the problem for you'),
+        db.prepare(
+          'INSERT INTO notifications (id, user_id, kind, title, body, order_id, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ).bind(
+          id('ntf'),
+          o.buyer_id,
+          'resolved',
+          'Problem sorted',
+          `Dobha support looked into "${o.item_title}" and paid the seller.`,
+          orderId,
+          o.item_id,
+          now(),
+        ),
+      ];
+      await db.batch(statements);
+    } else {
+      const statements = [
+        db.prepare(
+          'UPDATE wallets SET locked_cents = MAX(locked_cents - ?1, 0), available_cents = available_cents + ?1 WHERE user_id = ?2',
+        ).bind(total, o.buyer_id),
+        db.prepare('UPDATE wallets SET pending_cents = MAX(pending_cents - ?, 0) WHERE user_id = ?').bind(o.amount_cents, o.seller_id),
+        txn(db, o.buyer_id, {
+          title: `Refund for ${o.item_title}`,
+          subtitle: 'Dobha support settled the problem for you',
+          amount: total,
+          type: 'refund',
+          status: 'Refunded',
+          reference: o.vault_ref,
+        }),
+        db.prepare(
+          'INSERT INTO notifications (id, user_id, kind, title, body, order_id, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ).bind(
+          id('ntf'),
+          o.buyer_id,
+          'resolved',
+          'You have been refunded',
+          `${money(total)} for "${o.item_title}" is back in your wallet.`,
+          orderId,
+          o.item_id,
+          now(),
+        ),
+        db.prepare(
+          'INSERT INTO notifications (id, user_id, kind, title, body, order_id, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        ).bind(
+          id('ntf'),
+          o.seller_id,
+          'resolved',
+          'Buyer refunded',
+          `Dobha support refunded the buyer for "${o.item_title}".`,
+          orderId,
+          o.item_id,
+          now(),
+        ),
+      ];
+      await db.batch(statements);
+    }
+  });
   return json({ order: await orderJson(env, await loadOrder(env, orderId), admin.id) });
 }
 
 /** GET /api/wallet */
 export async function wallet(request, env) {
   const user = await requireUser(request, env);
-  const w = (await env.DB.prepare('SELECT * FROM wallets WHERE user_id = ?').bind(user.id).first()) || {};
-  const { results } = await env.DB.prepare('SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 50')
-    .bind(user.id)
-    .all();
+  const [w, { results }] = await withDatabase(env.DB, async (db) => {
+    const w = (await db.prepare('SELECT * FROM wallets WHERE user_id = ?').bind(user.id).first()) || {};
+    const { results } = await db.prepare('SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 50')
+      .bind(user.id)
+      .all();
+    return [w, { results }];
+  });
   return json({
     availableZar: zar(w.available_cents ?? 0),
     lockedZar: zar(w.locked_cents ?? 0),
@@ -427,17 +514,19 @@ export async function topUp(request, env) {
   const body = await readJson(request);
   const amount = rands(body, 'amountZar', { max: 50_000 });
   const method = str(body, 'method', { max: 60 });
-  await env.DB.batch([
-    env.DB.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(amount, user.id),
-    txn(env, user.id, {
-      title: `Top-up (${method})`,
-      subtitle: 'Added to your Dobha wallet',
-      amount,
-      type: 'topup',
-      status: 'Completed',
-      reference: `TOP-${10000 + rand(90000)}`,
-    }),
-  ]);
+  await withDatabase(env.DB, async (db) => {
+    await db.batch([
+      db.prepare('UPDATE wallets SET available_cents = available_cents + ? WHERE user_id = ?').bind(amount, user.id),
+      txn(db, user.id, {
+        title: `Top-up (${method})`,
+        subtitle: 'Added to your Dobha wallet',
+        amount,
+        type: 'topup',
+        status: 'Completed',
+        reference: `TOP-${10000 + rand(90000)}`,
+      }),
+    ]);
+  });
   return wallet(request, env);
 }
 
@@ -448,17 +537,21 @@ export async function withdraw(request, env) {
   const amount = rands(body, 'amountZar');
   const bank = str(body, 'bank', { max: 60 });
   const account = str(body, 'account', { min: 6, max: 20 });
-  const res = await env.DB.prepare('UPDATE wallets SET available_cents = available_cents - ?1 WHERE user_id = ?2 AND available_cents >= ?1')
-    .bind(amount, user.id)
-    .run();
+  const res = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('UPDATE wallets SET available_cents = available_cents - ?1 WHERE user_id = ?2 AND available_cents >= ?1')
+      .bind(amount, user.id)
+      .run();
+  });
   if (!res.meta.changes) throw new HttpError(402, 'Insufficient available balance');
-  await txn(env, user.id, {
-    title: `Withdrawal to ${bank}`,
-    subtitle: `Account ending ${account.slice(-4)}`,
-    amount,
-    type: 'withdrawal',
-    status: 'Processing',
-    reference: `WDR-${10000 + rand(90000)}`,
-  }).run();
+  await withDatabase(env.DB, async (db) => {
+    await txn(db, user.id, {
+      title: `Withdrawal to ${bank}`,
+      subtitle: `Account ending ${account.slice(-4)}`,
+      amount,
+      type: 'withdrawal',
+      status: 'Processing',
+      reference: `WDR-${10000 + rand(90000)}`,
+    }).run();
+  });
   return wallet(request, env);
 }

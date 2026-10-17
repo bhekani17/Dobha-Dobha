@@ -1,5 +1,8 @@
 -- Money is stored in cents (ZAR). Timestamps are Unix milliseconds.
 
+-- Enable pgcrypto for random ID generation
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE users (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,

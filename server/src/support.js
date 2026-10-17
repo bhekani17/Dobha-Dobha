@@ -3,7 +3,7 @@
 import { isAdmin, requireUser } from './auth.js';
 import { HttpError, id, iso, json, limited, now, readJson, str } from './http.js';
 import { canSendEmail, sendEmail } from './mail.js';
-import { notify } from './notifications.js';
+import { withDatabase } from './db-adapter.js';
 
 const TOPICS = ['order', 'payment', 'selling', 'account', 'safety', 'bug', 'other'];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -35,30 +35,38 @@ export async function createRequest(request, env) {
 
   let orderId = str(body, 'orderId', { max: 40, optional: true }) || null;
   if (orderId) {
-    const order = user && (await env.DB.prepare('SELECT id FROM orders WHERE id = ?1 AND (buyer_id = ?2 OR seller_id = ?2)').bind(orderId, user.id).first());
+    const order = user && (await withDatabase(env.DB, async (db) => {
+      return await db.prepare('SELECT id FROM orders WHERE id = ?1 AND (buyer_id = ?2 OR seller_id = ?2)').bind(orderId, user.id).first();
+    }));
     if (!order) orderId = null;
   }
 
-  const open = await env.DB.prepare("SELECT COUNT(*) AS n FROM support_requests WHERE (user_id = ? OR email = ?) AND status = 'open'")
-    .bind(user?.id ?? '', email)
-    .first();
+  const open = await withDatabase(env.DB, async (db) => {
+    return await db.prepare("SELECT COUNT(*) AS n FROM support_requests WHERE (user_id = ? OR email = ?) AND status = 'open'")
+      .bind(user?.id ?? '', email)
+      .first();
+  });
   if (open.n >= MAX_OPEN) throw new HttpError(429, 'You already have several questions waiting. We will answer those first.');
 
   const row = { id: id('sup'), user_id: user?.id ?? null, email, topic, message, order_id: orderId, status: 'open', reply: null, replied_at: null, created_at: now() };
-  await env.DB.prepare(
-    'INSERT INTO support_requests (id, user_id, email, topic, message, order_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-  )
-    .bind(row.id, row.user_id, email, topic, message, orderId, 'open', row.created_at)
-    .run();
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare(
+      'INSERT INTO support_requests (id, user_id, email, topic, message, order_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    )
+      .bind(row.id, row.user_id, email, topic, message, orderId, 'open', row.created_at)
+      .run();
+  });
   return json({ request: requestJson(row) }, 201);
 }
 
 /** GET /api/support: the signed-in user's questions and our answers, newest first. */
 export async function myRequests(request, env) {
   const user = await requireUser(request, env);
-  const { results } = await env.DB.prepare('SELECT * FROM support_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 50')
-    .bind(user.id)
-    .all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM support_requests WHERE user_id = ? ORDER BY created_at DESC LIMIT 50')
+      .bind(user.id)
+      .all();
+  });
   return json({ requests: results.map(requestJson) });
 }
 
@@ -71,10 +79,12 @@ async function requireAdmin(request, env) {
 /** GET /api/admin/support (admins): open questions, oldest first, with who asked. */
 export async function listOpen(request, env) {
   await requireAdmin(request, env);
-  const { results } = await env.DB.prepare(
-    `SELECT s.*, u.name AS user_name, u.handle AS user_handle FROM support_requests s LEFT JOIN users u ON u.id = s.user_id
-     WHERE s.status = 'open' ORDER BY s.created_at LIMIT 200`,
-  ).all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `SELECT s.*, u.name AS user_name, u.handle AS user_handle FROM support_requests s LEFT JOIN users u ON u.id = s.user_id
+       WHERE s.status = 'open' ORDER BY s.created_at LIMIT 200`,
+    ).all();
+  });
   return json({
     requests: results.map((r) => ({
       ...requestJson(r),
@@ -88,22 +98,32 @@ export async function listOpen(request, env) {
 /** POST /api/admin/support/:id/reply { reply } or /close (admins). */
 export async function answer(request, env, requestId, action) {
   await requireAdmin(request, env);
-  const row = await env.DB.prepare('SELECT * FROM support_requests WHERE id = ?').bind(requestId).first();
+  const row = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM support_requests WHERE id = ?').bind(requestId).first();
+  });
   if (!row) throw new HttpError(404, 'Question not found');
   if (row.status !== 'open') throw new HttpError(409, 'This question was already handled');
 
   if (action === 'close') {
-    await env.DB.prepare("UPDATE support_requests SET status = 'closed' WHERE id = ?").bind(row.id).run();
+    await withDatabase(env.DB, async (db) => {
+      await db.prepare("UPDATE support_requests SET status = 'closed' WHERE id = ?").bind(row.id).run();
+    });
     return json({ ok: true });
   }
 
   const reply = str(await readJson(request), 'reply', { min: 2, max: 2000 });
   const t = now();
-  const writes = [env.DB.prepare("UPDATE support_requests SET status = 'answered', reply = ?, replied_at = ? WHERE id = ?").bind(reply, t, row.id)];
-  if (row.user_id) {
-    writes.push(notify(env, row.user_id, { kind: 'support', title: 'Dobha support answered you', body: reply.slice(0, 280), orderId: row.order_id }));
-  }
-  await env.DB.batch(writes);
+  await withDatabase(env.DB, async (db) => {
+    const writes = [db.prepare("UPDATE support_requests SET status = 'answered', reply = ?, replied_at = ? WHERE id = ?").bind(reply, t, row.id)];
+    if (row.user_id) {
+      writes.push(
+        db.prepare(
+          'INSERT INTO notifications (id, user_id, kind, title, body, order_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ).bind(id('ntf'), row.user_id, 'support', 'Dobha support answered you', reply.slice(0, 280), row.order_id, now()),
+      );
+    }
+    await db.batch(writes);
+  });
 
   // Someone who wrote in signed out only has their email; send the answer there when email is set up.
   const emailed = !row.user_id && canSendEmail(env);

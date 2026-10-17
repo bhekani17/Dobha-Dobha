@@ -2,7 +2,7 @@
 import { requireUser } from './auth.js';
 import { HttpError, id, iso, json, limited, now, rands, readJson, str, zar } from './http.js';
 import { ITEM_SELECT, itemJson, loadItem } from './items.js';
-import { notify } from './notifications.js';
+import { withDatabase } from './db-adapter.js';
 
 const OFFER_VALID_MS = 48 * 60 * 60 * 1000;
 const money = (cents) => `R ${(cents / 100).toFixed(0)}`;
@@ -12,11 +12,13 @@ const money = (cents) => `R ${(cents / 100).toFixed(0)}`;
 /** GET /api/cart: pieces in the cart; sold or removed ones come back with `available: false`. */
 export async function getCart(request, env) {
   const user = await requireUser(request, env);
-  const { results } = await env.DB.prepare(
-    `${ITEM_SELECT} JOIN cart_items c ON c.item_id = i.id AND c.user_id = ?1 ORDER BY c.created_at DESC`,
-  )
-    .bind(user.id)
-    .all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `${ITEM_SELECT} JOIN cart_items c ON c.item_id = i.id AND c.user_id = ?1 ORDER BY c.created_at DESC`,
+    )
+      .bind(user.id)
+      .all();
+  });
   return json({ items: results.map((r) => ({ ...itemJson(r), available: r.status === 'available' })) });
 }
 
@@ -27,32 +29,42 @@ export async function addToCart(request, env, itemId) {
   const item = await loadItem(env, itemId, user.id);
   if (item.seller_id === user.id) throw new HttpError(400, "You can't buy your own item");
   if (item.status !== 'available') throw new HttpError(409, 'Someone already bought this piece');
-  const { n } = await env.DB.prepare('SELECT COUNT(*) AS n FROM cart_items WHERE user_id = ?').bind(user.id).first();
+  const { n } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT COUNT(*) AS n FROM cart_items WHERE user_id = ?').bind(user.id).first();
+  });
   if (n >= 30) throw new HttpError(400, 'Your cart is full (30 pieces)');
-  await env.DB.prepare('INSERT OR IGNORE INTO cart_items (user_id, item_id, created_at) VALUES (?, ?, ?)').bind(user.id, itemId, now()).run();
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare('INSERT OR IGNORE INTO cart_items (user_id, item_id, created_at) VALUES (?, ?, ?)').bind(user.id, itemId, now()).run();
+  });
   return getCart(request, env);
 }
 
 /** DELETE /api/cart/:itemId */
 export async function removeFromCart(request, env, itemId) {
   const user = await requireUser(request, env);
-  await env.DB.prepare('DELETE FROM cart_items WHERE user_id = ? AND item_id = ?').bind(user.id, itemId).run();
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare('DELETE FROM cart_items WHERE user_id = ? AND item_id = ?').bind(user.id, itemId).run();
+  });
   return getCart(request, env);
 }
 
 /// ---- Offers ----
 
 async function loadOffer(env, offerId, viewerId) {
-  const o = await env.DB.prepare('SELECT f.*, b.name AS buyer_name FROM offers f JOIN users b ON b.id = f.buyer_id WHERE f.id = ?')
-    .bind(offerId)
-    .first();
+  const o = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT f.*, b.name AS buyer_name FROM offers f JOIN users b ON b.id = f.buyer_id WHERE f.id = ?')
+      .bind(offerId)
+      .first();
+  });
   if (!o || (o.buyer_id !== viewerId && o.seller_id !== viewerId)) throw new HttpError(404, 'Offer not found');
   return o;
 }
 
 /** The offer with its listing, as the app sees it. */
 async function offerJson(env, o, viewerId) {
-  const item = await env.DB.prepare(`${ITEM_SELECT} WHERE i.id = ?2`).bind(viewerId, o.item_id).first();
+  const item = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(`${ITEM_SELECT} WHERE i.id = ?2`).bind(viewerId, o.item_id).first();
+  });
   // An accepted offer past its time can't be used any more.
   const expired = o.status === 'accepted' && o.expires_at && o.expires_at < now();
   return {
@@ -71,12 +83,14 @@ async function offerJson(env, o, viewerId) {
 /** GET /api/offers: offers you made and offers on your listings from the last 30 days, newest first. */
 export async function listOffers(request, env) {
   const user = await requireUser(request, env);
-  const { results } = await env.DB.prepare(
-    `SELECT f.*, b.name AS buyer_name FROM offers f JOIN users b ON b.id = f.buyer_id
-     WHERE (f.buyer_id = ?1 OR f.seller_id = ?1) AND f.updated_at > ?2 ORDER BY f.updated_at DESC LIMIT 100`,
-  )
-    .bind(user.id, now() - 30 * 24 * 60 * 60 * 1000)
-    .all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `SELECT f.*, b.name AS buyer_name FROM offers f JOIN users b ON b.id = f.buyer_id
+       WHERE (f.buyer_id = ?1 OR f.seller_id = ?1) AND f.updated_at > ?2 ORDER BY f.updated_at DESC LIMIT 100`,
+    )
+      .bind(user.id, now() - 30 * 24 * 60 * 60 * 1000)
+      .all();
+  });
   return json({ offers: await Promise.all(results.map((o) => offerJson(env, o, user.id))) });
 }
 
@@ -91,24 +105,33 @@ export async function makeOffer(request, env, itemId) {
   if (amount >= item.price_cents) throw new HttpError(400, `Offer less than the price (${money(item.price_cents)}), or just buy it`);
   if (amount < item.price_cents * 0.3) throw new HttpError(400, 'That offer is too low. Try at least 30% of the price.');
 
-  const open = await env.DB.prepare("SELECT 1 FROM offers WHERE item_id = ? AND buyer_id = ? AND status IN ('pending', 'countered')")
-    .bind(itemId, user.id)
-    .first();
+  const open = await withDatabase(env.DB, async (db) => {
+    return await db.prepare("SELECT 1 FROM offers WHERE item_id = ? AND buyer_id = ? AND status IN ('pending', 'countered')")
+      .bind(itemId, user.id)
+      .first();
+  });
   if (open) throw new HttpError(409, 'You already have an offer waiting on this piece');
 
   const offerId = id('ofr');
   const t = now();
-  await env.DB.batch([
-    env.DB.prepare(
-      "INSERT INTO offers (id, item_id, buyer_id, seller_id, amount_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
-    ).bind(offerId, itemId, user.id, item.seller_id, amount, t, t),
-    notify(env, item.seller_id, {
-      kind: 'offer',
-      title: `Offer on "${item.title}"`,
-      body: `${user.name} offered ${money(amount)} (listed at ${money(item.price_cents)}). Answer it in Orders.`,
-      itemId,
-    }),
-  ]);
+  await withDatabase(env.DB, async (db) => {
+    await db.batch([
+      db.prepare(
+        "INSERT INTO offers (id, item_id, buyer_id, seller_id, amount_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)",
+      ).bind(offerId, itemId, user.id, item.seller_id, amount, t, t),
+      db.prepare(
+        'INSERT INTO notifications (id, user_id, kind, title, body, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      ).bind(
+        id('ntf'),
+        item.seller_id,
+        'offer',
+        `Offer on "${item.title}"`,
+        `${user.name} offered ${money(amount)} (listed at ${money(item.price_cents)}). Answer it in Orders.`,
+        itemId,
+        now(),
+      ),
+    ]);
+  });
   return json({ offer: await offerJson(env, await loadOffer(env, offerId, user.id), user.id) }, 201);
 }
 
@@ -120,18 +143,28 @@ export async function makeOffer(request, env, itemId) {
 export async function respondToOffer(request, env, offerId, action) {
   const user = await requireUser(request, env);
   const o = await loadOffer(env, offerId, user.id);
-  const item = await env.DB.prepare('SELECT title, price_cents, status FROM items WHERE id = ?').bind(o.item_id).first();
+  const item = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT title, price_cents, status FROM items WHERE id = ?').bind(o.item_id).first();
+  });
   if (item.status !== 'available') throw new HttpError(409, 'This piece has already been sold');
   const isSeller = o.seller_id === user.id;
   const t = now();
 
   const move = async (status, amount = o.amount_cents) => {
-    const res = await env.DB.prepare('UPDATE offers SET status = ?, amount_cents = ?, updated_at = ?, expires_at = ? WHERE id = ? AND status = ?')
-      .bind(status, amount, t, status === 'accepted' ? t + OFFER_VALID_MS : null, offerId, o.status)
-      .run();
+    const res = await withDatabase(env.DB, async (db) => {
+      return await db.prepare('UPDATE offers SET status = ?, amount_cents = ?, updated_at = ?, expires_at = ? WHERE id = ? AND status = ?')
+        .bind(status, amount, t, status === 'accepted' ? t + OFFER_VALID_MS : null, offerId, o.status)
+        .run();
+    });
     if (!res.meta.changes) throw new HttpError(409, 'This offer has already changed, pull to refresh');
   };
-  const tell = (to, kind, title, body) => notify(env, to, { kind, title, body, itemId: o.item_id }).run();
+  const tell = async (to, kind, title, body) => {
+    await withDatabase(env.DB, async (db) => {
+      await db.prepare(
+        'INSERT INTO notifications (id, user_id, kind, title, body, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      ).bind(id('ntf'), to, kind, title, body, o.item_id, now()).run();
+    });
+  };
 
   if (isSeller && o.status === 'pending' && action === 'accept') {
     await move('accepted');
@@ -169,14 +202,16 @@ export async function respondToOffer(request, env, offerId, action) {
 // Anyone can follow anyone. In the follows table, seller_id is the person being followed.
 
 async function profileJson(env, profile, viewerId) {
-  const [stats, rating, followers, following, iFollow, followsMe] = await env.DB.batch([
-    env.DB.prepare("SELECT COUNT(*) AS n FROM orders WHERE seller_id = ? AND status = 'payoutReleased'").bind(profile.id),
-    env.DB.prepare('SELECT ROUND(AVG(rating), 1) AS avg, COUNT(*) AS n FROM reviews WHERE seller_id = ?').bind(profile.id),
-    env.DB.prepare('SELECT COUNT(*) AS n FROM follows WHERE seller_id = ?').bind(profile.id),
-    env.DB.prepare('SELECT COUNT(*) AS n FROM follows WHERE follower_id = ?').bind(profile.id),
-    env.DB.prepare('SELECT 1 AS yes FROM follows WHERE follower_id = ? AND seller_id = ?').bind(viewerId, profile.id),
-    env.DB.prepare('SELECT 1 AS yes FROM follows WHERE follower_id = ? AND seller_id = ?').bind(profile.id, viewerId),
-  ]);
+  const [stats, rating, followers, following, iFollow, followsMe] = await withDatabase(env.DB, async (db) => {
+    return await db.batch([
+      db.prepare("SELECT COUNT(*) AS n FROM orders WHERE seller_id = ? AND status = 'payoutReleased'").bind(profile.id),
+      db.prepare('SELECT ROUND(AVG(rating), 1) AS avg, COUNT(*) AS n FROM reviews WHERE seller_id = ?').bind(profile.id),
+      db.prepare('SELECT COUNT(*) AS n FROM follows WHERE seller_id = ?').bind(profile.id),
+      db.prepare('SELECT COUNT(*) AS n FROM follows WHERE follower_id = ?').bind(profile.id),
+      db.prepare('SELECT 1 AS yes FROM follows WHERE follower_id = ? AND seller_id = ?').bind(viewerId, profile.id),
+      db.prepare('SELECT 1 AS yes FROM follows WHERE follower_id = ? AND seller_id = ?').bind(profile.id, viewerId),
+    ]);
+  });
   return {
     id: profile.id,
     name: profile.name,
@@ -217,16 +252,20 @@ const personJson = (u, viewerId) => ({
 /** GET /api/users/:id: anyone's page; sellers also show their listings and reviews. */
 export async function getProfile(request, env, userId) {
   const user = await requireUser(request, env);
-  const profile = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  const profile = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  });
   if (!profile) throw new HttpError(404, 'User not found');
-  const [{ results: items }, { results: reviews }] = await env.DB.batch([
-    env.DB.prepare(`${ITEM_SELECT} WHERE i.seller_id = ?2 AND i.status = 'available' ORDER BY i.created_at DESC LIMIT 60`).bind(user.id, userId),
-    env.DB.prepare(
-      `SELECT r.rating, r.text, r.created_at, b.name AS buyer_name, i.title AS item_title
-       FROM reviews r JOIN users b ON b.id = r.buyer_id JOIN orders o ON o.id = r.order_id JOIN items i ON i.id = o.item_id
-       WHERE r.seller_id = ? ORDER BY r.created_at DESC LIMIT 30`,
-    ).bind(userId),
-  ]);
+  const [{ results: items }, { results: reviews }] = await withDatabase(env.DB, async (db) => {
+    return await db.batch([
+      db.prepare(`${ITEM_SELECT} WHERE i.seller_id = ?2 AND i.status = 'available' ORDER BY i.created_at DESC LIMIT 60`).bind(user.id, userId),
+      db.prepare(
+        `SELECT r.rating, r.text, r.created_at, b.name AS buyer_name, i.title AS item_title
+         FROM reviews r JOIN users b ON b.id = r.buyer_id JOIN orders o ON o.id = r.order_id JOIN items i ON i.id = o.item_id
+         WHERE r.seller_id = ? ORDER BY r.created_at DESC LIMIT 30`,
+      ).bind(userId),
+    ]);
+  });
   return json({
     profile: await profileJson(env, profile, user.id),
     items: items.map(itemJson),
@@ -238,11 +277,13 @@ export async function getProfile(request, env, userId) {
 export async function followList(request, env, userId, which) {
   const user = await requireUser(request, env);
   const [join, match] = which === 'followers' ? ['f.follower_id', 'f.seller_id'] : ['f.seller_id', 'f.follower_id'];
-  const { results } = await env.DB.prepare(
-    `SELECT ${personSql('?1')} FROM follows f JOIN users u ON u.id = ${join} WHERE ${match} = ?2 ORDER BY f.created_at DESC LIMIT 200`,
-  )
-    .bind(user.id, userId)
-    .all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `SELECT ${personSql('?1')} FROM follows f JOIN users u ON u.id = ${join} WHERE ${match} = ?2 ORDER BY f.created_at DESC LIMIT 200`,
+    )
+      .bind(user.id, userId)
+      .all();
+  });
   return json({ users: results.map((u) => personJson(u, user.id)) });
 }
 
@@ -251,14 +292,16 @@ export async function searchPeople(request, env) {
   const user = await requireUser(request, env);
   const q = (new URL(request.url).searchParams.get('q') || '').trim().replace(/^@/, '').toLowerCase().slice(0, 40);
   if (q.length < 2) return json({ users: [] });
-  const { results } = await env.DB.prepare(
-    `SELECT ${personSql('?1')} FROM users u
-     WHERE u.deleted_at IS NULL AND instr(lower(u.name || ' ' || u.handle || ' ' || u.shop_name), ?2) > 0
-     ORDER BY (lower(u.handle) = ?2) DESC, u.role = 'vendor' DESC, u.created_at LIMIT 20`,
-  )
-    .bind(user.id, q)
-    .all();
-  return json({ users: results.map((u) => personJson(u, user.id)) });
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `SELECT ${personSql('?1')} FROM users u
+       WHERE u.deleted_at IS NULL AND instr(lower(u.name || ' ' || u.handle || ' ' || u.shop_name), ?2) > 0
+       ORDER BY (lower(u.handle) = ?2) DESC, u.role = 'vendor' DESC, u.created_at LIMIT 20`,
+    )
+      .bind(user.id, q)
+      .all();
+  });
+  return json({ users: results.map((u) => personJson(u, user.id)) );
 }
 
 /** POST or DELETE /api/users/:id/follow */
@@ -266,26 +309,41 @@ export async function follow(request, env, userId) {
   const user = await requireUser(request, env);
   await limited(env.ACTION_LIMIT, request, user.id);
   if (userId === user.id) throw new HttpError(400, "You can't follow yourself");
-  const profile = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  const profile = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  });
   if (!profile) throw new HttpError(404, 'User not found');
   if (request.method === 'DELETE') {
-    await env.DB.prepare('DELETE FROM follows WHERE follower_id = ? AND seller_id = ?').bind(user.id, userId).run();
+    await withDatabase(env.DB, async (db) => {
+      await db.prepare('DELETE FROM follows WHERE follower_id = ? AND seller_id = ?').bind(user.id, userId).run();
+    });
   } else {
-    const res = await env.DB.prepare('INSERT OR IGNORE INTO follows (follower_id, seller_id, created_at) VALUES (?, ?, ?)')
-      .bind(user.id, userId, now())
-      .run();
+    const res = await withDatabase(env.DB, async (db) => {
+      return await db.prepare('INSERT OR IGNORE INTO follows (follower_id, seller_id, created_at) VALUES (?, ?, ?)')
+        .bind(user.id, userId, now())
+        .run();
+    });
     // Only a brand-new follow is announced, so following and unfollowing again doesn't spam.
-    const recent = await env.DB.prepare(
-      "SELECT 1 FROM notifications WHERE user_id = ? AND kind = 'follow' AND body LIKE ? AND created_at > ?",
-    )
-      .bind(userId, `%@${user.handle}%`, now() - 24 * 60 * 60 * 1000)
-      .first();
+    const recent = await withDatabase(env.DB, async (db) => {
+      return await db.prepare(
+        "SELECT 1 FROM notifications WHERE user_id = ? AND kind = 'follow' AND body LIKE ? AND created_at > ?",
+      )
+        .bind(userId, `%@${user.handle}%`, now() - 24 * 60 * 60 * 1000)
+        .first();
+    });
     if (res.meta.changes && !recent) {
-      await notify(env, userId, {
-        kind: 'follow',
-        title: `${user.shop_name || user.name} followed you`,
-        body: `@${user.handle} will see your new listings. Follow back from their profile.`,
-      }).run();
+      await withDatabase(env.DB, async (db) => {
+        await db.prepare(
+          'INSERT INTO notifications (id, user_id, kind, title, body, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+        ).bind(
+          id('ntf'),
+          userId,
+          'follow',
+          `${user.shop_name || user.name} followed you`,
+          `@${user.handle} will see your new listings. Follow back from their profile.`,
+          now(),
+        ).run();
+      });
     }
   }
   return json({ profile: await profileJson(env, profile, user.id) });
@@ -296,26 +354,37 @@ export async function follow(request, env, userId) {
 /** POST /api/orders/:id/review { rating: 1-5, text? } (the buyer, once the order is done) */
 export async function reviewOrder(request, env, orderId) {
   const user = await requireUser(request, env);
-  const o = await env.DB.prepare('SELECT o.*, i.title FROM orders o JOIN items i ON i.id = o.item_id WHERE o.id = ?').bind(orderId).first();
+  const o = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT o.*, i.title FROM orders o JOIN items i ON i.id = o.item_id WHERE o.id = ?').bind(orderId).first();
+  });
   if (!o || o.buyer_id !== user.id) throw new HttpError(404, 'Order not found');
   if (o.status !== 'payoutReleased') throw new HttpError(409, 'You can rate the seller once you have confirmed you got it');
   const body = await readJson(request);
   const rating = Number(body.rating);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, 'Pick 1 to 5 stars');
   const text = str(body, 'text', { max: 300, optional: true });
-  const res = await env.DB.prepare(
-    'INSERT OR IGNORE INTO reviews (order_id, seller_id, buyer_id, rating, text, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-  )
-    .bind(orderId, o.seller_id, user.id, rating, text, now())
-    .run();
+  const res = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      'INSERT OR IGNORE INTO reviews (order_id, seller_id, buyer_id, rating, text, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    )
+      .bind(orderId, o.seller_id, user.id, rating, text, now())
+      .run();
+  });
   if (!res.meta.changes) throw new HttpError(409, 'You already rated this order');
-  await notify(env, o.seller_id, {
-    kind: 'review',
-    title: `${rating} star${rating === 1 ? '' : 's'} from ${user.name}`,
-    body: text ? `"${text}" (${o.title})` : `For "${o.title}".`,
-    orderId,
-    itemId: o.item_id,
-  }).run();
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare(
+      'INSERT INTO notifications (id, user_id, kind, title, body, order_id, item_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).bind(
+      id('ntf'),
+      o.seller_id,
+      'review',
+      `${rating} star${rating === 1 ? '' : 's'} from ${user.name}`,
+      text ? `"${text}" (${o.title})` : `For "${o.title}".`,
+      orderId,
+      o.item_id,
+      now(),
+    ).run();
+  });
   return json({ ok: true });
 }
 
@@ -324,22 +393,24 @@ export async function reviewOrder(request, env, orderId) {
 /** GET /api/chats: one row per person you have messaged, latest first, with unread counts. */
 export async function listChats(request, env) {
   const user = await requireUser(request, env);
-  const { results } = await env.DB.prepare(
-    `WITH mine AS (
-       SELECT CASE WHEN sender_id = ?1 THEN recipient_id ELSE sender_id END AS other_id, text, created_at, sender_id, read_at, recipient_id
-       FROM messages WHERE sender_id = ?1 OR recipient_id = ?1
-     ),
-     latest AS (
-       SELECT other_id, MAX(created_at) AS at FROM mine GROUP BY other_id
-     )
-     SELECT l.other_id, l.at, m.text, m.sender_id,
-       (SELECT COUNT(*) FROM messages x WHERE x.sender_id = l.other_id AND x.recipient_id = ?1 AND x.read_at IS NULL) AS unread,
-       u.name, u.handle, u.shop_name, u.avatar_key
-     FROM latest l JOIN mine m ON m.other_id = l.other_id AND m.created_at = l.at JOIN users u ON u.id = l.other_id
-     GROUP BY l.other_id ORDER BY l.at DESC LIMIT 100`,
-  )
-    .bind(user.id)
-    .all();
+  const { results } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `WITH mine AS (
+         SELECT CASE WHEN sender_id = ?1 THEN recipient_id ELSE sender_id END AS other_id, text, created_at, sender_id, read_at, recipient_id
+         FROM messages WHERE sender_id = ?1 OR recipient_id = ?1
+       ),
+       latest AS (
+         SELECT other_id, MAX(created_at) AS at FROM mine GROUP BY other_id
+       )
+       SELECT l.other_id, l.at, m.text, m.sender_id,
+         (SELECT COUNT(*) FROM messages x WHERE x.sender_id = l.other_id AND x.recipient_id = ?1 AND x.read_at IS NULL) AS unread,
+         u.name, u.handle, u.shop_name, u.avatar_key
+       FROM latest l JOIN mine m ON m.other_id = l.other_id AND m.created_at = l.at JOIN users u ON u.id = l.other_id
+       GROUP BY l.other_id ORDER BY l.at DESC LIMIT 100`,
+    )
+      .bind(user.id)
+      .all();
+  });
   return json({
     chats: results.map((c) => ({
       userId: c.other_id,
@@ -357,17 +428,21 @@ export async function listChats(request, env) {
 /** GET /api/chats/:userId: the conversation (latest 200 messages); marks theirs as read. */
 export async function getChat(request, env, otherId) {
   const user = await requireUser(request, env);
-  const other = await env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(otherId).first();
+  const other = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM users WHERE id = ?').bind(otherId).first();
+  });
   if (!other) throw new HttpError(404, 'User not found');
-  const [{ results }] = await env.DB.batch([
-    env.DB.prepare(
-      `SELECT m.*, i.title AS item_title, i.price_cents AS item_price, i.photo_key AS item_photo FROM messages m
-       LEFT JOIN items i ON i.id = m.item_id
-       WHERE (m.sender_id = ?1 AND m.recipient_id = ?2) OR (m.sender_id = ?2 AND m.recipient_id = ?1)
-       ORDER BY m.created_at DESC LIMIT 200`,
-    ).bind(user.id, otherId),
-    env.DB.prepare('UPDATE messages SET read_at = ? WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL').bind(now(), otherId, user.id),
-  ]);
+  const [{ results }] = await withDatabase(env.DB, async (db) => {
+    return await db.batch([
+      db.prepare(
+        `SELECT m.*, i.title AS item_title, i.price_cents AS item_price, i.photo_key AS item_photo FROM messages m
+         LEFT JOIN items i ON i.id = m.item_id
+         WHERE (m.sender_id = ?1 AND m.recipient_id = ?2) OR (m.sender_id = ?2 AND m.recipient_id = ?1)
+         ORDER BY m.created_at DESC LIMIT 200`,
+      ).bind(user.id, otherId),
+      db.prepare('UPDATE messages SET read_at = ? WHERE sender_id = ? AND recipient_id = ? AND read_at IS NULL').bind(now(), otherId, user.id),
+    ]);
+  });
   return json({
     with: {
       userId: other.id,
@@ -392,21 +467,27 @@ export async function sendMessage(request, env, otherId) {
   const user = await requireUser(request, env);
   await limited(env.ACTION_LIMIT, request, user.id);
   if (otherId === user.id) throw new HttpError(400, "You can't message yourself");
-  const other = await env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(otherId).first();
+  const other = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT id FROM users WHERE id = ?').bind(otherId).first();
+  });
   if (!other) throw new HttpError(404, 'User not found');
   const body = await readJson(request);
   const text = str(body, 'text', { max: 1000 });
   const itemId = typeof body.itemId === 'string' && body.itemId ? body.itemId.slice(0, 40) : null;
   if (itemId) await loadItem(env, itemId, user.id);
   const msgId = id('msg');
-  await env.DB.prepare('INSERT INTO messages (id, sender_id, recipient_id, item_id, text, created_at) VALUES (?, ?, ?, ?, ?, ?)')
-    .bind(msgId, user.id, otherId, itemId, text, now())
-    .run();
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare('INSERT INTO messages (id, sender_id, recipient_id, item_id, text, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .bind(msgId, user.id, otherId, itemId, text, now())
+      .run();
+  });
   return json({ ok: true, id: msgId }, 201);
 }
 
 /** Unread messages across all chats, for the app's badge. */
 export async function unreadMessages(env, userId) {
-  const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM messages WHERE recipient_id = ? AND read_at IS NULL').bind(userId).first();
+  const row = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT COUNT(*) AS n FROM messages WHERE recipient_id = ? AND read_at IS NULL').bind(userId).first();
+  });
   return row?.n ?? 0;
 }

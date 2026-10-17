@@ -4,6 +4,7 @@ import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 
 import { optionalUser, requireUser } from './auth.js';
 import { HttpError, json, limited } from './http.js';
+import { withDatabase } from './db-adapter.js';
 
 const ROOM_RE = /^[a-zA-Z0-9_-]{1,40}$/;
 const ROOMS_CACHE_MS = 3000;
@@ -67,11 +68,13 @@ export async function rooms(request, env) {
   const ids = [...new Set(live.map((r) => r.hostId).filter(Boolean))];
   const hosts = new Map();
   if (ids.length) {
-    const { results } = await env.DB.prepare(
-      `SELECT id, name, shop_name, avatar_key FROM users WHERE id IN (${ids.map(() => '?').join(',')})`,
-    )
-      .bind(...ids)
-      .all();
+    const { results } = await withDatabase(env.DB, async (db) => {
+      return await db.prepare(
+        `SELECT id, name, shop_name, avatar_key FROM users WHERE id IN (${ids.map(() => '?').join(',')})`,
+      )
+        .bind(...ids)
+        .all();
+    });
     for (const u of results) hosts.set(u.id, u);
   }
   return json(

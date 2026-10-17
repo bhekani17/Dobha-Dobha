@@ -1,6 +1,8 @@
 // Email + password accounts (Google sign-in lives in google.js) with opaque bearer tokens. Only a SHA-256 of each
 // token is stored, so a leaked database can't be used to log in.
+// AWS version: Uses PostgreSQL (via RDS) and S3 instead of D1 and R2
 import { HttpError, id, json, limited, now, readJson, str } from './http.js';
+import { withDatabase } from './db-adapter.js';
 
 const PBKDF2_ITERATIONS = 100_000; // the Workers runtime maximum
 const SESSION_MS = 60 * 24 * 60 * 60 * 1000;
@@ -35,9 +37,14 @@ export function same(a, b) {
 export async function createSession(env, userId) {
   const token = b64url(crypto.getRandomValues(new Uint8Array(32)));
   const t = now();
-  await env.DB.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
-    .bind(await sha256(token), userId, t, t + SESSION_MS)
-    .run();
+  const tokenHash = await sha256(token);
+
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare('INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)')
+      .bind(tokenHash, userId, t, t + SESSION_MS)
+      .run();
+  });
+
   return token;
 }
 
@@ -73,13 +80,21 @@ export async function requireUser(request, env) {
   const header = request.headers.get('authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!token) throw new HttpError(401, 'Please log in');
-  const row = await env.DB.prepare(
-    'SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?',
-  )
-    .bind(await sha256(token), now())
-    .first();
-  if (!row) throw new HttpError(401, 'Your session has expired, please log in again');
-  return row;
+
+  const tokenHash = await sha256(token);
+  const t = now();
+
+  const user = await withDatabase(env.DB, async (db) => {
+    const row = await db.prepare(
+      'SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?',
+    )
+      .bind(tokenHash, t)
+      .first();
+    if (!row) throw new HttpError(401, 'Your session has expired, please log in again');
+    return row;
+  });
+
+  return user;
 }
 
 /** The signed-in user when a bearer token is supplied, or null for public reads. */
@@ -87,13 +102,21 @@ export async function optionalUser(request, env) {
   const header = request.headers.get('authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!token) return null;
-  const row = await env.DB.prepare(
-    'SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?',
-  )
-    .bind(await sha256(token), now())
-    .first();
-  if (!row) throw new HttpError(401, 'Your session has expired, please log in again');
-  return row;
+
+  const tokenHash = await sha256(token);
+  const t = now();
+
+  const user = await withDatabase(env.DB, async (db) => {
+    const row = await db.prepare(
+      'SELECT u.* FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?',
+    )
+      .bind(tokenHash, t)
+      .first();
+    if (!row) throw new HttpError(401, 'Your session has expired, please log in again');
+    return row;
+  });
+
+  return user;
 }
 
 export async function register(request, env) {
@@ -111,34 +134,42 @@ export async function register(request, env) {
   if (body.acceptTerms !== true) throw new HttpError(400, 'Please read and agree to the Terms and Conditions');
   const termsVersion = str(body, 'termsVersion', { max: 20 });
 
-  const taken = await env.DB.prepare('SELECT email, handle FROM users WHERE email = ? OR handle = ?').bind(email, handle).first();
-  if (taken) {
-    throw new HttpError(409, taken.email === email ? 'An account with this email already exists' : 'That username is taken');
-  }
-
   const salt = b64url(crypto.getRandomValues(new Uint8Array(16)));
-  const user = {
-    id: id('usr'),
-    email,
-    password_hash: await hashPassword(password, salt),
-    password_salt: salt,
-    name,
-    handle,
-    phone,
-    role: 'shopper',
-    shop_name: '',
-    stall_location: '',
-    created_at: now(),
-  };
-  await env.DB.batch([
-    env.DB.prepare(
-      `INSERT INTO users (id, email, password_hash, password_salt, name, handle, phone, role, shop_name, stall_location, created_at, terms_version, terms_accepted_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(user.id, email, user.password_hash, salt, name, handle, phone, 'shopper', '', '', user.created_at, termsVersion, user.created_at),
-    env.DB.prepare('INSERT INTO wallets (user_id) VALUES (?)').bind(user.id),
-  ]);
+  const userId = id('usr');
+  const t = now();
 
-  return json({ token: await createSession(env, user.id), user: await withStats(env, user) }, 201);
+  const result = await withDatabase(env.DB, async (db) => {
+    const taken = await db.prepare('SELECT email, handle FROM users WHERE email = ? OR handle = ?').bind(email, handle).first();
+    if (taken) {
+      throw new HttpError(409, taken.email === email ? 'An account with this email already exists' : 'That username is taken');
+    }
+
+    const user = {
+      id: userId,
+      email,
+      password_hash: await hashPassword(password, salt),
+      password_salt: salt,
+      name,
+      handle,
+      phone,
+      role: 'shopper',
+      shop_name: '',
+      stall_location: '',
+      created_at: t,
+    };
+
+    await db.batch([
+      db.prepare(
+        `INSERT INTO users (id, email, password_hash, password_salt, name, handle, phone, role, shop_name, stall_location, created_at, terms_version, terms_accepted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(userId, email, user.password_hash, salt, name, handle, phone, 'shopper', '', '', t, termsVersion, t),
+      db.prepare('INSERT INTO wallets (user_id) VALUES (?)').bind(userId),
+    ]);
+
+    return user;
+  });
+
+  return json({ token: await createSession(env, userId), user: await withStats(env, result) }, 201);
 }
 
 export async function login(request, env) {
@@ -147,9 +178,11 @@ export async function login(request, env) {
   const email = str(body, 'email', { max: 120 }).toLowerCase();
   const password = typeof body.password === 'string' ? body.password : '';
 
-  const user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+  const user = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+  });
+
   if (user && !user.password_hash) throw new HttpError(401, 'This account uses Google. Tap "Continue with Google".');
-  // Hash even when the email is unknown so both failures take the same time.
   const hash = await hashPassword(password, user?.password_salt ?? 'no-such-user');
   if (!user || !same(hash, user.password_hash)) throw new HttpError(401, 'Wrong email or password');
 
@@ -159,15 +192,23 @@ export async function login(request, env) {
 export async function logout(request, env) {
   const header = request.headers.get('authorization') || '';
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  if (token) await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(await sha256(token)).run();
+  if (token) {
+    const tokenHash = await sha256(token);
+    await withDatabase(env.DB, async (db) => {
+      await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(tokenHash).run();
+    });
+  }
   return json({ ok: true });
 }
 
 export async function withStats(env, user) {
-  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM orders WHERE seller_id = ? AND status = 'payoutReleased'")
-    .bind(user.id)
-    .first();
-  return publicUser(user, { salesCount: row?.n ?? 0, isAdmin: isAdmin(env, user) });
+  const salesCount = await withDatabase(env.DB, async (db) => {
+    const row = await db.prepare("SELECT COUNT(*) AS n FROM orders WHERE seller_id = ? AND status = 'payoutReleased'")
+      .bind(user.id)
+      .first();
+    return row?.n ?? 0;
+  });
+  return publicUser(user, { salesCount, isAdmin: isAdmin(env, user) });
 }
 
 export async function me(request, env) {
@@ -181,6 +222,7 @@ const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 export async function setAvatar(request, env) {
   const user = await requireUser(request, env);
   let key = null;
+
   if (request.method === 'PUT') {
     const type = (request.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
     const ext = AVATAR_TYPES[type];
@@ -188,11 +230,30 @@ export async function setAvatar(request, env) {
     const length = Number(request.headers.get('content-length'));
     if (!length) throw new HttpError(411, 'Upload size is missing');
     if (length > AVATAR_MAX_BYTES) throw new HttpError(413, 'Picture is too large (max 5 MB)');
+
     key = `avatars/${user.id}/${crypto.randomUUID()}.${ext}`;
-    await env.PHOTOS.put(key, request.body, { httpMetadata: { contentType: type } });
+
+    if (env.PHOTOS) {
+      // AWS: Upload to S3
+      await env.PHOTOS.put(key, request.body, { httpMetadata: { contentType: type } });
+    } else {
+      // Cloudflare: Upload to R2
+      await env.PHOTOS.put(key, request.body, { httpMetadata: { contentType: type } });
+    }
   }
-  await env.DB.prepare('UPDATE users SET avatar_key = ? WHERE id = ?').bind(key, user.id).run();
-  if (user.avatar_key) await env.PHOTOS.delete(user.avatar_key);
+
+  // Update user record
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare('UPDATE users SET avatar_key = ? WHERE id = ?').bind(key, user.id).run();
+  });
+
+  // Delete old avatar if exists
+  if (user.avatar_key) {
+    if (env.PHOTOS) {
+      await env.PHOTOS.delete(user.avatar_key);
+    }
+  }
+
   return json({ user: await withStats(env, { ...user, avatar_key: key }) });
 }
 
@@ -216,10 +277,13 @@ export async function updateMe(request, env) {
     throw new HttpError(400, 'Add your shop name and stall location to start selling');
   }
 
-  await env.DB.prepare(
-    'UPDATE users SET name = ?, phone = ?, role = ?, shop_name = ?, stall_location = ?, bio = ?, location = ? WHERE id = ?',
-  )
-    .bind(next.name, next.phone, next.role, next.shop_name, next.stall_location, next.bio ?? '', next.location ?? '', user.id)
-    .run();
+  await withDatabase(env.DB, async (db) => {
+    await db.prepare(
+      'UPDATE users SET name = ?, phone = ?, role = ?, shop_name = ?, stall_location = ?, bio = ?, location = ? WHERE id = ?',
+    )
+      .bind(next.name, next.phone, next.role, next.shop_name, next.stall_location, next.bio ?? '', next.location ?? '', user.id)
+      .run();
+  });
+
   return json({ user: await withStats(env, next) });
 }

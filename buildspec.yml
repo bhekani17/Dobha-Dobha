@@ -6,6 +6,7 @@ env:
     SAM_CLI_TELEMETRY: "0"
     STACK_NAME: dobha-marketplace-prototype-dev
     SAM_BUCKET: dobha-sam-artifacts-807701355530-af-south-1
+    TEMPLATE_FILE: server/infrastructure/template.yaml
 
 phases:
   install:
@@ -25,11 +26,11 @@ phases:
           aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION"
           echo "Dead stack deleted successfully."
         fi
-      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server/marketplace-prototype" ci
-      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server/marketplace-prototype" test
+      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server" ci
+      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server" test
   build:
     commands:
-      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam validate --template-file server/marketplace-prototype/template.yaml
-      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam build --template-file server/marketplace-prototype/template.yaml --build-dir .aws-sam/build
+      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam validate --template-file $TEMPLATE_FILE
+      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam build --template-file $TEMPLATE_FILE --build-dir .aws-sam/build
       - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam deploy --template-file .aws-sam/build/template.yaml --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION" --s3-bucket "$SAM_BUCKET" --s3-prefix "$STACK_NAME" --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides Stage=dev AllowedOrigin='*'
 

@@ -3,6 +3,7 @@
 // linking their Dobha account by Google id or verified email.
 import { createSession, withStats } from './auth.js';
 import { HttpError, id, json, limited, now, readJson, str } from './http.js';
+import { withDatabase } from './db-adapter.js';
 
 const JWKS_URL = 'https://www.googleapis.com/oauth2/v3/certs';
 const ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
@@ -61,7 +62,10 @@ async function freeHandle(env, email) {
   const base = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 14).padEnd(3, '0');
   for (let i = 0; i < 5; i++) {
     const handle = i === 0 ? base : `${base}${Math.floor(1000 + Math.random() * 9000)}`;
-    if (!(await env.DB.prepare('SELECT 1 FROM users WHERE handle = ?').bind(handle).first())) return handle;
+    const existing = await withDatabase(env.DB, async (db) => {
+      return await db.prepare('SELECT 1 FROM users WHERE handle = ?').bind(handle).first();
+    });
+    if (!existing) return handle;
   }
   return `user${crypto.randomUUID().replaceAll('-', '').slice(0, 12)}`;
 }
@@ -75,16 +79,22 @@ export async function googleSignIn(request, env) {
   const termsVersion = str(body, 'termsVersion', { max: 20, optional: true }) || null;
   const email = claims.email.toLowerCase();
 
-  let user = await env.DB.prepare('SELECT * FROM users WHERE google_sub = ?').bind(claims.sub).first();
+  let user = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM users WHERE google_sub = ?').bind(claims.sub).first();
+  });
   if (!user) {
     // Google has verified this email, so the account is theirs. Registration never verified it, though, so
     // someone else may have signed up with it first: drop that password and its sessions so they're locked out.
-    user = await env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+    user = await withDatabase(env.DB, async (db) => {
+      return await db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+    });
     if (user) {
-      await env.DB.batch([
-        env.DB.prepare("UPDATE users SET google_sub = ?, password_hash = '', password_salt = '' WHERE id = ?").bind(claims.sub, user.id),
-        env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
-      ]);
+      await withDatabase(env.DB, async (db) => {
+        await db.batch([
+          db.prepare("UPDATE users SET google_sub = ?, password_hash = '', password_salt = '' WHERE id = ?").bind(claims.sub, user.id),
+          db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
+        ]);
+      });
     }
   }
 
@@ -102,14 +112,16 @@ export async function googleSignIn(request, env) {
       stall_location: '',
       created_at: now(),
     };
-    await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO users (id, email, password_hash, password_salt, name, handle, phone, role, shop_name, stall_location, created_at, google_sub,
-           terms_version, terms_accepted_at)
-         VALUES (?, ?, '', '', ?, ?, '', 'shopper', '', '', ?, ?, ?, ?)`,
-      ).bind(user.id, email, user.name, user.handle, user.created_at, claims.sub, termsVersion, termsVersion ? user.created_at : null),
-      env.DB.prepare('INSERT INTO wallets (user_id) VALUES (?)').bind(user.id),
-    ]);
+    await withDatabase(env.DB, async (db) => {
+      await db.batch([
+        db.prepare(
+          `INSERT INTO users (id, email, password_hash, password_salt, name, handle, phone, role, shop_name, stall_location, created_at, google_sub,
+             terms_version, terms_accepted_at)
+           VALUES (?, ?, '', '', ?, ?, '', 'shopper', '', '', ?, ?, ?, ?)`,
+        ).bind(user.id, email, user.name, user.handle, user.created_at, claims.sub, termsVersion, termsVersion ? user.created_at : null),
+        db.prepare('INSERT INTO wallets (user_id) VALUES (?)').bind(user.id),
+      ]);
+    });
     created = true;
   }
 

@@ -2,6 +2,7 @@
 import { b64url, createSession, hashPassword, requireUser, same, sha256, withStats } from './auth.js';
 import { HttpError, json, limited, now, readJson, str } from './http.js';
 import { canSendEmail, sendEmail } from './mail.js';
+import { withDatabase } from './db-adapter.js';
 
 const CODE_MS = 15 * 60 * 1000;
 const WINDOW_MS = 60 * 60 * 1000;
@@ -40,22 +41,28 @@ export async function forgotPassword(request, env) {
   // Say so up front, whether or not the email has an account, so the app can offer support instead.
   if (!canSendEmail(env)) throw new HttpError(503, 'Password reset by email is not available yet');
 
-  const user = await env.DB.prepare('SELECT id, email FROM users WHERE email = ? AND deleted_at IS NULL').bind(email).first();
+  const user = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT id, email FROM users WHERE email = ? AND deleted_at IS NULL').bind(email).first();
+  });
   if (user) {
     const t = now();
-    const prev = await env.DB.prepare('SELECT sent_count, window_start FROM password_resets WHERE user_id = ?').bind(user.id).first();
+    const prev = await withDatabase(env.DB, async (db) => {
+      return await db.prepare('SELECT sent_count, window_start FROM password_resets WHERE user_id = ?').bind(user.id).first();
+    });
     const inWindow = prev && t - prev.window_start < WINDOW_MS;
     if (inWindow && prev.sent_count >= MAX_CODES_PER_WINDOW) {
       throw new HttpError(429, 'Too many codes sent. Try again in an hour.');
     }
     const code = newCode();
     // A new code replaces the old one and gets a fresh set of attempts.
-    await env.DB.prepare(
-      `INSERT INTO password_resets (user_id, code_hash, expires_at, attempts, sent_count, window_start) VALUES (?1, ?2, ?3, 0, ?4, ?5)
-       ON CONFLICT(user_id) DO UPDATE SET code_hash = ?2, expires_at = ?3, attempts = 0, sent_count = ?4, window_start = ?5`,
-    )
-      .bind(user.id, await codeHash(user.id, code), t + CODE_MS, inWindow ? prev.sent_count + 1 : 1, inWindow ? prev.window_start : t)
-      .run();
+    await withDatabase(env.DB, async (db) => {
+      await db.prepare(
+        `INSERT INTO password_resets (user_id, code_hash, expires_at, attempts, sent_count, window_start) VALUES (?1, ?2, ?3, 0, ?4, ?5)
+         ON CONFLICT(user_id) DO UPDATE SET code_hash = ?2, expires_at = ?3, attempts = 0, sent_count = ?4, window_start = ?5`,
+      )
+        .bind(user.id, await codeHash(user.id, code), t + CODE_MS, inWindow ? prev.sent_count + 1 : 1, inWindow ? prev.window_start : t)
+        .run();
+    });
     await sendResetEmail(env, user.email, code);
   }
   return json({ ok: true });
@@ -71,24 +78,32 @@ export async function resetPassword(request, env) {
   if (password.length < 8 || password.length > 200) throw new HttpError(400, 'Password must be at least 8 characters');
 
   const wrong = new HttpError(400, 'That code is wrong or has expired. Ask for a new one.');
-  const user = await env.DB.prepare('SELECT * FROM users WHERE email = ? AND deleted_at IS NULL').bind(email).first();
+  const user = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM users WHERE email = ? AND deleted_at IS NULL').bind(email).first();
+  });
   if (!user) throw wrong;
-  const reset = await env.DB.prepare('SELECT * FROM password_resets WHERE user_id = ?').bind(user.id).first();
+  const reset = await withDatabase(env.DB, async (db) => {
+    return await db.prepare('SELECT * FROM password_resets WHERE user_id = ?').bind(user.id).first();
+  });
   if (!reset || reset.expires_at < now() || reset.attempts >= MAX_ATTEMPTS) throw wrong;
 
   if (!same(await codeHash(user.id, code), reset.code_hash)) {
-    await env.DB.prepare('UPDATE password_resets SET attempts = attempts + 1 WHERE user_id = ?').bind(user.id).run();
+    await withDatabase(env.DB, async (db) => {
+      await db.prepare('UPDATE password_resets SET attempts = attempts + 1 WHERE user_id = ?').bind(user.id).run();
+    });
     throw wrong;
   }
 
   const salt = b64url(crypto.getRandomValues(new Uint8Array(16)));
   const hash = await hashPassword(password, salt);
-  await env.DB.batch([
-    env.DB.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').bind(hash, salt, user.id),
-    env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
-    // Keep the row (and its hourly count) but make the code unusable.
-    env.DB.prepare('UPDATE password_resets SET attempts = ? WHERE user_id = ?').bind(MAX_ATTEMPTS, user.id),
-  ]);
+  await withDatabase(env.DB, async (db) => {
+    await db.batch([
+      db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').bind(hash, salt, user.id),
+      db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
+      // Keep the row (and its hourly count) but make the code unusable.
+      db.prepare('UPDATE password_resets SET attempts = ? WHERE user_id = ?').bind(MAX_ATTEMPTS, user.id),
+    ]);
+  });
   const next = { ...user, password_hash: hash, password_salt: salt };
   return json({ token: await createSession(env, user.id), user: await withStats(env, next) });
 }
@@ -110,10 +125,12 @@ export async function deleteAccount(request, env) {
     throw new HttpError(400, 'Type DELETE to confirm');
   }
 
-  const [open, wallet] = await env.DB.batch([
-    env.DB.prepare(`SELECT COUNT(*) AS n FROM orders WHERE (buyer_id = ?1 OR seller_id = ?1) AND status IN ${OPEN_ORDER_STATUSES}`).bind(user.id),
-    env.DB.prepare('SELECT available_cents, locked_cents, pending_cents FROM wallets WHERE user_id = ?').bind(user.id),
-  ]);
+  const [open, wallet] = await withDatabase(env.DB, async (db) => {
+    return await db.batch([
+      db.prepare(`SELECT COUNT(*) AS n FROM orders WHERE (buyer_id = ?1 OR seller_id = ?1) AND status IN ${OPEN_ORDER_STATUSES}`).bind(user.id),
+      db.prepare('SELECT available_cents, locked_cents, pending_cents FROM wallets WHERE user_id = ?').bind(user.id),
+    ]);
+  });
   if (open.results[0].n > 0) {
     throw new HttpError(409, 'You have orders in progress. Finish or settle them before deleting your account.');
   }
@@ -123,42 +140,46 @@ export async function deleteAccount(request, env) {
   }
 
   // Photos and videos of listings nobody bought go; sold ones stay for the buyer's order history.
-  const { results: media } = await env.DB.prepare(
-    `SELECT m.media_key FROM item_media m JOIN items i ON i.id = m.item_id
-     WHERE i.seller_id = ? AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.item_id = i.id)`,
-  )
-    .bind(user.id)
-    .all();
+  const { results: media } = await withDatabase(env.DB, async (db) => {
+    return await db.prepare(
+      `SELECT m.media_key FROM item_media m JOIN items i ON i.id = m.item_id
+       WHERE i.seller_id = ? AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.item_id = i.id)`,
+    )
+      .bind(user.id)
+      .all();
+  });
   const keys = media.map((m) => m.media_key);
   if (user.avatar_key) keys.push(user.avatar_key);
 
   const anonHandle = `deleted_${crypto.randomUUID().replaceAll('-', '').slice(0, 12)}`;
   const u = user.id;
-  const run = (sql, ...args) => env.DB.prepare(sql).bind(u, ...args);
-  await env.DB.batch([
-    run("UPDATE offers SET status = 'cancelled', updated_at = ?2 WHERE (buyer_id = ?1 OR seller_id = ?1) AND status IN ('pending', 'countered', 'accepted')", now()),
-    // Cascades to their media, likes, saves, comments, carts, offers and reports.
-    run('DELETE FROM items WHERE seller_id = ?1 AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.item_id = items.id)'),
-    run("UPDATE items SET status = 'removed' WHERE seller_id = ?1 AND status = 'available'"),
-    run('DELETE FROM sessions WHERE user_id = ?1'),
-    run('DELETE FROM device_tokens WHERE user_id = ?1'),
-    run('DELETE FROM password_resets WHERE user_id = ?1'),
-    run('DELETE FROM likes WHERE user_id = ?1'),
-    run('DELETE FROM saves WHERE user_id = ?1'),
-    run('DELETE FROM comments WHERE user_id = ?1'),
-    run('DELETE FROM cart_items WHERE user_id = ?1'),
-    run('DELETE FROM follows WHERE follower_id = ?1 OR seller_id = ?1'),
-    run('DELETE FROM notifications WHERE user_id = ?1'),
-    run('DELETE FROM reports WHERE user_id = ?1'),
-    run(
-      `UPDATE users SET email = ?2, name = 'Deleted account', handle = ?3, phone = '', bio = '', location = '', shop_name = '',
-         stall_location = '', role = 'shopper', password_hash = '', password_salt = '', google_sub = NULL, avatar_key = NULL,
-         deleted_at = ?4 WHERE id = ?1`,
-      `${u}@deleted.invalid`,
-      anonHandle,
-      now(),
-    ),
-  ]);
+  await withDatabase(env.DB, async (db) => {
+    const run = (sql, ...args) => db.prepare(sql).bind(u, ...args);
+    await db.batch([
+      run("UPDATE offers SET status = 'cancelled', updated_at = ?2 WHERE (buyer_id = ?1 OR seller_id = ?1) AND status IN ('pending', 'countered', 'accepted')", now()),
+      // Cascades to their media, likes, saves, comments, carts, offers and reports.
+      run('DELETE FROM items WHERE seller_id = ?1 AND NOT EXISTS (SELECT 1 FROM orders o WHERE o.item_id = items.id)'),
+      run("UPDATE items SET status = 'removed' WHERE seller_id = ?1 AND status = 'available'"),
+      run('DELETE FROM sessions WHERE user_id = ?1'),
+      run('DELETE FROM device_tokens WHERE user_id = ?1'),
+      run('DELETE FROM password_resets WHERE user_id = ?1'),
+      run('DELETE FROM likes WHERE user_id = ?1'),
+      run('DELETE FROM saves WHERE user_id = ?1'),
+      run('DELETE FROM comments WHERE user_id = ?1'),
+      run('DELETE FROM cart_items WHERE user_id = ?1'),
+      run('DELETE FROM follows WHERE follower_id = ?1 OR seller_id = ?1'),
+      run('DELETE FROM notifications WHERE user_id = ?1'),
+      run('DELETE FROM reports WHERE user_id = ?1'),
+      run(
+        `UPDATE users SET email = ?2, name = 'Deleted account', handle = ?3, phone = '', bio = '', location = '', shop_name = '',
+           stall_location = '', role = 'shopper', password_hash = '', password_salt = '', google_sub = NULL, avatar_key = NULL,
+           deleted_at = ?4 WHERE id = ?1`,
+        `${u}@deleted.invalid`,
+        anonHandle,
+        now(),
+      ),
+    ]);
+  });
   if (keys.length) await env.PHOTOS.delete(keys);
   return json({ ok: true });
 }
@@ -176,9 +197,11 @@ export async function changePassword(request, env) {
 
   const salt = b64url(crypto.getRandomValues(new Uint8Array(16)));
   const token = (request.headers.get('authorization') || '').slice(7).trim();
-  await env.DB.batch([
-    env.DB.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').bind(await hashPassword(password, salt), salt, user.id),
-    env.DB.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(user.id, await sha256(token)),
-  ]);
+  await withDatabase(env.DB, async (db) => {
+    await db.batch([
+      db.prepare('UPDATE users SET password_hash = ?, password_salt = ? WHERE id = ?').bind(await hashPassword(password, salt), salt, user.id),
+      db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(user.id, await sha256(token)),
+    ]);
+  });
   return json({ ok: true });
 }
