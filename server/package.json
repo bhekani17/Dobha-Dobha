@@ -21,7 +21,6 @@
     "@aws-sdk/client-sqs": "^3.600.0",
     "@aws-sdk/client-secrets-manager": "^3.600.0",
     "@aws-sdk/lib-dynamodb": "^3.600.0",
-    "@aws-sdk/cognito-identity-provider": "^3.600.0",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.3"
   },

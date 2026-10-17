@@ -26,7 +26,7 @@ phases:
           aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION"
           echo "Dead stack deleted successfully."
         fi
-      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server" ci
+      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server" install
       - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server" test
   build:
     commands:
