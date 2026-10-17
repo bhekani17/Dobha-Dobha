@@ -37,20 +37,8 @@ Globals:
         ADMIN_EMAILS: !Ref AdminEmails
         GOOGLE_CLIENT_IDS: !Ref GoogleClientId
         ALLOWED_WEB_ORIGINS: !Ref AllowedOrigin
-    Layers:
-      - !Ref SharedLayer
 
 Resources:
-  # ============================================
-  # Shared Layer (common dependencies)
-  # ============================================
-  SharedLayer:
-    Type: AWS::Serverless::LayerVersion
-    Properties:
-      LayerName: dobha-shared-layer
-      Description: Shared dependencies for Dobha Lambdas
-      ContentUri: layers/shared/
-
   # ============================================
   # DynamoDB Tables
   # ============================================
@@ -537,8 +525,6 @@ Resources:
   # ============================================
   PhotosBucket:
     Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub '${Stage}-dobha-photos'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -557,8 +543,6 @@ Resources:
 
   WebsiteBucket:
     Type: AWS::S3::Bucket
-    Properties:
-      BucketName: !Sub '${Stage}-dobha-website'
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
         BlockPublicPolicy: false
@@ -632,29 +616,8 @@ Resources:
         - profile
       SupportedIdentityProviders:
         - COGNITO
-        - Google
       CallbackURLs:
         - !Ref AllowedOrigin
-
-  UserPoolDomain:
-    Type: AWS::Cognito::UserPoolDomain
-    Properties:
-      Domain: !Sub '${Stage}-dobha-${AWS::AccountId}'
-      UserPoolId: !Ref UserPool
-
-  # ============================================
-  # Cognito Identity Provider (Google)
-  # ============================================
-  GoogleIdentityProvider:
-    Type: AWS::Cognito::UserPoolIdentityProvider
-    Properties:
-      UserPoolId: !Ref UserPool
-      ProviderName: Google
-      ProviderType: Google
-      ProviderDetails:
-        authorize_scopes: 'email profile'
-        client_id: !Ref GoogleClientId
-        client_secret: '{{resolve:secretsmanager:GoogleClientSecret}}'
 
   # ============================================
   # API Gateway
