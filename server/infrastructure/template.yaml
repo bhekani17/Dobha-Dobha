@@ -1,0 +1,1178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Dobha Marketplace - AWS Serverless Infrastructure
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Deployment stage
+
+  AllowedOrigin:
+    Type: String
+    Default: '*'
+    Description: CORS allowed origin for API
+
+  AdminEmails:
+    Type: String
+    Default: 'ndlovubhekani17@gmail.com'
+    Description: Comma-separated admin emails
+
+  GoogleClientId:
+    Type: String
+    Default: '787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com'
+    Description: Google OAuth client ID
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Timeout: 30
+    MemorySize: 512
+    Environment:
+      Variables:
+        STAGE: !Ref Stage
+        ADMIN_EMAILS: !Ref AdminEmails
+        GOOGLE_CLIENT_IDS: !Ref GoogleClientId
+        ALLOWED_WEB_ORIGINS: !Ref AllowedOrigin
+    Layers:
+      - !Ref SharedLayer
+
+Resources:
+  # ============================================
+  # Shared Layer (common dependencies)
+  # ============================================
+  SharedLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: dobha-shared-layer
+      Description: Shared dependencies for Dobha Lambdas
+      ContentUri: layers/shared/
+
+  # ============================================
+  # DynamoDB Tables
+  # ============================================
+  UsersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-users'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: handle
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: EmailIndex
+          KeySchema:
+            - AttributeName: email
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: HandleIndex
+          KeySchema:
+            - AttributeName: handle
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+
+  SessionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-sessions'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: token_hash
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: token_hash
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expires_at
+        Enabled: true
+
+  ItemsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-items'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: seller_id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: SellerIndex
+          KeySchema:
+            - AttributeName: seller_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: FeedIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+
+  LikesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-likes'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: item_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: item_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: ItemIndex
+          KeySchema:
+            - AttributeName: item_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  SavesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-saves'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: item_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: item_id
+          KeyType: RANGE
+
+  CommentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-comments'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: item_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ItemIndex
+          KeySchema:
+            - AttributeName: item_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-orders'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: buyer_id
+          AttributeType: S
+        - AttributeName: seller_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: BuyerIndex
+          KeySchema:
+            - AttributeName: buyer_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: SellerIndex
+          KeySchema:
+            - AttributeName: seller_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+
+  WalletsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-wallets'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+
+  TransactionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-transactions'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  CartItemsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-cart'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: item_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+        - AttributeName: item_id
+          KeyType: RANGE
+
+  OffersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-offers'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: buyer_id
+          AttributeType: S
+        - AttributeName: seller_id
+          AttributeType: S
+        - AttributeName: item_id
+          AttributeType: S
+        - AttributeName: updated_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: BuyerIndex
+          KeySchema:
+            - AttributeName: buyer_id
+              KeyType: HASH
+            - AttributeName: updated_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: SellerIndex
+          KeySchema:
+            - AttributeName: seller_id
+              KeyType: HASH
+            - AttributeName: updated_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: ItemIndex
+          KeySchema:
+            - AttributeName: item_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  FollowsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-follows'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: follower_id
+          AttributeType: S
+        - AttributeName: seller_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: follower_id
+          KeyType: HASH
+        - AttributeName: seller_id
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SellerIndex
+          KeySchema:
+            - AttributeName: seller_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  MessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-messages'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: sender_id
+          AttributeType: S
+        - AttributeName: recipient_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: N
+        - AttributeName: read_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: PairIndex
+          KeySchema:
+            - AttributeName: sender_id
+              KeyType: HASH
+            - AttributeName: recipient_id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: RecipientIndex
+          KeySchema:
+            - AttributeName: recipient_id
+              KeyType: HASH
+            - AttributeName: read_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
+
+  ReviewsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-reviews'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: order_id
+          AttributeType: S
+        - AttributeName: seller_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: order_id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: SellerIndex
+          KeySchema:
+            - AttributeName: seller_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  NotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-notifications'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  ReportsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-reports'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  ProfileTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-profiles'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: user_id
+          KeyType: HASH
+
+  SupportRequestsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-support'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: status
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: StatusIndex
+          KeySchema:
+            - AttributeName: status
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  PushNotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-push'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+        - AttributeName: created_at
+          AttributeType: N
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+            - AttributeName: created_at
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
+  # ============================================
+  # S3 Buckets
+  # ============================================
+  PhotosBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${Stage}-dobha-photos'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: CleanupUnattached
+            Status: Enabled
+            ExpirationInDays: 7
+            NoncurrentVersionExpirationInDays: 1
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${Stage}-dobha-website'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub '${WebsiteBucket.Arn}/*'
+
+  # ============================================
+  # Cognito User Pool
+  # ============================================
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${Stage}-dobha-users'
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+      MfaConfiguration: OFF
+      Schema:
+        - AttributeName: email
+          AttributeType: String
+          Required: true
+          Mutable: true
+        - AttributeName: name
+          AttributeType: String
+          Required: true
+          Mutable: true
+        - AttributeName: phone_number
+          AttributeType: String
+          Required: false
+          Mutable: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub '${Stage}-dobha-web'
+      GenerateSecret: false
+      AuthFlows:
+        - USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - email
+        - openid
+        - profile
+      SupportedIdentityProviders:
+        - COGNITO
+        - Google
+      CallbackURLs:
+        - !Ref AllowedOrigin
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub '${Stage}-dobha-${AWS::AccountId}'
+      UserPoolId: !Ref UserPool
+
+  # ============================================
+  # Cognito Identity Provider (Google)
+  # ============================================
+  GoogleIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      UserPoolId: !Ref UserPool
+      ProviderName: Google
+      ProviderType: Google
+      ProviderDetails:
+        authorize_scopes: 'email profile'
+        client_id: !Ref GoogleClientId
+        client_secret: '{{resolve:secretsmanager:GoogleClientSecret}}'
+
+  # ============================================
+  # API Gateway
+  # ============================================
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
+      DefinitionBody:
+        openapi: '3.0'
+        info:
+          title: Dobha API
+          version: '1.0'
+        paths:
+          /api/auth/register:
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/auth/login:
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/auth/google:
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/me:
+            get:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+            patch:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+            delete:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/items:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+            post:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/items/{id}:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+            patch:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+            delete:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/orders:
+            get:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+            post:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/wallet:
+            get:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/social:
+            get:
+              x-amazon-apigateway-authorizer:
+                type: cognito_user_pools
+                providerArns:
+                  - !GetAtt UserPool.Arn
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SocialLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+
+  # ============================================
+  # Lambda Functions
+  # ============================================
+  AuthLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-auth'
+      Handler: src/auth/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          USERS_TABLE: !Ref UsersTable
+          SESSIONS_TABLE: !Ref SessionsTable
+          PROFILE_TABLE: !Ref ProfileTable
+          USER_POOL_ID: !Ref UserPool
+          USER_POOL_CLIENT_ID: !Ref UserPoolClient
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ProfileTable
+      Events:
+        RegisterApi:
+          Type: Api
+          Properties:
+            Path: /api/auth/register
+            Method: post
+            RestApiId: !Ref Api
+
+  ItemsLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-items'
+      Handler: src/items/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          ITEMS_TABLE: !Ref ItemsTable
+          LIKES_TABLE: !Ref LikesTable
+          SAVES_TABLE: !Ref SavesTable
+          COMMENTS_TABLE: !Ref CommentsTable
+          REPORTS_TABLE: !Ref ReportsTable
+          PHOTOS_BUCKET: !Ref PhotosBucket
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ItemsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref LikesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SavesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CommentsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReportsTable
+        - S3CrudPolicy:
+            BucketName: !Ref PhotosBucket
+
+  OrdersLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-orders'
+      Handler: src/orders/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          ORDERS_TABLE: !Ref OrdersTable
+          WALLET_TABLE: !Ref WalletsTable
+          TRANSACTIONS_TABLE: !Ref TransactionsTable
+          REVIEWS_TABLE: !Ref ReviewsTable
+          ITEMS_TABLE: !Ref ItemsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OrdersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref WalletsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TransactionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReviewsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ItemsTable
+
+  SocialLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-social'
+      Handler: src/social/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          CART_TABLE: !Ref CartItemsTable
+          OFFERS_TABLE: !Ref OffersTable
+          FOLLOWS_TABLE: !Ref FollowsTable
+          MESSAGES_TABLE: !Ref MessagesTable
+          REVIEWS_TABLE: !Ref ReviewsTable
+          USERS_TABLE: !Ref UsersTable
+          ITEMS_TABLE: !Ref ItemsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CartItemsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OffersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FollowsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref MessagesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReviewsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ItemsTable
+
+  NotificationsLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-notifications'
+      Handler: src/notifications/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          NOTIFICATIONS_TABLE: !Ref NotificationsTable
+          PUSH_TABLE: !Ref PushNotificationsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref NotificationsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PushNotificationsTable
+
+  SupportLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-support'
+      Handler: src/support/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          SUPPORT_TABLE: !Ref SupportRequestsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SupportRequestsTable
+        - Statement:
+            Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Resource: '*'
+
+  AdminLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-admin'
+      Handler: src/admin/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          REPORTS_TABLE: !Ref ReportsTable
+          SUPPORT_TABLE: !Ref SupportRequestsTable
+          ORDERS_TABLE: !Ref OrdersTable
+          ITEMS_TABLE: !Ref ItemsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReportsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SupportRequestsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref OrdersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ItemsTable
+
+  LiveLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-live'
+      Handler: src/live/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          LIVEKIT_URL: '{{resolve:secretsmanager:LiveKitUrl}}'
+          LIVEKIT_API_KEY: '{{resolve:secretsmanager:LiveKitApiKey}}'
+          LIVEKIT_API_SECRET: '{{resolve:secretsmanager:LiveKitApiSecret}}'
+      Policies:
+        - Statement:
+            Effect: Allow
+            Action:
+              - secretsmanager:GetSecretValue
+            Resource: '*'
+
+  CleanupLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub '${Stage}-dobha-cleanup'
+      Handler: src/cleanup/handler.handler
+      CodeUri: ../
+      Environment:
+        Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
+          PHOTOS_BUCKET: !Ref PhotosBucket
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - S3CrudPolicy:
+            BucketName: !Ref PhotosBucket
+      Events:
+        ScheduledCleanup:
+          Type: Schedule
+          Properties:
+            Schedule: 'cron(0 1 * * ? *)'
+            Name: DailyCleanup
+            Description: Daily cleanup of expired sessions and unattached uploads
+
+  # ============================================
+  # CloudFront Distribution for Website
+  # ============================================
+  WebsiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          Compress: true
+        PriceClass: PriceClass_All
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  # ============================================
+  # CloudFront Distribution for API
+  # ============================================
+  ApiDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Origins:
+          - Id: ApiOrigin
+            DomainName: !Sub '${Api}.execute-api.${AWS::Region}.amazonaws.com'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+        DefaultCacheBehavior:
+          TargetOriginId: ApiOrigin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: true
+            Headers:
+              - Authorization
+              - Content-Type
+            Cookies:
+              Forward: all
+          Compress: true
+          MinTTL: 0
+          DefaultTTL: 0
+          MaxTTL: 0
+        PriceClass: PriceClass_All
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+  # ============================================
+  # SQS Queue for Push Notifications
+  # ============================================
+  PushQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Stage}-dobha-push-queue'
+      VisibilityTimeout: 300
+      MessageRetentionPeriod: 86400
+      DeadLetterTargetArn: !GetAtt PushDLQ.Arn
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt PushDLQ.Arn
+        maxReceiveCount: 3
+
+  PushDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub '${Stage}-dobha-push-dlq'
+      MessageRetentionPeriod: 1209600
+
+  # ============================================
+  # SNS Topic for Push Notifications
+  # ============================================
+  PushTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${Stage}-dobha-push'
+
+  # ============================================
+  # CloudWatch Alarms
+  # ============================================
+  AuthLambdaErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Stage}-dobha-auth-lambda-errors'
+      AlarmDescription: Alert when Auth Lambda has too many errors
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AuthLambda
+
+  ApiGateway5XXAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${Stage}-dobha-api-5xx-errors'
+      AlarmDescription: Alert when API Gateway has too many 5XX errors
+      MetricName: 5XXError
+      Namespace: AWS/ApiGateway
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 10
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ApiName
+          Value: !Ref Api
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
+
+  ApiDistributionDomain:
+    Description: CloudFront distribution domain for API
+    Value: !GetAtt ApiDistribution.DomainName
+
+  WebsiteDistributionDomain:
+    Description: CloudFront distribution domain for website
+    Value: !GetAtt WebsiteDistribution.DomainName
+
+  WebsiteBucketName:
+    Description: S3 bucket name for website
+    Value: !Ref WebsiteBucket
+
+  PhotosBucketName:
+    Description: S3 bucket name for photos
+    Value: !Ref PhotosBucket
+
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient

@@ -1,111 +1,108 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Private S3 and CloudFront hosting for the Dobha-Dobha website.
+Description: Dobha Website - Static Hosting on S3 + CloudFront
 
 Parameters:
   Stage:
     Type: String
     Default: dev
-    AllowedPattern: '^[a-zA-Z0-9-]+$'
+    AllowedValues:
+      - dev
+      - prod
+    Description: Deployment stage
 
 Resources:
+  # S3 Bucket for Website
   WebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      OwnershipControls:
-        Rules:
-          - ObjectOwnership: BucketOwnerEnforced
+      BucketName: !Sub '${Stage}-dobha-website'
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+      VersioningConfiguration:
+        Status: Enabled
+      Tags:
+        - Key: Project
+          Value: Dobha
+        - Key: Stage
+          Value: !Ref Stage
 
-  WebsiteOriginAccessControl:
-    Type: AWS::CloudFront::OriginAccessControl
-    Properties:
-      OriginAccessControlConfig:
-        Name: !Sub dobha-website-oac-${Stage}
-        Description: CloudFront-only access to the private website bucket.
-        OriginAccessControlOriginType: s3
-        SigningBehavior: always
-        SigningProtocol: sigv4
-
-  WebsiteSecurityHeaders:
-    Type: AWS::CloudFront::ResponseHeadersPolicy
-    Properties:
-      ResponseHeadersPolicyConfig:
-        Name: !Sub dobha-website-security-headers-${Stage}
-        SecurityHeadersConfig:
-          ContentTypeOptions:
-            Override: true
-          FrameOptions:
-            FrameOption: DENY
-            Override: true
-          ReferrerPolicy:
-            ReferrerPolicy: strict-origin-when-cross-origin
-            Override: true
-          StrictTransportSecurity:
-            AccessControlMaxAgeSec: 63072000
-            IncludeSubdomains: true
-            Preload: true
-            Override: true
-
-  WebsiteDistribution:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
-        Enabled: true
-        Comment: !Sub Dobha-Dobha website (${Stage})
-        DefaultRootObject: index.html
-        HttpVersion: http2and3
-        PriceClass: PriceClass_100
-        Origins:
-          - Id: PrivateWebsiteBucket
-            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
-            S3OriginConfig:
-              OriginAccessIdentity: ''
-            OriginAccessControlId: !GetAtt WebsiteOriginAccessControl.Id
-        DefaultCacheBehavior:
-          TargetOriginId: PrivateWebsiteBucket
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods:
-            - GET
-            - HEAD
-          CachedMethods:
-            - GET
-            - HEAD
-          Compress: true
-          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
-          ResponseHeadersPolicyId: !Ref WebsiteSecurityHeaders
-
+  # Bucket Policy to Allow Public Read
   WebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Ref WebsiteBucket
       PolicyDocument:
-        Version: '2012-10-17'
         Statement:
-          - Sid: AllowCloudFrontReadOnly
-            Effect: Allow
-            Principal:
-              Service: cloudfront.amazonaws.com
-            Action: s3:GetObject
+          - Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
             Resource: !Sub '${WebsiteBucket.Arn}/*'
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${WebsiteDistribution}'
+
+  # CloudFront Distribution
+  WebsiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          Compress: true
+          MinTTL: 0
+          DefaultTTL: 86400
+          MaxTTL: 31536000
+        PriceClass: PriceClass_All
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+      Tags:
+        - Key: Project
+          Value: Dobha
+        - Key: Stage
+          Value: !Ref Stage
 
 Outputs:
-  WebsiteUrl:
-    Description: HTTPS URL for the deployed website.
-    Value: !Sub 'https://${WebsiteDistribution.DomainName}'
   WebsiteBucketName:
-    Description: Private S3 bucket for website files.
+    Description: S3 bucket name for website
     Value: !Ref WebsiteBucket
+
   WebsiteDistributionId:
-    Description: CloudFront distribution ID for cache invalidations.
+    Description: CloudFront distribution ID
     Value: !Ref WebsiteDistribution
+
+  WebsiteDistributionDomain:
+    Description: CloudFront distribution domain name
+    Value: !GetAtt WebsiteDistribution.DomainName
+
+  WebsiteURL:
+    Description: Website URL
+    Value: !Sub 'https://${WebsiteDistribution.DomainName}'
