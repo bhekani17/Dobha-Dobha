@@ -1,0 +1,3 @@
+#!/bin/bash
+export PYTHONPATH=/home/hivetech/snap/antigravity-cli/common/local/lib/python3.14/dist-packages:$PYTHONPATH
+exec /snap/antigravity-cli/23/usr/bin/python3 /home/hivetech/snap/antigravity-cli/common/local/bin/aws "$@"

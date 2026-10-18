@@ -1,0 +1,6 @@
+#!/bin/bash
+export PATH="/home/hivetech/Desktop/Development /Dobha-Dobha/server/node-runtime/bin:$PATH"
+export PYTHONPATH=/home/hivetech/snap/antigravity-cli/common/local/lib/python3.14/dist-packages:$PYTHONPATH
+export SAM_CLI_TELEMETRY=0
+export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-af-south-1}
+exec /snap/antigravity-cli/23/usr/bin/python3 /home/hivetech/snap/antigravity-cli/common/local/bin/sam "$@"
