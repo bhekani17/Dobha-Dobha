@@ -8,6 +8,7 @@ import '../models/thrift_item.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/item_photo.dart';
+import '../widgets/stories_row.dart';
 import '../widgets/ui.dart';
 import 'account_sheets.dart';
 
@@ -170,6 +171,25 @@ class _StudioScreenState extends State<StudioScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 20),
+
+          // Stories row
+          Row(
+            children: [
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Stories', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    SizedBox(height: 2),
+                    Text('Disappears in 24 hours — share a haul or a new drop.',
+                        style: TextStyle(fontSize: 12)),
+                  ],
+                ),
+              ),
+              const AddStoryButton(),
+            ],
+          ),
           const SizedBox(height: 26),
 
           Row(
@@ -245,6 +265,15 @@ class _StudioScreenState extends State<StudioScreen> {
                           tooltip: 'Edit listing',
                           icon: Icon(Icons.edit_outlined, size: 19, color: DobhaColors.muted),
                           onPressed: () => NewListingScreen.open(context, editing: item),
+                        ),
+                        IconButton(
+                          tooltip: item.isPromoted ? 'Boosted' : 'Boost listing',
+                          icon: Icon(
+                            Icons.rocket_launch_outlined,
+                            size: 19,
+                            color: item.isPromoted ? DobhaColors.amber : DobhaColors.muted,
+                          ),
+                          onPressed: () => _boostItem(item),
                         ),
                         IconButton(
                           tooltip: 'Remove listing',

@@ -74,6 +74,10 @@ class AppState extends ChangeNotifier {
   // Item a vendor chose to pin when they next go live (device-local).
   ThriftItem? _livePinnedItem;
 
+  // Stories and subscriptions
+  List<StoryGroup> _stories = [];
+  List<Subscription> _subscriptions = [];
+
   bool get restored => _restored;
   bool get isLoggedIn => _user != null;
   UserProfile get user => _user!;
@@ -100,6 +104,9 @@ class AppState extends ChangeNotifier {
   List<Offer> get offers => List.unmodifiable(_offers);
   int get followerCount => _followers;
   int get followingCount => _following;
+
+  List<StoryGroup> get stories => List.unmodifiable(_stories);
+  List<Subscription> get subscriptions => List.unmodifiable(_subscriptions);
 
   // ---- Session ----
 
@@ -238,6 +245,8 @@ class AppState extends ChangeNotifier {
     _unreadMessages = 0;
     _cart = [];
     _offers = [];
+    _stories = [];
+    _subscriptions = [];
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
   }
@@ -312,6 +321,8 @@ class AppState extends ChangeNotifier {
       loadCart(),
       loadOffers(),
       loadMyFollowCounts(),
+      loadStories(),
+      loadSubscriptions(),
       if (isVendor) loadMyItems(),
     ].map((f) => f.catchError((_) {})));
   }
@@ -764,11 +775,92 @@ class AppState extends ChangeNotifier {
     await _call(() => _api.post('/api/chats/$userId', {'text': text, 'itemId': ?itemId}));
   }
 
-  // ---- Support ----
-
   /// Sends a question to Dobha support. Works signed out too (then [email] is needed for the answer).
   Future<void> contactSupport({required String topic, required String message, String? orderId, String? email}) =>
       _call(() => _api.post('/api/support', {'topic': topic, 'message': message, 'orderId': ?orderId, 'email': ?email}));
+
+  // ---- Stories ----
+
+  Future<void> loadStories() async {
+    try {
+      final res = await _call(() => _api.getStories()) as Map<String, dynamic>;
+      final rawStories = res['stories'] as List? ?? [];
+      // Server returns stories grouped by user; each item is a list of story objects.
+      final groups = <String, List<Story>>{};
+      for (final entry in rawStories) {
+        final map = entry as Map<String, dynamic>;
+        // Grouped format: { userId, stories: [...] }
+        if (map.containsKey('stories')) {
+          final uid = map['userId'] as String? ?? map['user_id'] as String;
+          final list = (map['stories'] as List).map((s) => Story.fromJson(s as Map<String, dynamic>)).toList();
+          groups[uid] = list;
+        } else {
+          // Flat format: individual story
+          final story = Story.fromJson(map);
+          groups.putIfAbsent(story.userId, () => []).add(story);
+        }
+      }
+      _stories = groups.entries.map((e) {
+        final first = e.value.first;
+        return StoryGroup(
+          userId: e.key,
+          userName: first.userName,
+          userAvatarUrl: first.userAvatarUrl,
+          stories: e.value,
+        );
+      }).toList();
+      notifyListeners();
+    } catch (_) {
+      // Stories are non-critical; silently fail
+    }
+  }
+
+  /// Uploads story media and posts the story.
+  Future<void> createStory(Uint8List bytes, String contentType, {String caption = ''}) async {
+    final key = await _call(() => _api.uploadMedia(bytes, contentType));
+    final mediaUrl = _api.resolve('/media/$key');
+    final mediaType = contentType.startsWith('video/') ? 'video' : 'image';
+    await _call(() => _api.postStory(mediaUrl: mediaUrl, mediaType: mediaType, caption: caption));
+    await loadStories().catchError((_) {});
+  }
+
+  // ---- Subscriptions ----
+
+  Future<void> loadSubscriptions() async {
+    try {
+      final res = await _call(() => _api.getSubscriptions()) as Map<String, dynamic>;
+      _subscriptions = (res['subscriptions'] as List? ?? [])
+          .map((s) => Subscription.fromJson(s as Map<String, dynamic>))
+          .toList();
+      notifyListeners();
+    } catch (_) {
+      // Non-critical
+    }
+  }
+
+  /// Subscribes or unsubscribes to [userId]. Returns true if now subscribed.
+  Future<bool> toggleSubscription(String userId) async {
+    final res = await _call(() => _api.toggleSubscription(userId)) as Map<String, dynamic>;
+    final subscribed = res['subscribed'] as bool? ?? false;
+    await loadSubscriptions().catchError((_) {});
+    return subscribed;
+  }
+
+  bool isSubscribedTo(String userId) => _subscriptions.any((s) => s.sellerId == userId);
+
+  // ---- Promotions ----
+
+  /// Boosts [item] for [days] at [tier]. Deducts the cost from the seller's wallet.
+  Future<DateTime> promoteItem(ThriftItem item, {required int days, String tier = 'basic'}) async {
+    final res = await _call(() => _api.promoteItem(item.id, days: days, tier: tier)) as Map<String, dynamic>;
+    final until = DateTime.parse(res['promotedUntil'] as String);
+    // Reload the item in the inventory so the promoted badge appears
+    await loadMyItems().catchError((_) {});
+    await loadWallet().catchError((_) {});
+    return until;
+  }
+
+  // ---- Support ----
 
   Future<List<SupportRequest>> loadSupportRequests() async {
     final res = await _call(() => _api.get('/api/support'));

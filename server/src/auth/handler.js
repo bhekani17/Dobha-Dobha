@@ -213,11 +213,13 @@ exports.handler = async (event) => {
       const sub = body.sub || body.googleId;
 
       // In production, Google token can be decoded or passed directly
-      if (!email && body.credential) {
+      if (!email && (body.credential || body.idToken)) {
         try {
-          const parts = body.credential.split('.');
+          const token = body.credential || body.idToken;
+          const parts = token.split('.');
           if (parts.length === 3) {
-            const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf8'));
+            const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+            const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
             email = (payload.email || '').toLowerCase();
             name = payload.name || name;
           }

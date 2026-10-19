@@ -73,6 +73,10 @@ class ThriftItem {
   final int sellerReviewCount;
   final DateTime createdAt;
 
+  /// True when the listing is currently in a paid promotion window.
+  final bool isPromoted;
+  final DateTime? promotedUntil;
+
   const ThriftItem({
     required this.id,
     required this.title,

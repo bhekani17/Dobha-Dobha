@@ -30,6 +30,7 @@ class _SellerScreenState extends State<SellerScreen> {
   List<Review> _reviews = const [];
   String? _error;
   bool _following = false;
+  bool _subscribing = false;
 
   @override
   void initState() {
@@ -74,6 +75,27 @@ class _SellerScreenState extends State<SellerScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _following = false);
+    }
+  }
+
+  Future<void> _toggleSubscribe() async {
+    setState(() => _subscribing = true);
+    try {
+      final subscribed = await AppState().toggleSubscription(widget.userId);
+      if (!mounted) return;
+      final name = _profile?.displayName ?? 'this seller';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(subscribed
+              ? 'Subscribed to $name — you\'ll see their new drops first!'
+              : 'Unsubscribed from $name'),
+        ),
+      );
+      setState(() {}); // Rebuild so isSubscribedTo reflects the new value
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _subscribing = false);
     }
   }
 
@@ -234,6 +256,31 @@ class _SellerScreenState extends State<SellerScreen> {
                   ),
                 ],
               ),
+              if (p.isVendor) ...[
+                const SizedBox(height: 10),
+                ListenableBuilder(
+                  listenable: AppState(),
+                  builder: (context, _) {
+                    final isSubscribed = AppState().isSubscribedTo(p.id);
+                    return AppButton(
+                      color: isSubscribed ? null : DobhaColors.amber,
+                      foreground: isSubscribed ? null : Colors.black,
+                      onPressed: _subscribing ? null : _toggleSubscribe,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isSubscribed ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(isSubscribed ? 'Subscribed' : 'Subscribe for exclusive drops'),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
             ],
           ],
         ),

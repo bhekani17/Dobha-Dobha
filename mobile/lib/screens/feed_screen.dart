@@ -9,6 +9,7 @@ import '../widgets/checkout_modal.dart';
 import '../widgets/live_now_row.dart';
 import '../widgets/media_carousel.dart';
 import '../widgets/offer_card.dart';
+import '../widgets/stories_row.dart';
 import '../widgets/user_avatar.dart';
 import '../widgets/ui.dart';
 import 'cart_screen.dart';
@@ -90,6 +91,15 @@ class _FeedScreenState extends State<FeedScreen> {
                       ],
                     ),
                   ),
+                ),
+              ),
+              // Stories row — shown when anyone has posted a story
+              const Positioned(
+                top: 88,
+                left: 0,
+                right: 0,
+                child: SafeArea(
+                  child: StoriesRow(),
                 ),
               ),
             ],

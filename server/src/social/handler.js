@@ -16,6 +16,8 @@ exports.handler = async (event) => {
   const reviewsTable = process.env.REVIEWS_TABLE;
   const usersTable = process.env.USERS_TABLE;
   const itemsTable = process.env.ITEMS_TABLE;
+  const subsTable = process.env.SUBSCRIPTIONS_TABLE;
+  const storiesTable = process.env.STORIES_TABLE;
 
   const path = event.path || (event.requestContext && event.requestContext.http && event.requestContext.http.path) || '';
   const method = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || '').toUpperCase();
@@ -176,6 +178,168 @@ exports.handler = async (event) => {
         });
         return json(200, { following: false, message: 'Vendor unfollowed' });
       }
+    }
+
+    // -------------------------------------------------------------
+    // POST /api/users/{id}/subscribe: Subscribe/unsubscribe to a seller
+    // -------------------------------------------------------------
+    const subscribeMatch = path.match(/^\/api\/users\/([^\/]+)\/subscribe$/);
+    if (subscribeMatch && method === 'POST') {
+      const authUser = await requireUser(event);
+      const targetId = subscribeMatch[1];
+      if (targetId === authUser.id) return error(400, 'Cannot subscribe to yourself');
+
+      if (!subsTable) return error(500, 'Subscriptions not configured');
+
+      const key = `${authUser.id}#${targetId}`;
+      const existing = await dynamo.get(subsTable, { sub_key: key });
+      if (existing) {
+        await dynamo.delete(subsTable, { sub_key: key });
+        return json(200, { subscribed: false, message: 'Unsubscribed' });
+      } else {
+        await dynamo.put(subsTable, {
+          sub_key: key,
+          subscriber_id: authUser.id,
+          seller_id: targetId,
+          created_at: Date.now(),
+        });
+        return json(200, { subscribed: true, message: 'Subscribed! You will see their new drops.' });
+      }
+    }
+
+    // -------------------------------------------------------------
+    // GET /api/subscriptions: List who user subscribes to
+    // -------------------------------------------------------------
+    if (path === '/api/subscriptions' && method === 'GET') {
+      const authUser = await requireUser(event);
+      if (!subsTable) return json(200, { subscriptions: [] });
+      const res = await dynamo.query({
+        TableName: subsTable,
+        IndexName: 'SubscriberIndex',
+        KeyConditionExpression: 'subscriber_id = :uid',
+        ExpressionAttributeValues: { ':uid': authUser.id },
+      });
+      return json(200, { subscriptions: res.items });
+    }
+
+    // -------------------------------------------------------------
+    // GET /api/storefront/:handle: Public seller storefront
+    // -------------------------------------------------------------
+    const storefrontMatch = path.match(/^\/api\/storefront\/([^\/]+)$/);
+    if (storefrontMatch && method === 'GET') {
+      const handle = storefrontMatch[1];
+
+      const res = await dynamo.query({
+        TableName: usersTable,
+        IndexName: 'HandleIndex',
+        KeyConditionExpression: 'handle = :h',
+        ExpressionAttributeValues: { ':h': handle.toLowerCase() },
+        Limit: 1,
+      });
+      if (!res.items.length) return error(404, 'Storefront not found');
+      const seller = res.items[0];
+
+      // Check subscription status
+      let isSubscribed = false;
+      const viewingUser = await getUser(event);
+      if (viewingUser && subsTable) {
+        const sub = await dynamo.get(subsTable, { sub_key: `${viewingUser.id}#${seller.id}` });
+        isSubscribed = Boolean(sub);
+      }
+
+      // Get subscriber count
+      let subscriberCount = 0;
+      if (subsTable) {
+        const subsRes = await dynamo.query({
+          TableName: subsTable,
+          IndexName: 'SellerSubIndex',
+          KeyConditionExpression: 'seller_id = :sid',
+          ExpressionAttributeValues: { ':sid': seller.id },
+        }).catch(() => ({ count: 0 }));
+        subscriberCount = subsRes.count || 0;
+      }
+
+      return json(200, {
+        storefront: {
+          id: seller.id,
+          name: seller.shop_name || seller.name,
+          handle: seller.handle,
+          bio: seller.bio || '',
+          stallLocation: seller.stall_location || '',
+          avatarUrl: seller.avatar_key ? `/media/${seller.avatar_key}` : null,
+          bannerUrl: seller.banner_key ? `/media/${seller.banner_key}` : null,
+          pinnedItems: seller.pinned_items || [],
+          role: seller.role || 'vendor',
+          isSubscribed,
+          subscriberCount,
+          createdAt: seller.created_at,
+        },
+      });
+    }
+
+    // -------------------------------------------------------------
+    // GET /api/stories: List active stories (last 24 hours)
+    // -------------------------------------------------------------
+    if (path === '/api/stories' && method === 'GET') {
+      if (!storiesTable) return json(200, { stories: [] });
+      const cutoff = Date.now() - (24 * 3600 * 1000);
+      const res = await dynamo.scan({
+        TableName: storiesTable,
+        FilterExpression: 'created_at > :cutoff AND expires_at > :now',
+        ExpressionAttributeValues: { ':cutoff': cutoff, ':now': Date.now() },
+      });
+
+      // Group by user/seller
+      const byUser = {};
+      for (const s of res.items) {
+        if (!byUser[s.user_id]) {
+          byUser[s.user_id] = {
+            userId: s.user_id,
+            userName: s.user_name,
+            userHandle: s.user_handle,
+            avatarUrl: s.avatar_url || null,
+            stories: [],
+          };
+        }
+        byUser[s.user_id].stories.push({
+          id: s.id,
+          mediaUrl: s.media_url,
+          mediaType: s.media_type || 'image',
+          caption: s.caption || '',
+          createdAt: s.created_at,
+        });
+      }
+
+      return json(200, { stories: Object.values(byUser) });
+    }
+
+    // -------------------------------------------------------------
+    // POST /api/stories: Post a new story (expires in 24h)
+    // -------------------------------------------------------------
+    if (path === '/api/stories' && method === 'POST') {
+      const authUser = await requireUser(event);
+      if (!storiesTable) return error(500, 'Stories not configured');
+      const body = parseBody(event);
+      const mediaUrl = body.mediaUrl || body.media_url;
+      if (!mediaUrl) return error(400, 'mediaUrl is required');
+
+      const storyId = `sto_${require('crypto').randomUUID().replace(/-/g, '').slice(0, 16)}`;
+      const ts = Date.now();
+      const story = {
+        id: storyId,
+        user_id: authUser.id,
+        user_name: authUser.shop_name || authUser.name,
+        user_handle: authUser.handle,
+        avatar_url: null,
+        media_url: mediaUrl,
+        media_type: body.mediaType || 'image',
+        caption: (body.caption || '').slice(0, 200),
+        created_at: ts,
+        expires_at: ts + (24 * 3600 * 1000),
+      };
+
+      await dynamo.put(storiesTable, story);
+      return json(201, { story, message: 'Story posted! It will disappear in 24 hours.' });
     }
 
     // -------------------------------------------------------------

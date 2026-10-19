@@ -35,6 +35,10 @@ function formatItem(item, seller = null, viewerId = null, isLiked = false, isSav
     likesCount: item.likes_count || 0,
     isLiked: Boolean(isLiked),
     isSaved: Boolean(isSaved),
+    // --- new fields ---
+    viewCount: item.view_count || 0,
+    trendingScore: item.trending_score || 0,
+    videoUrl: item.video_url || null,
     createdAt: item.created_at ? new Date(item.created_at).toISOString() : null,
     seller: sellerInfo,
   };
@@ -51,6 +55,8 @@ exports.handler = async (event) => {
   const commentsTable = process.env.COMMENTS_TABLE;
   const walletsTable = process.env.WALLET_TABLE || process.env.WALLETS_TABLE;
   const transactionsTable = process.env.TRANSACTIONS_TABLE;
+  const followsTable = process.env.FOLLOWS_TABLE;
+  const adsTable = process.env.ADS_TABLE;
 
   const path = event.path || (event.requestContext && event.requestContext.http && event.requestContext.http.path) || '';
   const method = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || '').toUpperCase();
@@ -60,6 +66,32 @@ exports.handler = async (event) => {
     const user = await getUser(event);
 
     // -------------------------------------------------------------
+    // GET /api/trending: Public trending items feed
+    // -------------------------------------------------------------
+    if (path === '/api/trending' && method === 'GET') {
+      const res = await dynamo.scan({
+        TableName: itemsTable,
+        FilterExpression: '#st = :status',
+        ExpressionAttributeNames: { '#st': 'status' },
+        ExpressionAttributeValues: { ':status': 'available' },
+      });
+
+      const items = res.items || [];
+
+      // Compute trending score: likes*3 + view_count + promoted*50
+      const scored = items.map((item) => {
+        const isPromo = Boolean(item.is_promoted && (!item.promoted_until || item.promoted_until > now()));
+        const score = (item.likes_count || 0) * 3 + (item.view_count || 0) + (isPromo ? 50 : 0);
+        return { item, score };
+      });
+
+      scored.sort((a, b) => b.score - a.score);
+      const top20 = scored.slice(0, 20).map(({ item }) => formatItem(item, null, user ? user.id : null));
+
+      return json(200, { items: top20 });
+    }
+
+    // -------------------------------------------------------------
     // GET /api/items: Explore feed & digital storefront items
     // -------------------------------------------------------------
     if (path === '/api/items' && method === 'GET') {
@@ -67,6 +99,7 @@ exports.handler = async (event) => {
       const category = queryParams.category;
       const search = (queryParams.q || queryParams.search || '').toLowerCase();
       const status = queryParams.status || 'available';
+      const feed = queryParams.feed; // 'trending' | 'subscriptions'
 
       let items = [];
 
@@ -111,13 +144,40 @@ exports.handler = async (event) => {
         });
       }
 
-      // Sort promoted / ad placements to top
-      items.sort((a, b) => {
-        const aPromo = a.is_promoted && (!a.promoted_until || a.promoted_until > now()) ? 1 : 0;
-        const bPromo = b.is_promoted && (!b.promoted_until || b.promoted_until > now()) ? 1 : 0;
-        if (aPromo !== bPromo) return bPromo - aPromo;
-        return (b.created_at || 0) - (a.created_at || 0);
-      });
+      // Feed-specific sorting / filtering
+      if (feed === 'trending') {
+        // Sort by computed trending score DESC
+        items.sort((a, b) => {
+          const aPromo = a.is_promoted && (!a.promoted_until || a.promoted_until > now()) ? 1 : 0;
+          const bPromo = b.is_promoted && (!b.promoted_until || b.promoted_until > now()) ? 1 : 0;
+          const aScore = (a.likes_count || 0) * 3 + (a.view_count || 0) + (aPromo ? 50 : 0);
+          const bScore = (b.likes_count || 0) * 3 + (b.view_count || 0) + (bPromo ? 50 : 0);
+          return bScore - aScore;
+        });
+      } else if (feed === 'subscriptions') {
+        // Filter to only items from sellers the current user subscribes to
+        if (user && followsTable) {
+          const followsRes = await dynamo.query({
+            TableName: followsTable,
+            KeyConditionExpression: 'follower_id = :uid',
+            ExpressionAttributeValues: { ':uid': user.id },
+          });
+          const followedIds = new Set((followsRes.items || []).map((f) => f.seller_id));
+          items = items.filter((i) => followedIds.has(i.seller_id));
+        } else {
+          items = [];
+        }
+        // Sort by created_at for subscriptions feed
+        items.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      } else {
+        // Default: promoted to top, then by created_at
+        items.sort((a, b) => {
+          const aPromo = a.is_promoted && (!a.promoted_until || a.promoted_until > now()) ? 1 : 0;
+          const bPromo = b.is_promoted && (!b.promoted_until || b.promoted_until > now()) ? 1 : 0;
+          if (aPromo !== bPromo) return bPromo - aPromo;
+          return (b.created_at || 0) - (a.created_at || 0);
+        });
+      }
 
       // Enrich with like/save status if user signed in
       const formatted = await Promise.all(
@@ -187,6 +247,7 @@ exports.handler = async (event) => {
         tags,
         live_room: liveRoom,
         likes_count: 0,
+        view_count: 0,
         is_promoted: false,
         created_at: timestamp,
         updated_at: timestamp,
@@ -231,6 +292,14 @@ exports.handler = async (event) => {
       const itemId = itemMatch[1];
       const item = await dynamo.get(itemsTable, { id: itemId });
       if (!item) return error(404, 'Item not found');
+
+      // Fire-and-forget view count increment
+      dynamo.update({
+        TableName: itemsTable,
+        Key: { id: itemId },
+        UpdateExpression: 'SET view_count = if_not_exists(view_count, :zero) + :one',
+        ExpressionAttributeValues: { ':zero': 0, ':one': 1 },
+      }).catch(() => {});
 
       let seller = null;
       if (usersTable) {
@@ -333,6 +402,37 @@ exports.handler = async (event) => {
 
       await dynamo.delete(itemsTable, { id: itemId });
       return json(200, { message: 'Item deleted successfully' });
+    }
+
+    // -------------------------------------------------------------
+    // POST /api/items/{id}/video: Set video URL for an item
+    // -------------------------------------------------------------
+    const videoMatch = path.match(/^\/api\/items\/([^\/]+)\/video$/);
+    if (videoMatch && method === 'POST') {
+      const authUser = await requireUser(event);
+      const itemId = videoMatch[1];
+      const item = await dynamo.get(itemsTable, { id: itemId });
+      if (!item) return error(404, 'Item not found');
+      if (item.seller_id !== authUser.id && authUser.role !== 'admin') {
+        return error(403, 'You can only add a video to your own listings');
+      }
+
+      const body = parseBody(event);
+      const videoUrl = body.videoUrl || body.video_url;
+      if (!videoUrl) return error(400, 'videoUrl is required');
+
+      await dynamo.update({
+        TableName: itemsTable,
+        Key: { id: itemId },
+        UpdateExpression: 'SET video_url = :vurl, updated_at = :time',
+        ExpressionAttributeValues: { ':vurl': videoUrl, ':time': now() },
+      });
+
+      const updated = await dynamo.get(itemsTable, { id: itemId });
+      return json(200, {
+        message: 'Video URL set successfully',
+        item: formatItem(updated, null, authUser.id),
+      });
     }
 
     // -------------------------------------------------------------
@@ -516,6 +616,73 @@ exports.handler = async (event) => {
       }
 
       return json(200, { items });
+    }
+
+    // -------------------------------------------------------------
+    // POST /api/ads: Purchase a featured ad slot
+    // -------------------------------------------------------------
+    if (path === '/api/ads' && method === 'POST') {
+      const authUser = await requireUser(event);
+      const body = parseBody(event);
+      const tier = body.tier || 'basic'; // basic=R50/day, standard=R150/day, premium=R500/day
+      const tierPrices = { basic: 5000, standard: 15000, premium: 50000 }; // cents per day
+      const priceCents = tierPrices[tier] || 5000;
+      const days = Math.min(30, Math.max(1, parseInt(body.days || 7, 10)));
+      const totalCents = priceCents * days;
+
+      if (walletsTable) {
+        const wallet = await dynamo.get(walletsTable, { user_id: authUser.id });
+        if (!wallet || (wallet.available_cents || 0) < totalCents) {
+          return error(402, `Insufficient balance. Ad costs ${zar(totalCents)} for ${days} days on ${tier} tier.`);
+        }
+        await dynamo.update({
+          TableName: walletsTable,
+          Key: { user_id: authUser.id },
+          UpdateExpression: 'SET available_cents = available_cents - :cost, updated_at = :time',
+          ConditionExpression: 'available_cents >= :cost',
+          ExpressionAttributeValues: { ':cost': totalCents, ':time': now() },
+        });
+      }
+
+      if (adsTable) {
+        const adId = id('ad');
+        await dynamo.put(adsTable, {
+          id: adId,
+          seller_id: authUser.id,
+          item_id: body.itemId || null,
+          tier,
+          days,
+          total_cents: totalCents,
+          headline: (body.headline || '').slice(0, 80),
+          target_url: body.targetUrl || null,
+          status: 'active',
+          created_at: now(),
+          expires_at: now() + (days * 24 * 3600 * 1000),
+        });
+      }
+
+      return json(201, {
+        message: `Ad campaign created! Your ${tier} placement is live for ${days} days.`,
+        totalCharged: zar(totalCents),
+        tier,
+        days,
+      });
+    }
+
+    // -------------------------------------------------------------
+    // GET /api/ads: List seller's active ads
+    // -------------------------------------------------------------
+    if (path === '/api/ads' && method === 'GET') {
+      const authUser = await requireUser(event);
+      if (!adsTable) return json(200, { ads: [] });
+      const res = await dynamo.query({
+        TableName: adsTable,
+        IndexName: 'SellerAdsIndex',
+        KeyConditionExpression: 'seller_id = :sid',
+        ExpressionAttributeValues: { ':sid': authUser.id },
+        ScanIndexForward: false,
+      });
+      return json(200, { ads: res.items });
     }
 
     return error(404, `Route not found: ${method} ${path}`);

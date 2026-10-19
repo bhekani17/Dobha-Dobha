@@ -121,7 +121,11 @@ const api = async (path, { method = 'GET', body, raw, contentType, auth = !!stat
 const escapeHtml = (value = '') => String(value).replace(/[&<>"']/g, (char) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 }[char]));
-const money = (amount) => new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 2 }).format(amount || 0);
+const money = (amount) => {
+  // Handle API's "R 4599.00" string format — strip non-numeric chars except dot
+  const num = typeof amount === 'string' ? parseFloat(amount.replace(/[^0-9.]/g, '')) : amount;
+  return new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 2 }).format(num || 0);
+};
 function applyTheme(theme) {
   state.theme = theme;
   document.documentElement.dataset.theme = theme;
@@ -239,15 +243,7 @@ function renderItems() {
   const visible = state.items.filter((item) => (state.category === 'All categories' || item.category === state.category)
     && (!query || `${item.title} ${item.description} ${item.sellerName} ${item.category}`.toLowerCase().includes(query)));
   byId('empty-state').classList.toggle('hidden', visible.length > 0);
-  const cards = visible.map((item) => {
-    const media = item.photoUrl
-      ? `<img src="${escapeHtml(resolveMedia(item.photoUrl))}" alt="${escapeHtml(item.title)}" loading="lazy">`
-      : '<span class="muted">Dobha find</span>';
-    return `<article class="item-card" tabindex="0" role="button" aria-label="View ${escapeHtml(item.title)}" data-item="${escapeHtml(item.id)}">
-      <div class="item-image">${media}<span class="item-category">${escapeHtml(item.category)}</span></div>
-      <div class="item-meta"><div><h3>${escapeHtml(item.title)}</h3><p class="seller-line">${escapeHtml(item.sellerName || 'Dobha seller')}</p></div><strong>${money(item.priceZar)}</strong></div>
-    </article>`;
-  });
+  const cards = visible.map((item) => listingCard(item));
   byId('listing-grid').innerHTML = cards.join('');
   byId('home-grid').innerHTML = visible.slice(0, 8).map((item) => cards[visible.indexOf(item)]).join('');
   for (const grid of [byId('listing-grid'), byId('home-grid')]) {
@@ -286,21 +282,26 @@ async function loadItems(append = false) {
 function showProduct(id) {
   const item = state.items.find((listing) => listing.id === id);
   if (!item) return;
-  const firstMedia = item.media?.[0];
-  const mediaUrl = firstMedia?.url || item.photoUrl;
-  const media = firstMedia?.kind === 'video'
-    ? `<video src="${escapeHtml(resolveMedia(mediaUrl))}" controls playsinline></video>`
-    : `<img src="${escapeHtml(resolveMedia(mediaUrl || ''))}" alt="${escapeHtml(item.title)}">`;
+  // Normalise API fields
+  const seller = item.seller || {};
+  const sellerName = seller.name || item.sellerName || 'Dobha seller';
+  const sellerHandle = seller.handle ? `@${seller.handle}` : (item.sellerHandle || '');
+  const sellerId = seller.id || item.sellerId || '';
+  const photoSrc = (item.photos && item.photos[0]) || item.photoUrl || '';
+  const media = photoSrc
+    ? `<img src="${escapeHtml(resolveMedia(photoSrc))}" alt="${escapeHtml(item.title)}">`
+    : `<div class="item-placeholder" style="${categoryPlaceholder(item.category).match(/style="([^"]+)"/)?.[1] || ''}">${categoryPlaceholder(item.category).match(/<span[^>]*>([^<]+)<\/span>/g)?.join('') || ''}</div>`;
   byId('product-detail').innerHTML = `<div class="product-detail">
     <div class="product-preview">${media}</div>
     <div class="product-copy"><p class="eyebrow">${escapeHtml(item.category)} · ${escapeHtml(item.condition || 'Pre-loved')}</p>
       <h2>${escapeHtml(item.title)}</h2><p class="product-price">${money(item.priceZar)}</p>
-      <p class="seller-line">Listed by ${escapeHtml(item.sellerName || 'Dobha seller')} ${escapeHtml(item.sellerHandle || '')}</p>
+      <p class="seller-line">Listed by ${escapeHtml(sellerName)} ${escapeHtml(sellerHandle)}</p>
       <p class="product-description">${escapeHtml(item.description || 'A one-of-a-kind find, ready for its next home.')}</p>
-      ${item.size && item.size !== 'N/A' ? `<p class="product-description">Details: ${escapeHtml(item.size)}</p>` : ''}
+      ${item.size && item.size !== 'N/A' ? `<p class="product-description">Size / Details: ${escapeHtml(item.size)}</p>` : ''}
+      ${item.brand ? `<p class="product-description">Brand: ${escapeHtml(item.brand)}</p>` : ''}
       <p class="product-description">${Number(item.quantity) || 1} available · ${Number(item.likesCount) || 0} likes</p>
       <div class="product-actions"><button class="button button-dark" id="cart-button">Add to bag</button><button class="button button-outline" id="save-button">${item.isSaved ? 'Unsave' : 'Save'}</button><button class="button button-outline" id="like-button">${item.isLiked ? 'Unlike' : 'Like'}</button><button class="button button-outline" id="offer-button">Make an offer</button></div>
-      <a class="text-button seller-profile-link" href="#profile?id=${encodeURIComponent(item.sellerId)}">View seller profile →</a>
+      <a class="text-button seller-profile-link" href="#profile?id=${encodeURIComponent(sellerId)}">View seller profile →</a>
       <button class="text-button" id="message-product-seller">Message seller →</button>
       <section class="product-comments"><h3>Comments</h3><div id="comments-list"><p class="muted">Loading comments…</p></div><form id="comment-form" class="form-stack"><label class="field">Add a comment<textarea name="text" maxlength="500" required></textarea></label><button class="button button-outline">Comment</button></form><button class="text-button" id="report-button">Report this listing</button></section>
     </div></div>`;
@@ -310,7 +311,7 @@ function showProduct(id) {
   byId('offer-button').addEventListener('click', () => makeOffer(item));
   byId('message-product-seller').addEventListener('click', () => {
     if (!requireSignIn()) return;
-    state.selectedChat = item.sellerId;
+    state.selectedChat = sellerId;
     closeDialog('product-dialog');
     location.hash = 'messages';
   });
@@ -678,10 +679,31 @@ function updateCartBadge() {
   byId('cart-count').textContent = String(count);
   byId('cart-count').classList.toggle('hidden', !count);
 }
+function categoryPlaceholder(category) {
+  const map = {
+    'Fashion': { emoji: '👗', gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
+    'Electronics': { emoji: '📱', gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
+    'Footwear': { emoji: '👟', gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' },
+    'Accessories': { emoji: '💎', gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' },
+    'Home & Garden': { emoji: '🏡', gradient: 'linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%)' },
+  };
+  // Fuzzy match: check if category string contains any key
+  const match = Object.keys(map).find((key) => (category || '').toLowerCase().includes(key.toLowerCase()));
+  const { emoji, gradient } = map[match] || { emoji: '🛍️', gradient: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)' };
+  return `<div class="item-placeholder" style="background:${gradient}"><span class="item-placeholder-emoji">${emoji}</span><span class="item-placeholder-label">${escapeHtml(category || 'Find')}</span></div>`;
+}
+
 function listingCard(item) {
-  return `<article class="item-card" tabindex="0" role="button" aria-label="View ${escapeHtml(item.title)}" data-item="${escapeHtml(item.id)}">
-    <div class="item-image">${item.photoUrl ? `<img src="${escapeHtml(resolveMedia(item.photoUrl))}" alt="${escapeHtml(item.title)}" loading="lazy">` : '<span class="muted">Dobha find</span>'}<span class="item-category">${escapeHtml(item.category)}</span></div>
-    <div class="item-meta"><div><h3>${escapeHtml(item.title)}</h3><p class="seller-line">${escapeHtml(item.sellerName || 'Dobha seller')}</p></div><strong>${money(item.priceZar)}</strong></div>
+  const conditionClass = item.condition === 'New' || item.condition === 'new' ? 'condition-new' : item.condition ? 'condition-preloved' : '';
+  // API returns item.photos[] array and item.seller.name — normalise here
+  const photoSrc = (item.photos && item.photos[0]) || item.photoUrl || null;
+  const sellerName = (item.seller && item.seller.name) || item.sellerName || 'Dobha seller';
+  const media = photoSrc
+    ? `<img src="${escapeHtml(resolveMedia(photoSrc))}" alt="${escapeHtml(item.title)}" loading="lazy">`
+    : categoryPlaceholder(item.category);
+  return `<article class="item-card ${conditionClass}" tabindex="0" role="button" aria-label="View ${escapeHtml(item.title)}" data-item="${escapeHtml(item.id)}">
+    <div class="item-image">${media}<span class="item-category">${escapeHtml(item.category)}</span></div>
+    <div class="item-meta"><div><h3>${escapeHtml(item.title)}</h3><p class="seller-line">${escapeHtml(sellerName)}</p></div><strong>${money(item.priceZar)}</strong></div>
   </article>`;
 }
 function bindListingCards(target) {

@@ -364,8 +364,6 @@ Resources:
           AttributeType: S
         - AttributeName: recipient_id
           AttributeType: S
-        - AttributeName: created_at
-          AttributeType: N
         - AttributeName: read_at
           AttributeType: N
       KeySchema:
@@ -520,6 +518,83 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  SubscriptionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-subscriptions'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: sub_key
+          AttributeType: S
+        - AttributeName: subscriber_id
+          AttributeType: S
+        - AttributeName: seller_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: sub_key
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: SubscriberIndex
+          KeySchema:
+            - AttributeName: subscriber_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+        - IndexName: SellerSubIndex
+          KeySchema:
+            - AttributeName: seller_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+
+  AdsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-ads'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: seller_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: SellerAdsIndex
+          KeySchema:
+            - AttributeName: seller_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expires_at_ttl
+        Enabled: true
+
+  StoriesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub '${Stage}-dobha-stories'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: user_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserStoriesIndex
+          KeySchema:
+            - AttributeName: user_id
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expires_at_ttl
+        Enabled: true
+
   # ============================================
   # S3 Buckets
   # ============================================
@@ -546,24 +621,10 @@ Resources:
     Type: AWS::S3::Bucket
     Properties:
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: error.html
-
-  WebsiteBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref WebsiteBucket
-      PolicyDocument:
-        Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action: 's3:GetObject'
-            Resource: !Sub '${WebsiteBucket.Arn}/*'
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
 
   # ============================================
   # Cognito User Pool
@@ -583,20 +644,7 @@ Resources:
           RequireUppercase: true
           RequireNumbers: true
           RequireSymbols: false
-      MfaConfiguration: OFF
-      Schema:
-        - AttributeName: email
-          AttributeType: String
-          Required: true
-          Mutable: true
-        - AttributeName: name
-          AttributeType: String
-          Required: true
-          Mutable: true
-        - AttributeName: phone_number
-          AttributeType: String
-          Required: false
-          Mutable: true
+      MfaConfiguration: 'OFF'
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
@@ -604,58 +652,175 @@ Resources:
       UserPoolId: !Ref UserPool
       ClientName: !Sub '${Stage}-dobha-web'
       GenerateSecret: false
-      AuthFlows:
-        - USER_PASSWORD_AUTH
-        - ALLOW_REFRESH_TOKEN_AUTH
       ExplicitAuthFlows:
         - ALLOW_USER_PASSWORD_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
-      AllowedOAuthFlows:
-        - code
-      AllowedOAuthScopes:
-        - email
-        - openid
-        - profile
       SupportedIdentityProviders:
         - COGNITO
-      CallbackURLs:
-        - !Ref AllowedOrigin
 
   # ============================================
   # API Gateway
   # ============================================
+  # CORS headers on all API Gateway error responses (covers OPTIONS preflight 403/4xx)
+  ApiGwResponseDefault4XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref Api
+      ResponseType: DEFAULT_4XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+
+  ApiGwResponseDefault5XX:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref Api
+      ResponseType: DEFAULT_5XX
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+
+  ApiGwResponseMissingAuthToken:
+    Type: AWS::ApiGateway::GatewayResponse
+    Properties:
+      RestApiId: !Ref Api
+      ResponseType: MISSING_AUTHENTICATION_TOKEN
+      ResponseParameters:
+        gatewayresponse.header.Access-Control-Allow-Origin: "'*'"
+        gatewayresponse.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+        gatewayresponse.header.Access-Control-Allow-Methods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+
   Api:
     Type: AWS::Serverless::Api
     Properties:
       StageName: !Ref Stage
-      Auth:
-        DefaultAuthorizer: CognitoAuthorizer
-        AddDefaultAuthorizerToCorsPreflight: false
       DefinitionBody:
         openapi: '3.0'
         info:
           title: Dobha API
           version: '1.0'
+        x-amazon-apigateway-cors:
+          allowOrigins:
+            - '*'
+          allowHeaders:
+            - 'Content-Type'
+            - 'Authorization'
+            - 'X-Amz-Date'
+            - 'X-Api-Key'
+            - 'X-Amz-Security-Token'
+          allowMethods:
+            - 'GET'
+            - 'POST'
+            - 'PUT'
+            - 'PATCH'
+            - 'DELETE'
+            - 'OPTIONS'
         paths:
           /api/auth/register:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             post:
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
           /api/auth/login:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             post:
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
           /api/auth/google:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             post:
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
           /api/me:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,PATCH,DELETE,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             get:
               x-amazon-apigateway-authorizer:
                 type: cognito_user_pools
@@ -684,6 +849,27 @@ Resources:
                 httpMethod: POST
                 type: aws_proxy
           /api/items:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             get:
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
@@ -698,31 +884,29 @@ Resources:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
-          /api/items/{id}:
-            get:
-              x-amazon-apigateway-integration:
-                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
-                httpMethod: POST
-                type: aws_proxy
-            patch:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
-              x-amazon-apigateway-integration:
-                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
-                httpMethod: POST
-                type: aws_proxy
-            delete:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
-              x-amazon-apigateway-integration:
-                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
-                httpMethod: POST
-                type: aws_proxy
+          # /api/items/{id} removed: conflicts with sibling {proxy+} — all item sub-paths are handled by /api/items/{proxy+}
           /api/orders:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             get:
               x-amazon-apigateway-authorizer:
                 type: cognito_user_pools
@@ -742,6 +926,27 @@ Resources:
                 httpMethod: POST
                 type: aws_proxy
           /api/wallet:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             get:
               x-amazon-apigateway-authorizer:
                 type: cognito_user_pools
@@ -751,7 +956,29 @@ Resources:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
+          # Live routes - LiveLambda returns empty list when LiveKit not configured
           /api/rooms:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             get:
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LiveLambda.Arn}/invocations'
@@ -763,6 +990,27 @@ Resources:
                 httpMethod: POST
                 type: aws_proxy
           /api/token:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
             get:
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LiveLambda.Arn}/invocations'
@@ -858,6 +1106,36 @@ Resources:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SupportLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
+          /api/trending:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/stories:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SocialLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/subscriptions:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SocialLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/storefront/{proxy+}:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SocialLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/ads:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
           /api/admin/{proxy+}:
             x-amazon-apigateway-any-method:
               x-amazon-apigateway-integration:
@@ -907,6 +1185,7 @@ Resources:
       CodeUri: ../
       Environment:
         Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
           ITEMS_TABLE: !Ref ItemsTable
           LIKES_TABLE: !Ref LikesTable
           SAVES_TABLE: !Ref SavesTable
@@ -916,7 +1195,11 @@ Resources:
           WALLET_TABLE: !Ref WalletsTable
           TRANSACTIONS_TABLE: !Ref TransactionsTable
           PHOTOS_BUCKET: !Ref PhotosBucket
+          ADS_TABLE: !Ref AdsTable
+          SUBSCRIPTIONS_TABLE: !Ref SubscriptionsTable
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ItemsTable
         - DynamoDBCrudPolicy:
@@ -935,6 +1218,10 @@ Resources:
             TableName: !Ref TransactionsTable
         - S3CrudPolicy:
             BucketName: !Ref PhotosBucket
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AdsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SubscriptionsTable
 
   OrdersLambda:
     Type: AWS::Serverless::Function
@@ -944,6 +1231,8 @@ Resources:
       CodeUri: ../
       Environment:
         Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
+          USERS_TABLE: !Ref UsersTable
           ORDERS_TABLE: !Ref OrdersTable
           WALLET_TABLE: !Ref WalletsTable
           TRANSACTIONS_TABLE: !Ref TransactionsTable
@@ -951,6 +1240,10 @@ Resources:
           ITEMS_TABLE: !Ref ItemsTable
           NOTIFICATIONS_TABLE: !Ref NotificationsTable
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref OrdersTable
         - DynamoDBCrudPolicy:
@@ -972,6 +1265,7 @@ Resources:
       CodeUri: ../
       Environment:
         Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
           CART_TABLE: !Ref CartItemsTable
           OFFERS_TABLE: !Ref OffersTable
           FOLLOWS_TABLE: !Ref FollowsTable
@@ -979,7 +1273,11 @@ Resources:
           REVIEWS_TABLE: !Ref ReviewsTable
           USERS_TABLE: !Ref UsersTable
           ITEMS_TABLE: !Ref ItemsTable
+          SUBSCRIPTIONS_TABLE: !Ref SubscriptionsTable
+          STORIES_TABLE: !Ref StoriesTable
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref CartItemsTable
         - DynamoDBCrudPolicy:
@@ -994,6 +1292,10 @@ Resources:
             TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ItemsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SubscriptionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StoriesTable
 
   NotificationsLambda:
     Type: AWS::Serverless::Function
@@ -1003,9 +1305,15 @@ Resources:
       CodeUri: ../
       Environment:
         Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
+          USERS_TABLE: !Ref UsersTable
           NOTIFICATIONS_TABLE: !Ref NotificationsTable
           PUSH_TABLE: !Ref PushNotificationsTable
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref NotificationsTable
         - DynamoDBCrudPolicy:
@@ -1019,8 +1327,14 @@ Resources:
       CodeUri: ../
       Environment:
         Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
+          USERS_TABLE: !Ref UsersTable
           SUPPORT_TABLE: !Ref SupportRequestsTable
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref SupportRequestsTable
         - Statement:
@@ -1038,11 +1352,17 @@ Resources:
       CodeUri: ../
       Environment:
         Variables:
+          SESSIONS_TABLE: !Ref SessionsTable
+          USERS_TABLE: !Ref UsersTable
           REPORTS_TABLE: !Ref ReportsTable
           SUPPORT_TABLE: !Ref SupportRequestsTable
           ORDERS_TABLE: !Ref OrdersTable
           ITEMS_TABLE: !Ref ItemsTable
       Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SessionsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
             TableName: !Ref ReportsTable
         - DynamoDBCrudPolicy:
@@ -1060,18 +1380,13 @@ Resources:
       CodeUri: ../
       Environment:
         Variables:
-          LIVEKIT_URL: '{{resolve:secretsmanager:LiveKitUrl}}'
-          LIVEKIT_API_KEY: '{{resolve:secretsmanager:LiveKitApiKey}}'
-          LIVEKIT_API_SECRET: '{{resolve:secretsmanager:LiveKitApiSecret}}'
+          LIVEKIT_URL: 'wss://dobha-dobha-7co038tw.livekit.cloud'
+          LIVEKIT_API_KEY: '***REMOVED***'
+          LIVEKIT_API_SECRET: '***REMOVED***'
           USERS_TABLE: !Ref UsersTable
           ITEMS_TABLE: !Ref ItemsTable
           SESSIONS_TABLE: !Ref SessionsTable
       Policies:
-        - Statement:
-            Effect: Allow
-            Action:
-              - secretsmanager:GetSecretValue
-            Resource: '*'
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
         - DynamoDBCrudPolicy:
@@ -1101,39 +1416,6 @@ Resources:
             Schedule: 'cron(0 1 * * ? *)'
             Name: DailyCleanup
             Description: Daily cleanup of expired sessions and unattached uploads
-
-  # ============================================
-  # CloudFront Distribution for Website
-  # ============================================
-  WebsiteDistribution:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
-        Enabled: true
-        DefaultRootObject: index.html
-        Origins:
-          - Id: S3Origin
-            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
-            S3OriginConfig:
-              OriginAccessIdentity: ''
-        DefaultCacheBehavior:
-          TargetOriginId: S3Origin
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods:
-            - GET
-            - HEAD
-            - OPTIONS
-          CachedMethods:
-            - GET
-            - HEAD
-          ForwardedValues:
-            QueryString: false
-            Cookies:
-              Forward: none
-          Compress: true
-        PriceClass: PriceClass_All
-        ViewerCertificate:
-          CloudFrontDefaultCertificate: true
 
   # ============================================
   # CloudFront Distribution for API
@@ -1186,7 +1468,6 @@ Resources:
       QueueName: !Sub '${Stage}-dobha-push-queue'
       VisibilityTimeout: 300
       MessageRetentionPeriod: 86400
-      DeadLetterTargetArn: !GetAtt PushDLQ.Arn
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt PushDLQ.Arn
         maxReceiveCount: 3
@@ -1240,6 +1521,73 @@ Resources:
         - Name: ApiName
           Value: !Ref Api
 
+  # ============================================
+  # Lambda Permissions - Allow API Gateway to invoke each Lambda
+  # ============================================
+  LiveLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt LiveLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*'
+
+  ItemsLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt ItemsLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*'
+
+  OrdersLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt OrdersLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*'
+
+  SocialLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SocialLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*'
+
+  NotificationsLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt NotificationsLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*'
+
+  SupportLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt SupportLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*'
+
+  AdminLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt AdminLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*'
+
+  AuthLambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt AuthLambda.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Api}/*/*'
+
 Outputs:
   ApiEndpoint:
     Description: API Gateway endpoint URL
@@ -1248,10 +1596,6 @@ Outputs:
   ApiDistributionDomain:
     Description: CloudFront distribution domain for API
     Value: !GetAtt ApiDistribution.DomainName
-
-  WebsiteDistributionDomain:
-    Description: CloudFront distribution domain for website
-    Value: !GetAtt WebsiteDistribution.DomainName
 
   WebsiteBucketName:
     Description: S3 bucket name for website

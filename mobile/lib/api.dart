@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// The live Dobha server (the Cloudflare Worker in `server/`).
-const liveServerUrl = 'https://dobha-live.ndlovubhekani17.workers.dev';
+/// The live Dobha server (AWS API Gateway, af-south-1).
+const liveServerUrl = 'https://4mvo7623gl.execute-api.af-south-1.amazonaws.com/dev';
 const deploymentApiBaseUrl = String.fromEnvironment('API_BASE_URL');
 
 /// Use the deployed API when configured; otherwise preserve the current live setup.
@@ -89,6 +89,25 @@ class Api {
     final data = await get('/api/token', {'room': room, 'role': host ? 'host' : 'viewer'}) as Map<String, dynamic>;
     return JoinInfo(data['url'] as String, data['token'] as String);
   }
+
+  // ---- Stories ----
+
+  Future<dynamic> getStories() => get('/api/stories');
+
+  Future<dynamic> postStory({required String mediaUrl, required String mediaType, String caption = ''}) =>
+      post('/api/stories', {'mediaUrl': mediaUrl, 'mediaType': mediaType, 'caption': caption});
+
+  // ---- Subscriptions ----
+
+  Future<dynamic> toggleSubscription(String userId) => post('/api/users/$userId/subscribe');
+
+  Future<dynamic> getSubscriptions() => get('/api/subscriptions');
+
+  // ---- Promotions (boost) ----
+
+  /// Promotes [itemId] for [days] days at [tier]: 'basic', 'standard', or 'premium'.
+  Future<dynamic> promoteItem(String itemId, {required int days, String tier = 'basic'}) =>
+      post('/api/items/$itemId/promote', {'days': days, 'tier': tier});
 
   Future<dynamic> _send(
     String method,

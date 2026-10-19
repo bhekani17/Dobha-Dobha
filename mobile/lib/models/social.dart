@@ -1,5 +1,102 @@
 import 'thrift_item.dart';
 
+/// A 24-hour story posted by a user or vendor.
+class Story {
+  final String id;
+  final String userId;
+  final String userName;
+  final String userHandle;
+  final String? userAvatarUrl;
+  final String mediaUrl;
+
+  /// 'image' or 'video'
+  final String mediaType;
+  final String caption;
+  final DateTime createdAt;
+  final DateTime expiresAt;
+
+  const Story({
+    required this.id,
+    required this.userId,
+    required this.userName,
+    required this.userHandle,
+    this.userAvatarUrl,
+    required this.mediaUrl,
+    required this.mediaType,
+    required this.caption,
+    required this.createdAt,
+    required this.expiresAt,
+  });
+
+  bool get isVideo => mediaType == 'video';
+
+  factory Story.fromJson(Map<String, dynamic> json) => Story(
+        id: json['id'] as String,
+        userId: json['userId'] as String? ?? json['user_id'] as String,
+        userName: json['userName'] as String? ?? json['user_name'] as String? ?? '',
+        userHandle: json['userHandle'] as String? ?? json['user_handle'] as String? ?? '',
+        userAvatarUrl: json['userAvatarUrl'] as String? ?? json['avatar_url'] as String?,
+        mediaUrl: json['mediaUrl'] as String? ?? json['media_url'] as String,
+        mediaType: json['mediaType'] as String? ?? json['media_type'] as String? ?? 'image',
+        caption: json['caption'] as String? ?? '',
+        createdAt: DateTime.fromMillisecondsSinceEpoch(
+          json['createdAt'] is int
+              ? json['createdAt'] as int
+              : json['created_at'] is int
+                  ? json['created_at'] as int
+                  : DateTime.parse(json['createdAt'] as String? ?? json['created_at'] as String).millisecondsSinceEpoch,
+        ),
+        expiresAt: DateTime.fromMillisecondsSinceEpoch(
+          json['expiresAt'] is int
+              ? json['expiresAt'] as int
+              : json['expires_at'] is int
+                  ? json['expires_at'] as int
+                  : DateTime.parse(json['expiresAt'] as String? ?? json['expires_at'] as String).millisecondsSinceEpoch,
+        ),
+      );
+}
+
+/// A group of stories from one user (how they appear in the stories row).
+class StoryGroup {
+  final String userId;
+  final String userName;
+  final String? userAvatarUrl;
+  final List<Story> stories;
+
+  const StoryGroup({
+    required this.userId,
+    required this.userName,
+    this.userAvatarUrl,
+    required this.stories,
+  });
+
+  Story get latest => stories.last;
+}
+
+/// A subscription record (who the current user has subscribed to).
+class Subscription {
+  final String sellerId;
+  final String sellerName;
+  final String? sellerAvatarUrl;
+  final DateTime createdAt;
+
+  const Subscription({
+    required this.sellerId,
+    required this.sellerName,
+    this.sellerAvatarUrl,
+    required this.createdAt,
+  });
+
+  factory Subscription.fromJson(Map<String, dynamic> json) => Subscription(
+        sellerId: json['seller_id'] as String? ?? json['sellerId'] as String,
+        sellerName: json['sellerName'] as String? ?? json['seller_name'] as String? ?? '',
+        sellerAvatarUrl: json['sellerAvatarUrl'] as String? ?? json['avatar_url'] as String?,
+        createdAt: DateTime.fromMillisecondsSinceEpoch(
+          json['created_at'] is int ? json['created_at'] as int : DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+}
+
 /// A price offer on a listing, seen by either the buyer or the seller.
 class Offer {
   final String id;

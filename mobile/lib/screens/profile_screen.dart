@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../api.dart';
 import '../models/escrow_order.dart';
+import '../models/social.dart';
 import '../models/thrift_item.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
@@ -14,6 +16,7 @@ import 'edit_profile_screen.dart';
 import 'chat_screens.dart';
 import 'notifications_screen.dart';
 import 'people_screens.dart';
+import 'seller_screen.dart';
 import 'settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -24,7 +27,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(length: 2, vsync: this);
+  late final TabController _tabController = TabController(length: 3, vsync: this);
 
 
   @override
@@ -170,6 +173,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                     tabs: [
                       Tab(text: 'Orders (${orders.length})'),
                       Tab(text: 'Saved (${saved.length})'),
+                      Tab(text: 'Subscriptions'),
                     ],
                   ),
                 ),
@@ -180,6 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               children: [
                 _buildOrdersTab(orders),
                 _buildSavedTab(context, saved),
+                _buildSubscriptionsTab(context),
               ],
             ),
           ),
@@ -201,6 +206,32 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
         itemCount: orders.length,
         itemBuilder: (context, idx) => EscrowTrackerCard(order: orders[idx]),
       ),
+    );
+  }
+
+  Widget _buildSubscriptionsTab(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppState(),
+      builder: (context, _) {
+        final subs = AppState().subscriptions;
+        if (subs.isEmpty) {
+          return const _Empty(
+            icon: Icons.notifications_none_rounded,
+            text: 'No subscriptions yet.\nSubscribe to vendors to get notified about their new drops.',
+          );
+        }
+        return RefreshIndicator(
+          color: DobhaColors.green,
+          backgroundColor: DobhaColors.cardElevated,
+          onRefresh: AppState().loadSubscriptions,
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+            itemCount: subs.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
+            itemBuilder: (context, i) => _SubscriptionTile(sub: subs[i]),
+          ),
+        );
+      },
     );
   }
 
@@ -246,6 +277,70 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
             ),
           ),
       ],
+    );
+  }
+}
+
+class _SubscriptionTile extends StatefulWidget {
+  final Subscription sub;
+  const _SubscriptionTile({required this.sub});
+
+  @override
+  State<_SubscriptionTile> createState() => _SubscriptionTileState();
+}
+
+class _SubscriptionTileState extends State<_SubscriptionTile> {
+  bool _loading = false;
+
+  Future<void> _unsubscribe() async {
+    setState(() => _loading = true);
+    try {
+      await AppState().toggleSubscription(widget.sub.sellerId);
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sub = widget.sub;
+    return AppCard(
+      radius: 18,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => SellerScreen.open(context, sub.sellerId),
+            child: UserAvatar(url: sub.sellerAvatarUrl, name: sub.sellerName, size: 46),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => SellerScreen.open(context, sub.sellerId),
+              child: Text(
+                sub.sellerName,
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          _loading
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: DobhaColors.muted),
+                )
+              : AppButton(
+                  radius: 12,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  onPressed: _unsubscribe,
+                  child: Text('Unsubscribe', style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
+                ),
+        ],
+      ),
     );
   }
 }

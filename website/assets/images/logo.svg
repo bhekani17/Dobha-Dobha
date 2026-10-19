@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Pure Dark Green Background -->
+  <rect x="0" y="0" width="512" height="512" rx="110" fill="#022C22" />
+
+  <!-- Live Broadcast Pulse Outer Ring -->
+  <circle cx="380" cy="132" r="30" fill="#065F46" opacity="0.6" />
+  <circle cx="380" cy="132" r="16" fill="#FFFFFF" />
+
+  <!-- Stylized Thrift Tag Body (White) -->
+  <path d="M140 180 L280 120 C295 114 312 120 320 134 L390 250 C398 264 394 282 380 290 L240 370 C226 378 208 372 200 358 L130 240 C122 226 126 208 140 180 Z" fill="#FFFFFF" />
+
+  <!-- Tag Hole -->
+  <circle cx="180" cy="180" r="18" fill="#022C22" />
+
+  <!-- Center Play / Live Symbol (Dark Green) -->
+  <polygon points="250,220 250,290 310,255" fill="#022C22" />
+</svg>
