@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Dobha Marketplace - AWS Serverless Infrastructure with RDS
+Description: Deprecated incomplete Lambda/RDS alternative; not the approved production target
 
 Parameters:
   Stage:
@@ -13,8 +13,9 @@ Parameters:
 
   AllowedOrigin:
     Type: String
-    Default: '*'
-    Description: CORS allowed origin for API
+    AllowedPattern: '^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$'
+    ConstraintDescription: Provide exactly one HTTP or HTTPS website origin without a path or wildcard.
+    Description: A single trusted website origin for API CORS.
 
   AdminEmails:
     Type: String
@@ -34,8 +35,9 @@ Parameters:
   DBPassword:
     Type: String
     NoEcho: true
-    Default: 'ChangeMePassword123!'
-    Description: RDS database password (min 8 characters)
+    MinLength: 16
+    MaxLength: 41
+    Description: Required database password; supply securely and never commit it.
 
   DBName:
     Type: String
@@ -328,13 +330,26 @@ Resources:
     Properties:
       BucketName: !Sub '${Stage}-dobha-website'
       PublicAccessBlockConfiguration:
-        BlockPublicAcls: false
-        BlockPublicPolicy: false
-        IgnorePublicAcls: false
-        RestrictPublicBuckets: false
-      WebsiteConfiguration:
-        IndexDocument: index.html
-        ErrorDocument: error.html
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+
+  WebsiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${Stage}-dobha-website-oac'
+        Description: Private S3 access for the website distribution
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
 
   WebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
@@ -342,10 +357,15 @@ Resources:
       Bucket: !Ref WebsiteBucket
       PolicyDocument:
         Statement:
-          - Effect: Allow
-            Principal: '*'
-            Action: 's3:GetObject'
+          - Sid: AllowCloudFrontReadOnly
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
             Resource: !Sub '${WebsiteBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${WebsiteDistribution}'
 
   # ============================================
   # API Gateway
@@ -539,6 +559,7 @@ Resources:
         Origins:
           - Id: S3Origin
             DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt WebsiteOriginAccessControl.Id
             S3OriginConfig:
               OriginAccessIdentity: ''
         DefaultCacheBehavior:

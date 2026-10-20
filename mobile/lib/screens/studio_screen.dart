@@ -62,10 +62,6 @@ class _StudioScreenState extends State<StudioScreen> {
     }
   }
 
-  Future<void> _boostItem(ThriftItem item) async {
-    await BoostListingSheet.show(context, item);
-  }
-
   Future<void> _remove(ThriftItem item) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -271,13 +267,13 @@ class _StudioScreenState extends State<StudioScreen> {
                           onPressed: () => NewListingScreen.open(context, editing: item),
                         ),
                         IconButton(
-                          tooltip: item.isPromoted ? 'Boosted' : 'Boost listing',
+                          tooltip: 'Paid listing boosts are unavailable',
                           icon: Icon(
                             Icons.rocket_launch_outlined,
                             size: 19,
-                            color: item.isPromoted ? DobhaColors.amber : DobhaColors.muted,
+                            color: DobhaColors.muted,
                           ),
-                          onPressed: () => _boostItem(item),
+                          onPressed: null,
                         ),
                         IconButton(
                           tooltip: 'Remove listing',

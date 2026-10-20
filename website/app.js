@@ -31,7 +31,7 @@ const categoryCards = [
 ];
 const savedTheme = localStorage.getItem('dobha-theme');
 const apiBase = String(window.DOBHA_CONFIG?.apiBase || 'https://dobha-live.ndlovubhekani17.workers.dev').replace(/\/+$/, '');
-const termsVersion = window.DOBHA_CONFIG?.termsVersion || '2026-10-02';
+const termsVersion = window.DOBHA_CONFIG?.termsVersion || '2026-10-21';
 const state = {
   token: localStorage.getItem('dobha-token') || '',
   user: null,
@@ -52,10 +52,18 @@ const state = {
   offers: [],
   orders: [],
   notifications: [],
+  storyQueue: [],
+  storyPosition: 0,
   chats: [],
   selectedChat: '',
   chatPoll: null,
   roomPoll: null,
+  notificationPoll: null,
+  unreadNotificationCount: null,
+  stories: [],
+  hostRoom: null,
+  hostTracks: [],
+  hostRoomName: '',
   resetEmail: '',
 };
 const byId = (id) => document.getElementById(id);
@@ -133,7 +141,7 @@ function applyTheme(theme) {
   byId('theme-toggle').setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
   byId('theme-toggle').title = `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`;
   document.querySelectorAll('.brand-symbol img').forEach((image) => {
-    image.src = `assets/images/logo-${theme}.png`;
+    image.src = '/assets/images/logo.svg';
   });
 }
 function notify(message, error = false) {
@@ -171,8 +179,12 @@ function setSignedIn(user, token) {
   loadItems();
 }
 function signOut() {
+  clearInterval(state.notificationPoll);
+  state.notificationPoll = null;
+  if (state.hostRoom) stopLiveHost().catch((error) => console.error('Unable to end the live stream:', error));
   state.user = null;
   state.token = '';
+  state.unreadNotificationCount = null;
   localStorage.removeItem('dobha-token');
   localStorage.removeItem('dobha-user');
   byId('auth-button').textContent = 'Sign in';
@@ -278,6 +290,75 @@ async function loadItems(append = false) {
   } catch (error) {
     byId('listing-grid').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
   }
+}
+async function loadReels() {
+  const target = byId('reels-feed');
+  target.innerHTML = '<p class="muted">Loading video finds…</p>';
+  try {
+    const { items } = await api('/api/items?limit=100');
+    const reels = items.filter((item) => item.videoUrl);
+    state.items = [...state.items.filter((item) => !reels.some((reel) => reel.id === item.id)), ...reels];
+    target.innerHTML = reels.length ? reels.map((item) => `<article class="reel-card" data-reel="${escapeHtml(item.id)}">
+      <video src="${escapeHtml(resolveMedia(item.videoUrl))}" autoplay muted loop playsinline controls preload="metadata"></video>
+      <div class="reel-caption"><p class="eyebrow">${escapeHtml(item.seller?.name || item.sellerName || 'Dobha seller')}</p><h2>${escapeHtml(item.title)}</h2><p>${money(item.priceZar)} · ${escapeHtml(item.condition || 'Pre-loved')}</p>
+        <div class="action-row"><button class="button button-light" data-reel-open="${escapeHtml(item.id)}">View listing</button><button class="button button-outline" data-reel-like="${escapeHtml(item.id)}">${item.isLiked ? 'Unlike' : 'Like'}</button><button class="button button-outline" data-reel-save="${escapeHtml(item.id)}">${item.isSaved ? 'Unsave' : 'Save'}</button></div>
+      </div>
+    </article>`).join('') : '<p class="muted">No listing videos yet. Sellers can add video to a listing from the Sell page.</p>';
+    target.querySelectorAll('[data-reel-open]').forEach((button) => button.addEventListener('click', () => showProduct(button.dataset.reelOpen)));
+    target.querySelectorAll('[data-reel-like]').forEach((button) => button.addEventListener('click', () => itemAction(button.dataset.reelLike, 'like', 'Likes')));
+    target.querySelectorAll('[data-reel-save]').forEach((button) => button.addEventListener('click', () => itemAction(button.dataset.reelSave, 'save', 'Saved items')));
+  } catch (error) {
+    target.innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
+  }
+}
+async function loadStories() {
+  const target = byId('stories-row');
+  if (!target) return;
+  try {
+    const { stories } = await api('/api/stories');
+    state.stories = stories || [];
+    state.storyQueue = state.stories.flatMap((group, groupIndex) =>
+      (group.stories || []).map((story, storyIndex) => ({ groupIndex, storyIndex, group, story })));
+    target.innerHTML = state.stories.length
+      ? state.stories.map((group, index) => `<button class="story-ring" type="button" data-story-group="${index}" aria-label="View ${escapeHtml(group.userName)}'s stories">
+          <span>${group.avatarUrl ? `<img src="${escapeHtml(resolveMedia(group.avatarUrl))}" alt="">` : escapeHtml((group.userName || '?').slice(0, 1).toUpperCase())}</span><small>${escapeHtml(group.userName || 'Seller')}</small>
+        </button>`).join('')
+      : '<p class="muted">No active stories. Check back when sellers share a new find.</p>';
+    target.querySelectorAll('[data-story-group]').forEach((button) => {
+      button.addEventListener('click', () => openStory(Number(button.dataset.storyGroup)));
+    });
+  } catch (error) {
+    target.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+  }
+}
+function openStory(groupIndex) {
+  const position = state.storyQueue.findIndex((entry) => entry.groupIndex === groupIndex);
+  if (position < 0) return;
+  state.storyPosition = position;
+  renderStory();
+  openDialog('story-dialog');
+}
+function renderStory() {
+  const entry = state.storyQueue[state.storyPosition];
+  if (!entry) return;
+  const { group, story } = entry;
+  const mediaUrl = escapeHtml(resolveMedia(story.mediaUrl));
+  const media = story.mediaType === 'video'
+    ? `<video src="${mediaUrl}" controls autoplay playsinline></video>`
+    : `<img src="${mediaUrl}" alt="${escapeHtml(story.caption || `${group.userName}'s story`)}">`;
+  byId('story-viewer').innerHTML = `<p class="eyebrow">${escapeHtml(group.userName || 'Seller')} · ${escapeHtml(group.userHandle || '')}</p><div class="story-media">${media}</div><p>${escapeHtml(story.caption || '')}</p>`;
+  byId('story-previous').disabled = state.storyPosition === 0;
+  byId('story-next').textContent = state.storyPosition === state.storyQueue.length - 1 ? 'Done' : 'Next';
+}
+function stepStory(direction) {
+  const next = state.storyPosition + direction;
+  if (next < 0) return;
+  if (next >= state.storyQueue.length) {
+    closeDialog('story-dialog');
+    return;
+  }
+  state.storyPosition = next;
+  renderStory();
 }
 function showProduct(id) {
   const item = state.items.find((listing) => listing.id === id);
@@ -397,6 +478,7 @@ async function watchStream(room, inline = false) {
     if (!Room || !Track || !RoomEvent) throw new Error('The live video player could not be loaded.');
     const liveRoom = new Room();
     state.stream = liveRoom;
+    liveRoom.on(RoomEvent.DataReceived, handleLiveData);
     liveRoom.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind === Track.Kind.Video) {
         track.attach(player.video);
@@ -435,6 +517,8 @@ async function stopStream() {
     byId('inline-live-placeholder').textContent = 'Connecting to the live stream…';
     setMessage('inline-live-message', '');
   }
+  document.querySelectorAll('[data-live-chat]').forEach((target) => { target.innerHTML = ''; });
+  document.querySelectorAll('[data-live-pinned]').forEach((target) => { target.innerHTML = ''; });
 }
 async function loadOrders() {
   if (!state.token) {
@@ -446,15 +530,13 @@ async function loadOrders() {
     const { orders } = await apiPrivate('/orders');
     state.orders = orders;
     byId('orders-list').innerHTML = orders.length ? orders.map((order) => `<article class="order-card feature-card">
-      <div><strong>${escapeHtml(order.item?.title || 'Dobha item')}</strong><span>${escapeHtml(order.id)} · ${escapeHtml(new Date(order.createdAt).toLocaleDateString())}</span><span>${order.isSeller ? 'Sale' : 'Purchase'} · ${escapeHtml(order.deliveryMethod || '')}</span></div>
+      <div><strong>${escapeHtml(order.item?.title || 'Dobha item')}</strong><span>${escapeHtml(order.id)} · ${escapeHtml(new Date(order.createdAt).toLocaleDateString())}</span><span>${order.isSeller ? 'Sale' : 'Purchase'} · ${escapeHtml(order.deliveryMethod || '')}</span><span class="field-hint">Historical order status only; it does not verify a real payment, delivery, or payout.</span></div>
       <div><strong>${money(order.amountZar + (order.shippingFeeZar || 0))}</strong><span class="order-status">${escapeHtml(order.status)}</span>
-        ${order.isSeller && order.status === 'paymentHeld' ? (order.deliveryMethod === 'Downtown Joburg Safe Hub' ? `<button data-order-action="dispatch" data-order-id="${escapeHtml(order.id)}" class="button button-outline">Mark ready for collection</button>` : `<form data-order-form="dispatch" data-order-id="${escapeHtml(order.id)}"><input name="trackingNumber" required minlength="4" maxlength="40" placeholder="Tracking number"><button class="button button-outline">Mark dispatched</button></form>`) : ''}
-        ${!order.isSeller && ['paymentHeld','vendorDispatched'].includes(order.status) ? `<button data-order-action="confirm" data-order-id="${escapeHtml(order.id)}" class="button button-dark">Confirm received</button><button data-order-action="dispute" data-order-id="${escapeHtml(order.id)}" class="button button-outline">Report a problem</button>` : ''}
+        ${!order.isSeller && ['paymentHeld','vendorDispatched'].includes(order.status) ? `<button data-order-action="dispute" data-order-id="${escapeHtml(order.id)}" class="button button-outline">Ask support about this record</button>` : ''}
         ${order.canReview ? `<button data-order-action="review" data-order-id="${escapeHtml(order.id)}" class="button button-outline">Review seller</button>` : ''}
       </div>
     </article>`).join('') : '<p class="muted">No orders yet. Your finds will show up here.</p>';
     byId('orders-list').querySelectorAll('[data-order-action]').forEach((button) => button.addEventListener('click', () => orderAction(button.dataset.orderId, button.dataset.orderAction)));
-    byId('orders-list').querySelectorAll('[data-order-form="dispatch"]').forEach((form) => form.addEventListener('submit', (event) => dispatchOrder(event, form)));
   } catch (error) {
     byId('orders-list').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
   }
@@ -466,6 +548,155 @@ async function uploadFile(file) {
     contentType: file.type,
   });
   return { key: upload.key };
+}
+async function submitStory(event) {
+  event.preventDefault();
+  if (!requireSignIn()) return;
+  if (state.user?.role !== 'vendor') {
+    setMessage('story-message', 'Create a seller profile before posting a story.', true);
+    return;
+  }
+  const form = event.currentTarget;
+  const file = form.elements.media.files[0];
+  if (!file) return;
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  setMessage('story-message', 'Uploading your story…');
+  try {
+    const upload = await uploadFile(file);
+    await api('/api/stories', {
+      method: 'POST',
+      body: {
+        mediaUrl: `/media/${upload.key}`,
+        mediaType: file.type.startsWith('video/') ? 'video' : 'image',
+        caption: form.elements.caption.value.trim(),
+      },
+    });
+    form.reset();
+    setMessage('story-message', 'Story posted. It expires after 24 hours.');
+    await loadStories();
+  } catch (error) {
+    setMessage('story-message', error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+async function startLiveHost(event) {
+  event.preventDefault();
+  if (!requireSignIn()) return;
+  if (state.user?.role !== 'vendor') {
+    setMessage('host-live-message', 'Create a seller profile before starting a stream.', true);
+    return;
+  }
+  const client = window.LivekitClient;
+  if (!client?.Room || !client?.createLocalTracks) {
+    setMessage('host-live-message', 'Live video is unavailable because the browser SDK did not load.', true);
+    return;
+  }
+  const form = event.currentTarget;
+  const roomName = form.elements.room.value.trim();
+  if (!/^[A-Za-z0-9_-]{1,40}$/.test(roomName)) {
+    setMessage('host-live-message', 'Use 1–40 letters, numbers, hyphens, or underscores for the stream name.', true);
+    return;
+  }
+  const button = byId('start-live-host');
+  button.disabled = true;
+  setMessage('host-live-message', 'Connecting to live video…');
+  let room;
+  let tracks = [];
+  try {
+    const token = await api(`/api/token?room=${encodeURIComponent(roomName)}&role=host`);
+    tracks = await client.createLocalTracks({ audio: true, video: { facingMode: 'user' } });
+    if (!tracks.some((track) => track.kind === 'video')) {
+      throw new Error('The camera could not be started.');
+    }
+    room = new client.Room();
+    room.on(client.RoomEvent.DataReceived, handleLiveData);
+    await room.connect(token.url, token.token);
+    for (const track of tracks) await room.localParticipant.publishTrack(track, { name: track.kind });
+    state.hostRoom = room;
+    state.hostTracks = tracks;
+    state.hostRoomName = roomName;
+    const preview = byId('host-preview');
+    const videoTrack = tracks.find((track) => track.kind === 'video');
+    videoTrack.attach(preview);
+    byId('host-preview-placeholder').classList.add('hidden');
+    byId('start-live-host').classList.add('hidden');
+    byId('stop-live-host').classList.remove('hidden');
+    setMessage('host-live-message', `You are live in “${roomName}”. Keep this page open while streaming.`);
+  } catch (error) {
+    if (room) await room.disconnect().catch((disconnectError) => console.error('Live room cleanup failed:', disconnectError));
+    tracks.forEach((track) => track.stop());
+    setMessage('host-live-message', error.message, true);
+  } finally {
+    button.disabled = false;
+  }
+}
+async function stopLiveHost() {
+  const room = state.hostRoom;
+  const tracks = state.hostTracks;
+  state.hostRoom = null;
+  state.hostTracks = [];
+  state.hostRoomName = '';
+  try {
+    if (room) await room.disconnect();
+  } finally {
+    tracks.forEach((track) => track.stop());
+    const preview = byId('host-preview');
+    if (preview) {
+      preview.srcObject = null;
+      byId('host-preview-placeholder').classList.remove('hidden');
+    }
+    byId('start-live-host')?.classList.remove('hidden');
+    byId('stop-live-host')?.classList.add('hidden');
+    if (byId('host-live-message')) setMessage('host-live-message', 'Live stream ended.');
+  }
+}
+function handleLiveData(data, participant) {
+  try {
+    const message = JSON.parse(new TextDecoder().decode(data));
+    if (message.type === 'chat' && typeof message.text === 'string') {
+      appendLiveChat(participant?.name || 'Seller', message.text);
+    } else if (message.type === 'pin_item' && message.item) {
+      renderPinnedLiveItem(message.item);
+    } else if (message.type === 'unpin_item') {
+      document.querySelectorAll('[data-live-pinned]').forEach((target) => { target.innerHTML = ''; });
+    }
+  } catch (error) {
+    console.error('Unable to read live stream message:', error);
+  }
+}
+function appendLiveChat(name, text) {
+  document.querySelectorAll('[data-live-chat]').forEach((target) => {
+    const line = document.createElement('p');
+    line.innerHTML = `<strong>${escapeHtml(name)}:</strong> ${escapeHtml(text)}`;
+    target.append(line);
+    target.scrollTop = target.scrollHeight;
+  });
+}
+function renderPinnedLiveItem(item) {
+  document.querySelectorAll('[data-live-pinned]').forEach((target) => {
+    target.innerHTML = `<p><strong>${escapeHtml(item.title || 'Pinned listing')}</strong> · ${escapeHtml(item.price || '')}</p><p class="field-hint">Checkout is unavailable; this pin does not reserve or sell the item.</p>`;
+  });
+}
+async function sendLiveChat(event) {
+  event.preventDefault();
+  const room = state.hostRoom || state.stream;
+  if (!room?.localParticipant) {
+    notify('Join a live stream before sending a message.', true);
+    return;
+  }
+  const form = event.currentTarget;
+  const text = form.elements.message.value.trim();
+  if (!text) return;
+  try {
+    const data = new TextEncoder().encode(JSON.stringify({ type: 'chat', text }));
+    await room.localParticipant.publishData(data, { reliable: true });
+    appendLiveChat(state.user?.name || 'You', text);
+    form.reset();
+  } catch (error) {
+    notify(error.message || 'Message could not be sent.', true);
+  }
 }
 function renderHomeCategories() {
   byId('home-categories').innerHTML = categoryCards.map(([name, icon, description]) => `
@@ -482,13 +713,18 @@ function renderHomeCategories() {
 }
 function renderPage() {
   const requested = location.hash.slice(1).split('?')[0] || 'home';
-  const page = ['home', 'shop', 'live', 'sell', 'orders', 'cart', 'saved', 'offers', 'wallet', 'messages', 'notifications', 'account', 'support', 'people', 'profile', 'about'].includes(requested) ? requested : 'home';
+  const page = ['home', 'reels', 'shop', 'live', 'sell', 'orders', 'cart', 'saved', 'offers', 'wallet', 'messages', 'notifications', 'account', 'support', 'people', 'profile', 'about'].includes(requested) ? requested : 'home';
   state.page = page;
   if (state.inlineStream && page !== 'live') stopStream();
+  if (state.hostRoom && page !== 'sell') {
+    stopLiveHost().catch((error) => console.error('Unable to end the live stream:', error));
+  }
   clearInterval(state.chatPoll);
   state.chatPoll = null;
   clearInterval(state.roomPoll);
   state.roomPoll = null;
+  clearInterval(state.notificationPoll);
+  state.notificationPoll = null;
   document.querySelectorAll('[data-page]').forEach((section) => {
     section.classList.toggle('hidden', section.dataset.page !== page);
   });
@@ -502,6 +738,8 @@ function renderPage() {
       const vendor = state.user?.role !== 'vendor';
       setFieldGroup(document.querySelector('.vendor-fields'), vendor);
       setFieldGroup(document.querySelector('.listing-fields'), !vendor);
+      setFieldGroup(byId('seller-story-section'), !vendor);
+      setFieldGroup(byId('web-live-studio'), !vendor);
       byId('sell-title').textContent = vendor ? 'Your corner of the marketplace' : 'List your next find';
     }
   }
@@ -514,7 +752,11 @@ function renderPage() {
     loadChats();
     state.chatPoll = setInterval(() => loadChats(), 5000);
   }
-  if (page === 'notifications') loadNotifications();
+  if (page === 'notifications') {
+    loadNotifications();
+    pollBrowserNotifications();
+    state.notificationPoll = setInterval(pollBrowserNotifications, 30_000);
+  }
   if (page === 'account') renderAccount();
   if (page === 'support') loadSupport();
   if (page === 'people') byId('people-results').innerHTML = '';
@@ -524,6 +766,8 @@ function renderPage() {
     renderFilters();
     loadItems();
   }
+  if (page === 'reels') loadReels();
+  if (page === 'home') loadStories();
   if (page === 'home' || page === 'live') {
     loadLiveRooms();
     state.roomPoll = setInterval(loadLiveRooms, 10_000);
@@ -546,6 +790,8 @@ async function createVendor() {
     setMessage('sell-message', 'Your shop is ready. Add your first listing below.');
     setFieldGroup(document.querySelector('.vendor-fields'), false);
     setFieldGroup(document.querySelector('.listing-fields'), true);
+    setFieldGroup(byId('seller-story-section'), false);
+    setFieldGroup(byId('web-live-studio'), false);
     byId('sell-title').textContent = 'List your first item';
   } catch (error) {
     setMessage('sell-message', error.message, true);
@@ -809,25 +1055,6 @@ async function removeFromCart(itemId) {
     notify(error.message, true);
   }
 }
-async function checkout(event) {
-  event.preventDefault();
-  if (!requireSignIn()) return;
-  const form = event.currentTarget;
-  const button = form.querySelector('button[type="submit"]');
-  button.disabled = true;
-  setMessage('checkout-message', 'Placing your order requests…');
-  const data = new FormData(form);
-  try {
-    const result = await api('/api/cart/checkout', { method: 'POST', body: Object.fromEntries(data) });
-    const failures = (result.failed || []).map((entry) => entry.error);
-    setMessage('checkout-message', `${result.orders.length} order(s) placed.${failures.length ? ` Some items could not be ordered: ${failures.join('; ')}` : ''}`);
-    await Promise.all([loadCart(), loadOrders()]);
-  } catch (error) {
-    setMessage('checkout-message', error.message, true);
-  } finally {
-    button.disabled = false;
-  }
-}
 async function loadSaved() {
   if (!requireSignIn()) return;
   const target = byId('saved-list');
@@ -852,27 +1079,11 @@ async function loadOffers() {
       ${offer.isSeller && offer.status === 'pending' ? `<button data-offer-action="accept" data-offer="${escapeHtml(offer.id)}" class="button button-dark">Accept</button><button data-offer-action="decline" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Decline</button><button data-offer-action="counter" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Counter</button>` : ''}
       ${!offer.isSeller && offer.status === 'pending' ? `<button data-offer-action="cancel" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Cancel</button>` : ''}
       ${!offer.isSeller && offer.status === 'countered' ? `<button data-offer-action="accept" data-offer="${escapeHtml(offer.id)}" class="button button-dark">Accept counter</button><button data-offer-action="decline" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Decline</button>` : ''}
-      ${offer.status === 'accepted' && !offer.isSeller ? `<form class="offer-checkout form-stack" data-item="${escapeHtml(offer.item.id)}" data-offer-id="${escapeHtml(offer.id)}"><label class="field">Delivery address<textarea name="deliveryAddress" minlength="5" maxlength="200" required></textarea></label><label class="field">Delivery method<select name="deliveryMethod"><option>PUDO Locker-to-Locker</option><option>Courier Guy Door-to-Door</option><option>Downtown Joburg Safe Hub</option></select></label><label class="field">Payment method<select name="paymentMethod"><option>Dobha In-App Wallet</option><option>Capitec Pay (Instant)</option><option>Ozow Instant EFT</option><option>Debit / Credit Card</option></select></label><p class="field-hint">Use the accepted offer price (${money(offer.amountZar)}). Payment is simulated.</p><button class="button button-dark">Buy at accepted price</button></form>` : ''}
+      ${offer.status === 'accepted' && !offer.isSeller ? `<p class="field-hint">Accepted price: ${money(offer.amountZar)}. Checkout is unavailable because Dobha does not currently process payments. No order will be placed.</p>` : ''}
       </div></article>`).join('') : '<p class="muted">No offers yet.</p>';
     target.querySelectorAll('[data-offer-action]').forEach((button) => button.addEventListener('click', () => offerAction(button.dataset.offer, button.dataset.offerAction)));
-    target.querySelectorAll('.offer-checkout').forEach((form) => form.addEventListener('submit', placeAcceptedOffer));
   } catch (error) {
     target.innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
-  }
-}
-async function placeAcceptedOffer(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const values = Object.fromEntries(new FormData(form));
-  try {
-    await api('/api/orders', {
-      method: 'POST',
-      body: { ...values, itemId: form.dataset.item, offerId: form.dataset.offerId },
-    });
-    notify('Order placed at the accepted offer price.');
-    await loadOffers();
-  } catch (error) {
-    notify(error.message, true);
   }
 }
 async function offerAction(offerId, action) {
@@ -897,20 +1108,6 @@ async function loadWallet() {
     byId('wallet-transactions').innerHTML = wallet.transactions.length ? wallet.transactions.map((transaction) => `<article class="order-card"><div><strong>${escapeHtml(transaction.title)}</strong><span>${escapeHtml(transaction.subtitle || '')} · ${escapeHtml(transaction.date ? new Date(transaction.date).toLocaleDateString() : '')}</span></div><div><strong>${money(transaction.amountZar)}</strong><span class="order-status">${escapeHtml(transaction.status)}</span></div></article>`).join('') : '<p class="muted">No wallet transactions.</p>';
   } catch (error) {
     byId('wallet-summary').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
-  }
-}
-async function walletAction(event, path) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const body = Object.fromEntries(new FormData(form));
-  body.amountZar = Number(body.amountZar);
-  try {
-    await api(path, { method: 'POST', body });
-    form.reset();
-    notify('Wallet updated. This is a simulated transaction.');
-    await loadWallet();
-  } catch (error) {
-    notify(error.message, true);
   }
 }
 async function loadNotifications() {
@@ -941,6 +1138,49 @@ async function loadNotifications() {
     }));
   } catch (error) {
     target.innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
+  }
+}
+async function pollBrowserNotifications() {
+  if (!state.token) return;
+  try {
+    const { unread } = await api('/api/notifications/unread');
+    const unreadCount = Number(unread);
+    if (!Number.isFinite(unreadCount)) throw new Error('Notification count is invalid');
+    const previous = state.unreadNotificationCount;
+    state.unreadNotificationCount = unreadCount;
+    if (
+      previous !== null &&
+      unreadCount > previous &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      const notification = new Notification('Dobha-Dobha', {
+        body: 'You have new marketplace activity.',
+        icon: '/assets/images/icon.svg',
+      });
+      notification.onclick = () => {
+        window.focus();
+        location.hash = 'notifications';
+      };
+    }
+  } catch (error) {
+    console.error('Browser notification polling failed:', error);
+  }
+}
+async function enableBrowserNotifications() {
+  const status = byId('browser-notification-status');
+  if (!('Notification' in window)) {
+    status.textContent = 'This browser does not support notifications.';
+    return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    status.textContent = permission === 'granted'
+      ? 'Browser alerts are enabled while this website is open.'
+      : 'Browser alerts were not enabled. You can change this in your browser settings.';
+    if (permission === 'granted') await pollBrowserNotifications();
+  } catch (error) {
+    status.textContent = error.message;
   }
 }
 async function loadChats() {
@@ -1095,21 +1335,12 @@ async function orderAction(orderId, action) {
     }
     return;
   }
-  if (action === 'confirm' && !confirm('Confirm that you received this order? This releases the simulated escrow.')) return;
-  if (action === 'dispute' && !confirm('Report a problem and pause the simulated payout?')) return;
+  if (action !== 'dispute') return;
+  if (!confirm('Ask support about this historical order record? Dobha does not hold funds or settle orders.')) return;
   try {
     await api(`/api/orders/${orderId}/${action}`, { method: 'POST' });
     await loadOrders();
-    notify(action === 'confirm' ? 'Order confirmed.' : action === 'dispute' ? 'Support has been notified.' : 'Order updated.');
-  } catch (error) {
-    notify(error.message, true);
-  }
-}
-async function dispatchOrder(event, form) {
-  event.preventDefault();
-  try {
-    await api(`/api/orders/${form.dataset.orderId}/dispatch`, { method: 'POST', body: { trackingNumber: new FormData(form).get('trackingNumber') } });
-    await loadOrders();
+    notify('Support has been notified.');
   } catch (error) {
     notify(error.message, true);
   }
@@ -1247,9 +1478,6 @@ function init() {
   });
   byId('vendor-submit').addEventListener('click', createVendor);
   byId('sell-form').addEventListener('submit', createListing);
-  byId('checkout-form').addEventListener('submit', checkout);
-  byId('wallet-topup').addEventListener('submit', (event) => walletAction(event, '/api/wallet/topup'));
-  byId('wallet-withdraw').addEventListener('submit', (event) => walletAction(event, '/api/wallet/withdraw'));
   byId('profile-form').addEventListener('submit', saveProfile);
   byId('avatar-form').addEventListener('submit', uploadAvatar);
   byId('remove-avatar').addEventListener('click', removeAvatar);
@@ -1257,12 +1485,29 @@ function init() {
   byId('delete-account-form').addEventListener('submit', deleteAccount);
   byId('support-form').addEventListener('submit', submitSupport);
   byId('people-search-form').addEventListener('submit', searchPeople);
+  byId('story-form').addEventListener('submit', submitStory);
+  byId('live-host-form').addEventListener('submit', startLiveHost);
+  byId('stop-live-host').addEventListener('click', () => {
+    stopLiveHost().catch((error) => setMessage('host-live-message', error.message, true));
+  });
+  document.querySelectorAll('[data-live-chat-form]').forEach((form) => form.addEventListener('submit', sendLiveChat));
+  byId('story-previous').addEventListener('click', () => stepStory(-1));
+  byId('story-next').addEventListener('click', () => stepStory(1));
+  byId('story-dialog').addEventListener('close', () => {
+    byId('story-viewer').querySelectorAll('video').forEach((video) => video.pause());
+  });
+  byId('enable-browser-notifications').addEventListener('click', enableBrowserNotifications);
   byId('stop-inline-stream').addEventListener('click', stopStream);
   document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
   document.querySelectorAll('dialog').forEach((dialog) => dialog.addEventListener('click', (event) => {
     if (event.target === dialog) dialog.close();
   }));
   byId('live-dialog').addEventListener('close', stopStream);
+  window.addEventListener('beforeunload', () => {
+    state.hostTracks.forEach((track) => track.stop());
+    state.stream?.disconnect();
+    state.hostRoom?.disconnect();
+  });
   window.addEventListener('hashchange', () => {
     byId('mobile-menu-toggle').setAttribute('aria-expanded', 'false');
     byId('top-actions').classList.remove('mobile-open');

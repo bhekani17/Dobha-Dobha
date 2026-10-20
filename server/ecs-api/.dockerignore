@@ -1,0 +1,10 @@
+.env
+.env.*
+.git
+.gitignore
+.npmrc
+coverage
+node_modules
+npm-debug.log*
+*.pem
+*.key

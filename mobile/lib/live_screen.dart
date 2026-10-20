@@ -6,9 +6,7 @@ import 'package:livekit_client/livekit_client.dart';
 
 import 'api.dart';
 import 'live_models.dart';
-import 'models/thrift_item.dart';
 import 'theme.dart';
-import 'widgets/checkout_modal.dart';
 import 'widgets/floating_reactions.dart';
 import 'widgets/ui.dart';
 import 'widgets/pinned_product_card.dart';
@@ -124,18 +122,6 @@ class _LiveScreenState extends State<LiveScreen> {
         setState(() => _pinnedItem = item);
       } else if (type == 'unpin_item') {
         setState(() => _pinnedItem = null);
-      } else if (type == 'claim_item') {
-        final who = msg['who'] as String;
-        final title = msg['title'] as String? ?? 'this item';
-        final itemId = msg['itemId'] as String?;
-        if (_pinnedItem != null && _pinnedItem!.id == itemId) {
-          setState(() {
-            _pinnedItem = _pinnedItem!.copyWith(status: 'sold', claimedBy: who);
-          });
-        }
-        _addMessage('', '$who claimed $title!', isSystem: true, icon: Icons.celebration_rounded);
-        _reactions.addReaction(Reaction.celebrate);
-        _reactions.addReaction(Reaction.fire);
       }
     } catch (_) {
       // Ignore unknown payloads
@@ -201,37 +187,6 @@ class _LiveScreenState extends State<LiveScreen> {
   Future<void> _unpinItem() async {
     setState(() => _pinnedItem = null);
     await _sendData({'type': 'unpin_item'});
-  }
-
-  /// Viewer claim: a real escrow checkout for the pinned listing, then tell the room.
-  Future<void> _claimItem() async {
-    if (_pinnedItem == null || _pinnedItem!.isSold) return;
-    final current = _pinnedItem!;
-
-    final ThriftItem item;
-    try {
-      final res = await widget.api.get('/api/items/${current.id}');
-      item = ThriftItem.fromJson(res['item'] as Map<String, dynamic>);
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      return;
-    }
-    if (!mounted) return;
-    if (item.isClaimed) {
-      setState(() => _pinnedItem = current.copyWith(status: 'sold'));
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Someone already claimed this piece')));
-      return;
-    }
-    final paid = await CheckoutModal.show(context, item);
-    if (paid != true || !mounted) return;
-
-    final updated = current.copyWith(status: 'sold', claimedBy: widget.identity);
-    setState(() => _pinnedItem = updated);
-
-    await _sendData({'type': 'claim_item', 'itemId': current.id, 'who': widget.identity, 'title': current.title});
-    _addMessage('', '${widget.identity} claimed ${current.title}!', isSystem: true, icon: Icons.celebration_rounded);
-    _reactions.addReaction(Reaction.celebrate);
-    _reactions.addReaction(Reaction.fire);
   }
 
   Future<void> _leave() async {
@@ -322,7 +277,6 @@ class _LiveScreenState extends State<LiveScreen> {
                     item: _pinnedItem,
                     isHost: widget.host,
                     onPinTap: _openPinDialog,
-                    onClaimTap: _claimItem,
                     onUnpinTap: _unpinItem,
                   ),
                   _inputBar(),

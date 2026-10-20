@@ -599,7 +599,7 @@ class ItemInfoSheet extends StatelessWidget {
                     Icon(Icons.verified_user_outlined, size: 18, color: DobhaColors.green),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text('We hold your payment and only pay the seller once you have the piece.',
+                      child: Text('Checkout is unavailable. Dobha does not currently process payments or hold funds.',
                           style: TextStyle(fontSize: 13, color: DobhaColors.textSecondary, height: 1.35)),
                     ),
                   ],

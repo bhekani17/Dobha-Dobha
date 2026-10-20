@@ -8,13 +8,27 @@ const { id, orderId, vaultRef, zar, toCents } = require('../src/utils/id.js');
 
 describe('Dobha Dobha - Utility & Core Business Logic Tests', () => {
   describe('Response & CORS utilities', () => {
-    it('should format successful JSON response with CORS headers', () => {
+    it('does not emit a wildcard origin when no website origin is configured', () => {
       const res = json(200, { success: true });
       assert.equal(res.statusCode, 200);
-      assert.equal(res.headers['Access-Control-Allow-Origin'], '*');
+      assert.equal(res.headers['Access-Control-Allow-Origin'], undefined);
       assert.equal(res.headers['Content-Type'], 'application/json');
       const body = JSON.parse(res.body);
       assert.equal(body.success, true);
+    });
+
+    it('uses only the explicitly configured website origin', () => {
+      const modulePath = require.resolve('../src/utils/response.js');
+      const originalOrigin = process.env.ALLOWED_WEB_ORIGINS;
+      process.env.ALLOWED_WEB_ORIGINS = 'https://shop.example.com';
+      delete require.cache[modulePath];
+      const configuredResponse = require(modulePath).json(200, { success: true });
+      assert.equal(configuredResponse.headers['Access-Control-Allow-Origin'], 'https://shop.example.com');
+      assert.equal(configuredResponse.headers.Vary, 'Origin');
+      if (originalOrigin === undefined) delete process.env.ALLOWED_WEB_ORIGINS;
+      else process.env.ALLOWED_WEB_ORIGINS = originalOrigin;
+      delete require.cache[modulePath];
+      require(modulePath);
     });
 
     it('should handle OPTIONS preflight request', () => {
@@ -22,7 +36,7 @@ describe('Dobha Dobha - Utility & Core Business Logic Tests', () => {
       const res = handleCors(event);
       assert.notEqual(res, null);
       assert.equal(res.statusCode, 204);
-      assert.equal(res.headers['Access-Control-Allow-Origin'], '*');
+      assert.equal(res.headers['Access-Control-Allow-Origin'], undefined);
     });
 
     it('should parse JSON body correctly', () => {

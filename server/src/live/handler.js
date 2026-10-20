@@ -142,13 +142,7 @@ exports.handler = async (event) => {
 
       const cfg = getLiveKitConfig();
       if (!cfg) {
-        // Fallback simulated token when LiveKit Cloud is not yet bound
-        return json(200, {
-          url: 'wss://dobha-live.placeholder',
-          token: `simulated-token-${crypto.randomUUID()}`,
-          role,
-          room,
-        });
+        return error(503, 'Live streaming is unavailable until LiveKit is configured');
       }
 
       const identity = user

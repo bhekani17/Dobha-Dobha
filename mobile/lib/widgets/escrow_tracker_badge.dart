@@ -80,7 +80,7 @@ class EscrowTrackerCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
           ],
-          Text(status.description(isSeller: isVendorView), style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary, height: 1.35)),
+          Text(status.description(), style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary, height: 1.35)),
           const SizedBox(height: 14),
           _buildActionRow(context, order),
           Align(
@@ -166,53 +166,9 @@ class EscrowTrackerCard extends StatelessWidget {
   }
 
   Widget _buildActionRow(BuildContext context, EscrowOrder order) {
-    final appState = AppState();
-
-    if (order.status == EscrowStatus.paymentHeld) {
-      if (!isVendorView) return const SizedBox.shrink();
-      return AppButton(
-        onPressed: () {
-          HapticFeedback.mediumImpact();
-          if (order.isHubCollection) {
-            _act(context, () => appState.dispatchOrder(order.id), 'Marked as sent');
-          } else {
-            _askTracking(context, order);
-          }
-        },
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [Icon(Icons.local_shipping_outlined, size: 17), SizedBox(width: 8), Text("I've sent it")],
-        ),
-      );
-    }
-
-    if (order.status == EscrowStatus.vendorDispatched) {
-      if (isVendorView) {
-        return const SizedBox.shrink();
-      }
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AppButton(
-            color: DobhaColors.green,
-            onPressed: () {
-              HapticFeedback.heavyImpact();
-              _showConfirmDialog(context, order);
-            },
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [Icon(Icons.check_rounded, size: 18), SizedBox(width: 8), Text('I got it, all good')],
-            ),
-          ),
-          const SizedBox(height: 6),
-          Center(
-            child: TextButton(
-              onPressed: () => _confirmDispute(context, order),
-              child: Text('Report a problem', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
-            ),
-          ),
-        ],
-      );
+    if (order.status == EscrowStatus.paymentHeld ||
+        order.status == EscrowStatus.vendorDispatched) {
+      return const SizedBox.shrink();
     }
 
     if (order.canReview) {

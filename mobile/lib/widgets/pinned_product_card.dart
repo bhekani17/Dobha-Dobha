@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-
 import '../live_models.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
@@ -11,7 +9,6 @@ class PinnedProductBanner extends StatelessWidget {
   final PinnedItem? item;
   final bool isHost;
   final VoidCallback? onPinTap;
-  final VoidCallback? onClaimTap;
   final VoidCallback? onUnpinTap;
 
   const PinnedProductBanner({
@@ -19,7 +16,6 @@ class PinnedProductBanner extends StatelessWidget {
     required this.item,
     required this.isHost,
     this.onPinTap,
-    this.onClaimTap,
     this.onUnpinTap,
   });
 
@@ -97,7 +93,7 @@ class PinnedProductBanner extends StatelessWidget {
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
-                          'Sold to ${current.claimedBy ?? "buyer"}',
+                          'Legacy status',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: DobhaColors.amber, fontSize: 12, fontWeight: FontWeight.w600),
@@ -122,22 +118,8 @@ class PinnedProductBanner extends StatelessWidget {
                 PopupMenuItem(value: 'unpin', child: Text('Unpin item', style: TextStyle(color: DobhaColors.red))),
               ],
             )
-          else if (!isSold)
-            AppButton(
-              color: DobhaColors.green,
-              radius: 12,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-              onPressed: () {
-                HapticFeedback.mediumImpact();
-                onClaimTap?.call();
-              },
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [Icon(Icons.flash_on, size: 16), SizedBox(width: 4), Text('DOBHA', style: TextStyle(fontSize: 13))],
-              ),
-            )
           else
-            AppTag('SOLD', color: DobhaColors.amber),
+            AppTag(isSold ? 'LEGACY' : 'NO CHECKOUT', color: isSold ? DobhaColors.amber : DobhaColors.muted),
         ],
       ),
     );

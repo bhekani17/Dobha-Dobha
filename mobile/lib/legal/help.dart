@@ -1,5 +1,4 @@
-/// Answers for the Help screen, grouped by topic. Keep them in step with how the app and server actually work
-/// (delivery prices and the 5% fee live in server/src/orders.js).
+/// Answers for the Help screen, grouped by topic and current application behavior.
 library;
 
 class HelpQuestion {
@@ -18,43 +17,43 @@ const helpTopics = [
   HelpTopic('Buying', [
     HelpQuestion(
       'How do I buy a piece?',
-      'Tap a piece on Home or Explore, then tap Buy. Choose how you want it delivered and how you want to pay, and check the total before you pay. You can also add several pieces to your cart and check out together.',
+      'Browse listings and add finds to your bag, but checkout is not available yet. Dobha does not currently process payments, create paid orders, or hold funds.',
     ),
     HelpQuestion(
-      'Is my money safe?',
-      'Yes. When you pay, Dobha Dobha holds the money. The seller is only paid after you tell us you received the piece and it is what you expected. If something is wrong, report a problem from the order before you confirm and the money stays on hold.',
+      'Does Dobha hold or protect my money?',
+      'No. Payments and escrow are not available. Do not send money or banking details to a seller based on a listing, order record, or wallet balance in the app.',
     ),
     HelpQuestion(
       'Can I ask for a lower price?',
-      'Yes. Tap Make an offer on a listing. The seller can accept, decline or send a counter offer. If an offer is accepted, you have 48 hours to buy the piece at that price.',
+      'Yes. Tap Make an offer on a listing. The seller can accept, decline or send a counter offer. Accepting an offer does not place an order; checkout is unavailable.',
     ),
     HelpQuestion(
       'Can I ask the seller a question first?',
-      'Yes. Open the listing and message the seller, or tap their name to see their profile and reviews. Keep chats and payments inside Dobha Dobha so you stay protected.',
+      'Yes. Open the listing and message the seller, or tap their name to see their profile and reviews. Dobha does not currently process payments or protect off-platform transactions.',
     ),
   ]),
   HelpTopic('Delivery', [
     HelpQuestion(
-      'What delivery options are there?',
-      'PUDO Locker-to-Locker (R 50), Courier Guy Door-to-Door (R 65), or free collection at the Downtown Joburg Safe Hub. Delivery is charged per piece because each seller sends their own.',
+      'Are delivery services available?',
+      'Delivery partners are not integrated. Any delivery options or tracking shown on historical order records are not verified by Dobha.',
     ),
     HelpQuestion(
-      'How do I track my order?',
-      'Open the Orders tab. When the seller sends your piece they add the courier tracking number, and you get a notification. For Safe Hub orders you are told when it is ready to collect.',
+      'How do I track an order?',
+      'Paid checkout is unavailable. Older order records may show demo or historical delivery statuses that are not verified by a shipping provider.',
     ),
     HelpQuestion(
-      'The seller has not sent my piece. What now?',
-      'Sellers should send within 3 business days. Message the seller first. If you hear nothing, use Contact support and tell us the order, and we will follow up. Your money stays on hold the whole time.',
+      'I have a problem with an order record. What now?',
+      'Dobha does not hold funds or settle orders. Use Contact support to ask about the record; do not treat its status as proof of payment or delivery.',
     ),
   ]),
   HelpTopic('Problems with an order', [
     HelpQuestion(
-      'My piece is not what was shown. What do I do?',
-      'Do not confirm the order. Open it in the Orders tab and tap Report a problem. The money stays on hold while Dobha support looks into it with you and the seller, then we refund you or pay the seller depending on what happened.',
+      'Can Dobha refund or settle a problem?',
+      'No. Payments, refunds, and escrow settlement are unavailable. Contact support for questions about a historical record; support cannot move or refund money through the app.',
     ),
     HelpQuestion(
-      'I confirmed by mistake.',
-      'Once you confirm, the seller is paid, so it cannot be undone in the app. Use Contact support straight away and tell us the order, and we will see what we can do with the seller.',
+      'An old order says it was confirmed. Was the seller paid?',
+      'Not necessarily. Historical/demo statuses do not verify that a real payment or payout took place. Contact support if you need help understanding a record.',
     ),
     HelpQuestion(
       'How long does support take?',
@@ -68,25 +67,25 @@ const helpTopics = [
     ),
     HelpQuestion(
       'When do I get paid?',
-      'As soon as the buyer confirms they received the piece. The price minus the 5% Dobha fee goes into your Dobha wallet. Delivery fees are not part of your payout.',
+      'Payouts and paid orders are not available. A displayed wallet balance or order status is not proof that Dobha owes or holds funds.',
     ),
     HelpQuestion(
-      'How do I send a sold piece?',
-      'Send it within 3 business days with the delivery option the buyer chose, then open the order and tap the button to mark it as sent, adding the tracking number from your receipt. Safe Hub orders do not need a tracking number.',
+      'Can I complete a sale or arrange delivery here?',
+      'Listings and live video are available, but checkout and delivery services are not integrated. Do not treat a listing or accepted offer as a completed sale.',
     ),
     HelpQuestion(
       'Can I go live?',
-      'Yes. Open the Sell tab, tap a listing to pin it, name your stream and tap Go Live Now. Viewers can buy the pinned piece while you show it.',
+      'Yes. Open the Sell tab, tap a listing to pin it, name your stream and tap Go Live Now. Viewers can watch and chat, but cannot buy through an in-app payment.',
     ),
   ]),
   HelpTopic('Wallet and payouts', [
     HelpQuestion(
       'How do I withdraw my money?',
-      'Open the Orders tab and tap Withdraw. Enter a South African bank account. Only money that is available can be withdrawn; money still held for orders becomes available once those orders are done.',
+      'Withdrawals are unavailable. Do not enter bank details. Wallet balances shown may include demo or historical activity and are not spendable funds held by Dobha.',
     ),
     HelpQuestion(
-      'What are the different balances?',
-      'You can spend or withdraw: money that is yours now. On hold for your orders: money you paid for pieces still on their way. Coming to you from sales: money from your sales, paid to you once buyers confirm.',
+      'What do the displayed balances mean?',
+      'They may reflect historical or demo records only. Dobha does not currently accept deposits, hold escrow funds, or make payouts.',
     ),
   ]),
   HelpTopic('Account and safety', [
@@ -100,11 +99,11 @@ const helpTopics = [
     ),
     HelpQuestion(
       'How do I stay safe?',
-      'Keep chats and payments inside Dobha Dobha. Never pay a seller directly or share your banking PIN or passwords. Be careful of anyone who asks you to move a deal off the app.',
+      'Dobha does not process payments or protect off-platform transactions. Do not send money, share banking PINs or passwords, or rely on app order statuses as proof of a transaction.',
     ),
     HelpQuestion(
       'How do I delete my account?',
-      'Open Me, then Settings, then Delete account. Finish any orders and withdraw your wallet first. Your profile, listings that never sold, likes and saves are removed; order records are kept as the law requires.',
+      'Open Me, then Settings, then Delete account. Your profile and eligible personal data are removed; some historical records may be retained as required by law.',
     ),
   ]),
 ];

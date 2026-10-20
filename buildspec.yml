@@ -4,8 +4,6 @@ env:
   variables:
     AWS_DEFAULT_REGION: af-south-1
     SAM_CLI_TELEMETRY: "0"
-    STACK_NAME: dobha-marketplace-prototype-dev
-    SAM_BUCKET: dobha-sam-artifacts-807701355530-af-south-1
     TEMPLATE_FILE: server/infrastructure/template.yaml
 
 phases:
@@ -17,20 +15,19 @@ phases:
       - python3 -m venv /tmp/sam-cli && /tmp/sam-cli/bin/pip install --upgrade aws-sam-cli
   pre_build:
     commands:
-      - aws s3api head-bucket --bucket "$SAM_BUCKET" --region "$AWS_DEFAULT_REGION" 2>/dev/null || aws s3 mb "s3://$SAM_BUCKET" --region "$AWS_DEFAULT_REGION"
-      - |
-        STATUS=$(aws cloudformation describe-stacks --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION" --query "Stacks[0].StackStatus" --output text 2>/dev/null || echo "DOES_NOT_EXIST")
-        if [ "$STATUS" = "ROLLBACK_COMPLETE" ]; then
-          echo "Stack $STACK_NAME is in ROLLBACK_COMPLETE state. Deleting dead stack before deploying..."
-          aws cloudformation delete-stack --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION"
-          aws cloudformation wait stack-delete-complete --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION"
-          echo "Dead stack deleted successfully."
-        fi
-      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server" install
-      - npm --prefix "${CODEBUILD_SRC_DIR:-.}/server" test
+      - npm --prefix server ci
+      - npm --prefix server test
+      - npm --prefix server/ecs-api ci
+      - npm --prefix server/ecs-api run prisma:generate
+      - npm --prefix server/ecs-api test
+      - npm --prefix website ci
+      - npm --prefix website run build
+      - node --check server/src/items/handler.js
+      - node --check server/src/orders/handler.js
+      - node --check server/src/utils/response.js
+      - node --check server/ecs-api/src/modules/escrow/escrow.service.js
+      - node --check website/app.js
   build:
     commands:
-      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam validate --template-file $TEMPLATE_FILE
-      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam build --template-file $TEMPLATE_FILE --build-dir .aws-sam/build
-      - cd "${CODEBUILD_SRC_DIR:-.}" && /tmp/sam-cli/bin/sam deploy --template-file .aws-sam/build/template.yaml --stack-name "$STACK_NAME" --region "$AWS_DEFAULT_REGION" --s3-bucket "$SAM_BUCKET" --s3-prefix "$STACK_NAME" --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND --no-confirm-changeset --no-fail-on-empty-changeset --parameter-overrides Stage=dev AllowedOrigin='*'
-
+      - /tmp/sam-cli/bin/sam validate --template-file "$TEMPLATE_FILE"
+      - /tmp/sam-cli/bin/sam build --template-file "$TEMPLATE_FILE" --build-dir .aws-sam/build

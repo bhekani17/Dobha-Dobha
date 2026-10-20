@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../api.dart';
 import '../models/escrow_order.dart';
 import '../models/user_profile.dart';
 import '../state/app_state.dart';
@@ -11,143 +10,6 @@ import '../widgets/ui.dart';
 
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
-
-  static Future<void> _run(BuildContext context, Future<void> Function() action, String done) async {
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await action();
-      messenger.showSnackBar(SnackBar(content: Text(done)));
-    } on ApiException catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
-
-  void _showTopUpDialog(BuildContext context) {
-    final amountCtrl = TextEditingController();
-    String method = 'Capitec Pay (Instant)';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.add_circle_outline_rounded, color: DobhaColors.green, size: 22),
-              SizedBox(width: 8),
-              Text('Top Up Wallet', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: -0.3)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Add money so you can pay for pieces in one tap.',
-                  style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Amount (ZAR)', prefixText: 'R '),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: method,
-                decoration: const InputDecoration(labelText: 'Payment Provider'),
-                dropdownColor: DobhaColors.cardElevated,
-                items: ['Capitec Pay (Instant)', 'Ozow Instant EFT', 'Standard Bank Card', 'FNB Pay']
-                    .map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 13))))
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => method = val);
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final amount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
-                if (amount <= 0) return;
-                Navigator.of(ctx).pop();
-                _run(context, () => AppState().topUpWallet(amount, method), 'Added R ${amount.toStringAsFixed(0)} via $method');
-              },
-              child: const Text('Top Up'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showWithdrawDialog(BuildContext context) {
-    final amountCtrl = TextEditingController();
-    final accountCtrl = TextEditingController();
-    String bank = 'Capitec Bank';
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: Row(
-            children: [
-              Icon(Icons.account_balance_rounded, color: DobhaColors.cyan, size: 22),
-              SizedBox(width: 8),
-              Text('Withdraw', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, letterSpacing: -0.3)),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Available: R ${AppState().availableBalance.toStringAsFixed(0)}',
-                style: TextStyle(fontSize: 12, color: DobhaColors.green, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Amount (ZAR)', prefixText: 'R '),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: bank,
-                decoration: const InputDecoration(labelText: 'Bank'),
-                dropdownColor: DobhaColors.cardElevated,
-                items: ['Capitec Bank', 'FNB / RMB', 'Standard Bank', 'Nedbank', 'Discovery Bank']
-                    .map((b) => DropdownMenuItem(value: b, child: Text(b, style: const TextStyle(fontSize: 13))))
-                    .toList(),
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => bank = val);
-                },
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: accountCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Account Number'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                final amount = double.tryParse(amountCtrl.text.trim()) ?? 0.0;
-                final acc = accountCtrl.text.trim();
-                if (amount <= 0 || acc.isEmpty) return;
-                Navigator.of(ctx).pop();
-                _run(context, () => AppState().withdrawFunds(amount, bank, acc),
-                    'Withdrawal of R ${amount.toStringAsFixed(0)} to $bank requested');
-              },
-              child: const Text('Withdraw'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +62,7 @@ class WalletScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('You can spend or withdraw',
+                    Text('Displayed balance (may include demo activity)',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: DobhaColors.textSecondary)),
                     const SizedBox(height: 6),
                     Text(
@@ -232,29 +94,13 @@ class WalletScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppButton(
-                            color: DobhaColors.green,
-                            onPressed: () => _showTopUpDialog(context),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [Icon(Icons.add, size: 18), SizedBox(width: 6), Text('Top Up')],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: AppButton(
-                            onPressed: () => _showWithdrawDialog(context),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [Icon(Icons.north_east_rounded, size: 18), SizedBox(width: 6), Text('Withdraw')],
-                            ),
-                          ),
-                        ),
-                      ],
+                    AppWell(
+                      radius: 14,
+                      tint: DobhaColors.amber,
+                      child: const Text(
+                        'Payments, wallet deposits, withdrawals, and escrow are unavailable. This balance is not spendable and does not represent funds held by Dobha.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.4),
+                      ),
                     ),
                   ],
                 ),

@@ -1,86 +1,91 @@
-# Dobha server and AWS deployment
+# Marketplace backend and migration status
 
-`server/` contains the backend and infrastructure for the applications in the repository:
+## Repository layout
 
 ```text
 server/
-  src/                       Current marketplace API
-  migrations/                Current marketplace database migrations
-  infrastructure/            AWS static website hosting template
-  marketplace-prototype/     Incomplete AWS marketplace API prototype
-  capstone-self-storage/      Separate AWS elective capstone
+  src/                       Existing Lambda/DynamoDB-oriented backend handlers
+  test/                      Tests for the existing backend source
+  infrastructure/
+    template.yaml            Legacy SAM/Lambda/DynamoDB stack
+    template-rds.yaml        Legacy, incomplete Lambda/RDS alternative
+    website.yaml             Private S3 + CloudFront website hosting
+  ecs-api/                   Separate Fastify/PostgreSQL target foundation
 ```
 
-## Current marketplace status
+The mobile client is in `../mobile/`; the React/Vite website is in
+`../website/`. The website currently mounts its existing marketplace markup
+through a React bridge while its interactions are migrated incrementally; keep
+that markup as a single source rather than maintaining duplicate mobile/web
+implementations.
 
-The active marketplace API is still the service in `src/`, deployed using its current Worker configuration. The website and mobile app depend on it today. The AWS marketplace API in `marketplace-prototype/` supports only a subset of the current route and data contract, so it is not ready to replace the active backend.
+## Current source versus target
 
-The website's static assets can be hosted in a private Amazon S3 bucket behind CloudFront. That does not, by itself, migrate the API: the website configuration currently still points to the existing API. Keep that service available until the AWS API, data/media migration, and both client cutovers have passed parity testing.
+`src/` and `infrastructure/template.yaml` are the existing Lambda/DynamoDB
+implementation. The `template-rds.yaml` alternative is not the chosen
+architecture and is not production-ready; it lacks the target ECS/RDS Proxy
+design. Neither template represents the planned production architecture.
+Check the deployed AWS account and runtime directly before release decisions;
+repository contents alone do not establish what is currently live.
 
-The Flutter app can be built against a future AWS CloudFront/API origin without changing its production default:
+`ecs-api/` is the selected migration direction from the earlier architecture
+decision: Node.js/Fastify, PostgreSQL/Prisma, and ECS Fargate. It currently
+contains a process/health foundation, relational schema, initial migration,
+and an escrow service. It does not yet contain production authentication,
+marketplace routes, provider webhooks, ECS infrastructure, or client parity.
+No existing client is cut over to it.
 
-```powershell
-Push-Location .\mobile
-flutter build web --release --dart-define-from-file=config/google.json --dart-define=API_BASE_URL=https://<CloudFront-domain>
-Pop-Location
-```
+## Financial safety status
 
-For Android/iOS builds, pass the same `--dart-define=API_BASE_URL=...` option along with the Google sign-in configuration. Leave `API_BASE_URL` unset until the AWS API implements and passes parity tests; otherwise the app continues to use the current API (or the current web origin).
+The current source rejects checkout/order creation, shipment dispatch,
+confirmation, escrow resolution, wallet deposits/withdrawals, and paid listing
+promotion until verified payment processing exists. The clients no longer
+offer payment entry or claim that demo records represent held funds. Historical
+order and wallet data can still exist; those records do not prove that a real
+payment, delivery, refund, or payout occurred.
 
-## Deploy static website hosting to AWS
+These are source-level protections, not a production incident fix. The build
+pipeline is validation-only and does not deploy them. Verify the live runtime,
+perform a reviewed staged release, and test the deployed endpoints before
+claiming that any production environment has these protections.
 
-Requirements: AWS CLI configured for the intended account and region, Node.js/npm only if needed for local website tooling, and permissions to manage CloudFormation, S3, and CloudFront. Provision the private bucket and CloudFront distribution:
+## Development and checks
 
-```powershell
-aws cloudformation validate-template --template-body file://server/infrastructure/website.yaml
-aws cloudformation deploy --template-file server/infrastructure/website.yaml --stack-name dobha-website-dev --parameter-overrides Stage=dev
-aws cloudformation describe-stacks --stack-name dobha-website-dev --query "Stacks[0].Outputs" --output table
-```
+Existing backend tests:
 
-Upload the static site from the repository root using the `WebsiteBucketName` output:
-
-```powershell
-aws s3 sync .\website\ s3://<WebsiteBucketName> --delete
-aws cloudfront create-invalidation --distribution-id <WebsiteDistributionId> --paths "/*"
-```
-
-The website uses the public browser configuration in `website/config.js`. It contains a Google OAuth client ID and the current API URL; never place private credentials or AWS secrets there. The current API still requires the website origin to be allowlisted by the active service.
-
-## AWS marketplace API prototype
-
-`marketplace-prototype/` contains a separate SAM/Cognito/DynamoDB implementation for evaluating the AWS migration. It does not share data with the current marketplace service, and it does not yet implement all current marketplace functionality.
-
-The prototype's `DELETE /api/me` requires a fresh password check (or a typed `DELETE` confirmation for passwordless accounts), refuses unsettled or unknown order statuses, removes personal buyer delivery addresses, deletes unsold listings and personal media, and anonymizes the profile while retaining settled order history and sold listings. The prototype does not yet implement wallet balances; add and test the equivalent available/locked/pending balance safeguard before migrating wallet data or treating account deletion as production-ready.
-
-```powershell
-Push-Location .\server\marketplace-prototype
+```sh
+cd server
+npm ci
 npm test
-sam validate --template-file .\template.yaml
-sam build --template-file .\template.yaml
-Pop-Location
 ```
 
-Only deploy this prototype to an AWS account you are authorized to use. It can create billable resources. Do not direct production clients or migrate production data to it until its features, authorization, storage, and operational behavior have been reviewed and tested.
+The ECS API foundation and its escrow service tests are documented in
+[ecs-api/README.md](./ecs-api/README.md). It needs Node.js 22 and a generated
+Prisma client. Both backend projects now have committed npm lockfiles and the
+CI build uses `npm ci`; resolve the Prisma advisory documented in the ECS API
+guide before production use.
 
-### Deploying from CodePipeline
+The root `buildspec.yml` runs tests, JavaScript syntax checks, the website
+production bundle, SAM validation, and SAM build only. It does not create
+buckets, delete stacks, or deploy AWS resources. Treat both SAM templates as
+legacy artifacts and do not promote them as the target service.
 
-The repository-root `buildspec.yml` runs the marketplace prototype tests, validates and builds its SAM template, then deploys it to `af-south-1`. To use it, configure the CodePipeline build action as an AWS CodeBuild project using a managed Linux image that supports Node.js 22 and Python 3.11 and the source artifact's repository-root `buildspec.yml`; the current inline Commands action does not read this file. Configure the CodeBuild project and its service role in the AWS Console. The CodeBuild service role (not just the CodePipeline role) needs access to the SAM deployment artifact bucket, CloudFormation, the resources in `marketplace-prototype/template.yaml`, and `iam:PassRole` for the Lambda execution roles. Do not grant administrator permissions as a workaround. The first deployment may fail until the account's CloudFormation/SAM managed deployment resources and required permissions are set up.
+## Infrastructure
 
-The buildspec deploys automatically on every pipeline execution. Review the pipeline branch and AWS account/region before enabling it. The SAM template includes CloudFront and website S3 resources in addition to the API; this build does not upload website assets.
+`infrastructure/website.yaml` provisions a private encrypted S3 bucket and
+CloudFront Origin Access Control. It hosts static website assets only; it does
+not migrate or deploy an API.
 
-## Self-storage elective capstone
+Before implementing ECS infrastructure or a client cutover, define and review:
 
-The independent [self-storage capstone](./capstone-self-storage/README.md) is not part of the marketplace. Its Cognito-authenticated SAM application uses API Gateway, Lambda, DynamoDB, S3/CloudFront, and SQS-backed notifications. Follow its README for prerequisites and deployment. Review AWS pricing and create a budget alert before provisioning resources.
+- Private VPC subnets, ALB/task security groups, ECS Fargate service/task roles,
+  and RDS Proxy connectivity.
+- Secrets Manager integration, TLS, least-privilege IAM, and private media
+  access.
+- CloudWatch logs, metrics, alarms, audit events, and operational runbooks.
+- Database/media migration, backups, rollback, route parity, and load tests.
+- Verified payment-provider webhooks, idempotent ledger operations, disputes,
+  reconciliation, and end-to-end financial tests.
 
-## Marketplace migration requirements
-
-Before switching the marketplace clients or removing the current API, complete and verify:
-
-- Route and behavior parity for website and mobile features.
-- Authentication/account migration and safe password-reset behavior.
-- Database and media migration, with backup and rollback procedures.
-- AWS least-privilege permissions, secrets management, origin restrictions, and monitoring.
-- Web and mobile integration tests against the deployed AWS environment.
-- A controlled client cutover and post-deployment checks.
-
-Do not claim AWS-only marketplace hosting until the API and client cutover is complete.
+Do not direct production clients or migrate production data until those
+controls and parity tests are implemented and a cutover has been approved.

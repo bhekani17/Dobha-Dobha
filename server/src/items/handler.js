@@ -62,6 +62,10 @@ exports.handler = async (event) => {
   const method = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || '').toUpperCase();
   const queryParams = event.queryStringParameters || {};
 
+  if (/^\/api\/items\/[^/]+\/promote$/.test(path) && method === 'POST') {
+    return error(503, 'Paid listing promotion is disabled until verified payment processing is integrated');
+  }
+
   try {
     const user = await getUser(event);
 

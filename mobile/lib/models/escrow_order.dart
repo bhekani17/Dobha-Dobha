@@ -28,22 +28,18 @@ extension EscrowStatusX on EscrowStatus {
   }
 
   /// One sentence on what happens next.
-  String description({required bool isSeller}) {
+  String description() {
     switch (this) {
       case EscrowStatus.paymentHeld:
-        return isSeller
-            ? 'The buyer has paid. Send the piece, then tap the button below. You get paid once they receive it.'
-            : 'You paid. We hold the money until you have the piece, so you are covered. Waiting for the seller to send it.';
+        return 'Legacy order record. No payment is verified, and order fulfillment is currently unavailable.';
       case EscrowStatus.vendorDispatched:
-        return isSeller
-            ? 'On its way. You get paid as soon as the buyer confirms it arrived.'
-            : 'On its way to you. Check it when it arrives, then confirm so the seller gets paid.';
+        return 'Legacy order record. The displayed delivery status is not verified by a live payment or shipping service.';
       case EscrowStatus.payoutReleased:
-        return isSeller ? 'The buyer received it and you have been paid.' : 'You received it and the seller has been paid.';
+        return 'Legacy order record. This status does not verify that any real payment or payout occurred.';
       case EscrowStatus.disputed:
-        return 'Dobha support is looking into this. The money stays on hold until it is sorted out.';
+        return 'Legacy order record. No money is held by Dobha; contact support if you need help with this record.';
       case EscrowStatus.refunded:
-        return isSeller ? 'Dobha support refunded the buyer.' : 'Dobha support refunded you. The money is back in your wallet.';
+        return 'Legacy order record. This status does not verify that a real refund occurred.';
     }
   }
 

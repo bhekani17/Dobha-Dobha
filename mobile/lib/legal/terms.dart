@@ -5,8 +5,8 @@
 /// `python tool/build_legal_pages.py` to update the public web page (web/terms.html).
 library;
 
-const termsVersion = '2026-10-02';
-const termsUpdated = '2 October 2026';
+const termsVersion = '2026-10-21';
+const termsUpdated = '21 October 2026';
 
 class TermsSection {
   final String title;
@@ -25,24 +25,21 @@ const termsSections = [
     'You may have one personal account. We may suspend or close accounts that break these terms.',
   ]),
   TermsSection('3. Buying', [
-    'Items may be new or pre-owned. Look carefully at the photos, details, condition and description before you buy, and ask the seller in chat if anything is unclear.',
-    'Prices are in South African rand. The total you pay is the price plus the delivery fee for the option you choose, shown before you pay.',
-    'When you pay, we hold the money and only pay the seller once you confirm you received the piece as described. Please check it and confirm, or report a problem, soon after it arrives.',
-    'Each purchase is a separate order with its own seller, even when you check out several pieces from your cart together.',
+    'Items may be new or pre-owned. Look carefully at the photos, details, condition and description, and ask the seller in chat if anything is unclear.',
+    'Checkout is currently unavailable. A listing or accepted offer is not a completed purchase, and no delivery fee is being collected.',
   ]),
   TermsSection('4. Selling', [
     'You can sell once you add your shop name and stall location. You must own what you list and have the right to sell it.',
     'Listings must be honest: use real photos, accurate details and condition, and describe any flaws. The quantity you list must be what you actually have.',
-    'Once an item sells, send it promptly (we expect within 3 business days) and add the courier tracking number when you mark it as sent, unless the buyer collects it at the Safe Hub.',
-    'The app currently simulates payment, wallet, escrow and payout flows for learning purposes. It does not charge real payment methods or hold or transfer real money. Do not enter real payment details or rely on demo order or payout states as financial transactions.',
+    'Listings and live streams do not complete a sale. Checkout, delivery, payment, escrow, and payout services are currently unavailable.',
   ]),
   TermsSection('5. Offers', [
-    'Buyers can offer a lower price and sellers can accept, decline or counter. When an offer or counter is accepted, the buyer may buy the piece at that price within 48 hours, and the seller agrees to sell at that price during that time.',
+    'Buyers can make offers and sellers can accept, decline or counter. Accepting an offer does not place an order because checkout is unavailable.',
   ]),
   TermsSection('6. Payments, payouts and problems', [
-    'The app currently simulates payment, wallet, escrow and payout flows for learning purposes. No real payment is collected, held, refunded or paid out. Do not enter real payment details.',
-    'You can submit a demo order issue through the app, but its order and support status do not represent a real payment dispute or settlement.',
-    'Demo withdrawals do not transfer money. Bank name and account information entered into a demo withdrawal form should not be real.',
+    'Dobha does not currently process payments, accept deposits, hold escrow, issue refunds, or make payouts. Do not enter or send payment or banking details.',
+    'Historical order and wallet records may contain demonstration data and do not verify that a real payment, delivery, refund, or payout occurred.',
+    'Support can answer questions about records but cannot move, hold, refund, or pay money through the app.',
     'Nothing in these terms takes away your rights under the Consumer Protection Act or other South African law.',
   ]),
   TermsSection('7. Things you may not sell', [
@@ -50,7 +47,7 @@ const termsSections = [
   ]),
   TermsSection('8. Live streams, chat and comments', [
     'Be respectful. Harassment, threats, hate speech, sexual content, spam and scams are not allowed in live streams, chats, comments or listings.',
-    'Do not share other people\'s personal information. Payment functionality in this learning version is simulated and does not protect or settle off-app deals. The website can watch live streams hosted from the mobile app; it cannot host a stream.',
+    'Do not share other people\'s personal information. Dobha does not process payments or protect off-app deals. The website can watch live streams hosted from the mobile app; it cannot host a stream.',
     'You can report a listing from its menu. We may remove content, end live streams, and limit or close accounts that break these rules.',
   ]),
   TermsSection('9. Your content', [
@@ -59,7 +56,7 @@ const termsSections = [
   ]),
   TermsSection('10. Privacy', [
     'We collect what we need to run Dobha Dobha: your name, username, email address and phone number, your profile, delivery addresses you enter, your listings, orders, offers, messages, comments and live stream activity, and basic device and usage information.',
-    'We use it to run your account, create order records, simulate wallet activity, deliver notifications, keep the marketplace safe, and handle questions. Sellers see the name and delivery address you give for an order. We do not sell your personal information.',
+    'We use it to run your account, deliver notifications, keep the marketplace safe, and handle questions. Existing historical records may include order, wallet, or delivery details. We do not sell your personal information.',
     'We protect your information under the Protection of Personal Information Act (POPIA). You can ask to see, correct or delete your personal information, subject to records we must keep by law, such as order history.',
   ]),
   TermsSection('11. Our responsibility', [

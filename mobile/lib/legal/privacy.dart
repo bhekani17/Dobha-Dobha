@@ -4,7 +4,7 @@ library;
 
 import 'terms.dart';
 
-const privacyUpdated = '2 October 2026';
+const privacyUpdated = '21 October 2026';
 
 const privacySections = [
   TermsSection('1. Who we are', [
@@ -14,20 +14,20 @@ const privacySections = [
     'Account details: your name, username, email address, phone number if you give it, password (stored only in a scrambled form we cannot read), and your Google account id if you use Continue with Google.',
     'Profile and shop details: your picture, bio, area, shop name and stall location.',
     'Marketplace activity: listings and their photos and videos, likes, saves, comments, offers, carts, follows, reviews, chats, live streams you host or watch, and reports you make.',
-    'Orders and demo money features: order details, delivery addresses, the payment option you select, simulated wallet activity, and the bank name and last four account digits entered for a demo withdrawal.',
+    'Historical records: stored order details, delivery addresses, wallet activity, and limited bank details from previous demo withdrawal forms. New payment and withdrawal details are not requested.',
     'Support: questions you send us and our answers.',
     'Technical information: your IP address, basic device and app information, and a push notification token for your phone if you allow notifications, used to keep the service secure and working and to send you alerts.',
   ]),
   TermsSection('3. How we use it', [
-    'To run your account and the marketplace: showing listings, creating order records, simulating wallet actions, notifications and chat.',
-    'To keep people safe: preventing fraud and abuse, limiting repeated requests, reviewing reports and settling problems with orders.',
+    'To run your account and the marketplace: showing listings, notifications and chat, and retaining existing marketplace records.',
+    'To keep people safe: preventing fraud and abuse, limiting repeated requests, reviewing reports and answering questions about existing records.',
     'To answer you when you contact support, and to tell you about important changes such as updates to our terms.',
     'We do not sell your personal information, and we do not use it for advertising by other companies.',
   ]),
   TermsSection('4. Who can see it', [
     'Other users see your public profile: name, username, picture, bio, area, shop details, listings, reviews and follower counts.',
-    'When you buy, the seller sees your name and the delivery address for that order so they can send it.',
-    'We use service providers to run Dobha Dobha, such as Cloudflare (API, database and file storage), AWS (website hosting when deployed there), LiveKit (live streaming), Google (Continue with Google), Firebase (mobile push notifications), and our email provider (password reset codes and support answers). They only get what they need to do that job. This learning version does not integrate real payment processing or delivery partners.',
+    'Historical order records may contain a name and delivery address previously supplied for fulfillment.',
+    'We use service providers to run Dobha Dobha, such as Cloudflare (API, database and file storage), AWS (website hosting when deployed there), LiveKit (live streaming), Google (Continue with Google), Firebase (mobile push notifications), and our email provider (password reset codes and support answers). They only get what they need to do that job. Dobha does not currently integrate real payment processing or delivery partners.',
     'We may share information when the law requires it, or to protect people from fraud or harm.',
   ]),
   TermsSection('5. How long we keep it', [
@@ -36,7 +36,7 @@ const privacySections = [
   ]),
   TermsSection('6. Your rights', [
     'You can see and correct most of your information yourself under Me, then Edit profile.',
-    'You can delete your account at any time under Me, then Settings, once your orders are finished and your wallet is empty.',
+    'You can request account deletion under Me, then Settings. Some historical records may be retained where required by law.',
     'You can ask us what information we hold about you, ask us to correct or delete it, or object to how we use it, by using Contact support in the app.',
     'If you are unhappy with how we handle your information, you may complain to the Information Regulator of South Africa.',
   ]),

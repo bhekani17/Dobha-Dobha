@@ -1,0 +1,254 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SHOPPER
+  VENDOR
+  ADMIN
+  SUPPORT
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  RESERVED
+  SOLD
+  ARCHIVED
+}
+
+enum ReelStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+}
+
+enum LiveStreamStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+  CANCELLED
+}
+
+enum LiveProvider {
+  AGORA
+  LIVEKIT
+}
+
+enum OrderStatus {
+  AWAITING_PAYMENT
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  COMPLETED
+  CANCELLED
+}
+
+enum EscrowStatus {
+  PENDING
+  HELD
+  DISPUTED
+  RELEASED
+  REFUNDED
+}
+
+enum EscrowAction {
+  FUND
+  DISPUTE
+  RELEASE
+  REFUND
+}
+
+enum LedgerEntryType {
+  ESCROW_FUND
+  ESCROW_RELEASE
+  ESCROW_REFUND
+}
+
+model User {
+  id              String             @id @default(uuid()) @db.Uuid
+  email           String             @unique @db.VarChar(320)
+  phone           String?            @unique @db.VarChar(32)
+  displayName     String             @db.VarChar(80)
+  createdAt       DateTime           @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @db.Timestamptz(6)
+  roles           UserRole[]
+  vendorProfile   VendorProfile?
+  listings        ProductListing[]   @relation("VendorListings")
+  reels           ProductReel[]      @relation("VendorReels")
+  liveStreams     LiveStream[]       @relation("VendorStreams")
+  buyerOrders     Order[]            @relation("OrderBuyer")
+  sellerOrders    Order[]            @relation("OrderSeller")
+  wallets         Wallet[]
+  buyerEscrows    EscrowTransaction[] @relation("EscrowBuyer")
+  sellerEscrows   EscrowTransaction[] @relation("EscrowSeller")
+  escrowActions   EscrowTransition[] @relation("EscrowActor")
+}
+
+model UserRole {
+  userId    String   @db.Uuid
+  role      Role
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, role])
+  @@index([role, userId])
+}
+
+model VendorProfile {
+  userId      String   @id @db.Uuid
+  storeName   String   @unique @db.VarChar(80)
+  bio         String?  @db.VarChar(500)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model ProductListing {
+  id          String        @id @default(uuid()) @db.Uuid
+  vendorId    String        @db.Uuid
+  title       String        @db.VarChar(160)
+  description String?       @db.VarChar(4000)
+  priceCents  BigInt        @db.BigInt
+  currency    String        @default("ZAR") @db.Char(3)
+  status      ListingStatus @default(DRAFT)
+  imageKeys   String[]      @default([])
+  createdAt   DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(6)
+  vendor      User          @relation("VendorListings", fields: [vendorId], references: [id], onDelete: Restrict)
+  reels       ProductReel[]
+  orders      Order[]
+
+  @@index([vendorId, status, createdAt])
+  @@index([status, createdAt])
+}
+
+model ProductReel {
+  id          String     @id @default(uuid()) @db.Uuid
+  vendorId    String     @db.Uuid
+  listingId   String?    @db.Uuid
+  caption     String?    @db.VarChar(500)
+  videoKey    String     @db.VarChar(1024)
+  thumbnailKey String?   @db.VarChar(1024)
+  status      ReelStatus @default(DRAFT)
+  publishedAt DateTime?  @db.Timestamptz(6)
+  createdAt   DateTime   @default(now()) @db.Timestamptz(6)
+  vendor      User       @relation("VendorReels", fields: [vendorId], references: [id], onDelete: Restrict)
+  listing     ProductListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@index([status, publishedAt])
+  @@index([vendorId, createdAt])
+}
+
+model LiveStream {
+  id              String           @id @default(uuid()) @db.Uuid
+  vendorId        String           @db.Uuid
+  provider        LiveProvider
+  providerRoomId  String           @unique @db.VarChar(255)
+  title           String           @db.VarChar(160)
+  status          LiveStreamStatus @default(SCHEDULED)
+  scheduledAt     DateTime?        @db.Timestamptz(6)
+  startedAt       DateTime?        @db.Timestamptz(6)
+  endedAt         DateTime?        @db.Timestamptz(6)
+  createdAt       DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @db.Timestamptz(6)
+  vendor          User             @relation("VendorStreams", fields: [vendorId], references: [id], onDelete: Restrict)
+
+  @@index([status, scheduledAt])
+  @@index([vendorId, createdAt])
+}
+
+model Order {
+  id             String     @id @default(uuid()) @db.Uuid
+  buyerId        String     @db.Uuid
+  sellerId       String     @db.Uuid
+  listingId      String     @db.Uuid
+  amountCents    BigInt     @db.BigInt
+  currency       String     @db.Char(3)
+  status         OrderStatus @default(AWAITING_PAYMENT)
+  createdAt      DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime   @updatedAt @db.Timestamptz(6)
+  buyer          User       @relation("OrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller         User       @relation("OrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  listing        ProductListing @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  escrow         EscrowTransaction?
+
+  @@index([buyerId, status, createdAt])
+  @@index([sellerId, status, createdAt])
+  @@index([listingId, status])
+}
+
+model Wallet {
+  id                  String        @id @default(uuid()) @db.Uuid
+  userId              String        @db.Uuid
+  currency            String        @db.Char(3)
+  availableCents      BigInt        @default(0) @db.BigInt
+  heldCents           BigInt        @default(0) @db.BigInt
+  createdAt           DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime      @updatedAt @db.Timestamptz(6)
+  user                User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  ledgerEntries       LedgerEntry[]
+
+  @@unique([userId, currency])
+}
+
+model EscrowTransaction {
+  id             String              @id @default(uuid()) @db.Uuid
+  orderId        String              @unique @db.Uuid
+  buyerId        String              @db.Uuid
+  sellerId       String              @db.Uuid
+  amountCents    BigInt              @db.BigInt
+  currency       String              @db.Char(3)
+  status         EscrowStatus        @default(PENDING)
+  createdAt      DateTime            @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @db.Timestamptz(6)
+  order          Order               @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  buyer          User                @relation("EscrowBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  seller         User                @relation("EscrowSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  transitions    EscrowTransition[]
+  ledgerEntries  LedgerEntry[]
+
+  @@index([buyerId, status, createdAt])
+  @@index([sellerId, status, createdAt])
+}
+
+model EscrowTransition {
+  id             String            @id @default(uuid()) @db.Uuid
+  escrowId       String            @db.Uuid
+  actorUserId    String            @db.Uuid
+  action         EscrowAction
+  fromStatus     EscrowStatus
+  toStatus       EscrowStatus
+  idempotencyKey String            @unique @db.VarChar(128)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  escrow         EscrowTransaction @relation(fields: [escrowId], references: [id], onDelete: Restrict)
+  actor          User              @relation("EscrowActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+  ledgerEntries  LedgerEntry[]
+
+  @@index([escrowId, createdAt])
+  @@index([actorUserId, createdAt])
+}
+
+model LedgerEntry {
+  id                  String          @id @default(uuid()) @db.Uuid
+  walletId            String          @db.Uuid
+  escrowId            String          @db.Uuid
+  transitionId        String          @db.Uuid
+  entryType           LedgerEntryType
+  availableDeltaCents BigInt          @db.BigInt
+  heldDeltaCents      BigInt          @db.BigInt
+  createdAt           DateTime        @default(now()) @db.Timestamptz(6)
+  wallet              Wallet          @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  escrow              EscrowTransaction @relation(fields: [escrowId], references: [id], onDelete: Restrict)
+  transition          EscrowTransition @relation(fields: [transitionId], references: [id], onDelete: Restrict)
+
+  @@unique([walletId, transitionId])
+  @@index([escrowId, createdAt])
+  @@index([walletId, createdAt])
+}
