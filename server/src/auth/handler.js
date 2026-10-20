@@ -3,12 +3,14 @@
 const crypto = require('crypto');
 const { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { OAuth2Client } = require('google-auth-library');
 const dynamo = require('../utils/dynamo');
 const { CORS_HEADERS, json, error, handleCors, parseBody } = require('../utils/response');
 const { id, now, zar } = require('../utils/id');
 const { hashToken, getUser, requireUser, extractBearer } = require('../utils/auth');
 
 const s3 = new S3Client({});
+const googleOAuthClient = new OAuth2Client();
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const MEDIA_MAX_BYTES = 60 * 1024 * 1024;
 const DIRECT_MEDIA_MAX_BYTES = 8 * 1024 * 1024;
@@ -266,29 +268,41 @@ exports.handler = async (event) => {
     // -------------------------------------------------------------
     if (path.endsWith('/api/auth/google') && method === 'POST') {
       const body = parseBody(event);
-      let email = (body.email || '').trim().toLowerCase();
-      let name = (body.name || '').trim();
-      const sub = body.sub || body.googleId;
-
-      // In production, Google token can be decoded or passed directly
-      if (!email && (body.credential || body.idToken)) {
-        try {
-          const token = body.credential || body.idToken;
-          const parts = token.split('.');
-          if (parts.length === 3) {
-            const padded = parts[1].replace(/-/g, '+').replace(/_/g, '/');
-            const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
-            email = (payload.email || '').toLowerCase();
-            name = payload.name || name;
-          }
-        } catch {
-          // Fall through
-        }
+      const idToken = body.credential || body.idToken;
+      if (typeof idToken !== 'string' || !idToken.trim()) {
+        return error(400, 'A Google ID token is required');
       }
 
-      if (!email) {
-        return error(400, 'Google sign-in token could not be verified');
+      const audiences = (process.env.GOOGLE_CLIENT_IDS || '')
+        .split(',')
+        .map((audience) => audience.trim())
+        .filter(Boolean);
+      if (audiences.length === 0) {
+        return error(503, 'Google sign-in is not configured');
       }
+
+      let claims;
+      try {
+        const ticket = await googleOAuthClient.verifyIdToken({
+          idToken,
+          audience: audiences,
+        });
+        claims = ticket.getPayload();
+      } catch {
+        return error(401, 'Google sign-in token is invalid or expired');
+      }
+
+      if (
+        typeof claims?.sub !== 'string' ||
+        typeof claims.email !== 'string' ||
+        claims.email_verified !== true
+      ) {
+        return error(401, 'Google sign-in requires a verified email address');
+      }
+
+      const email = claims.email.trim().toLowerCase();
+      const name = typeof claims.name === 'string' ? claims.name.trim() : '';
+      const sub = claims.sub;
 
       let user = null;
       const res = await dynamo.query({
