@@ -62,6 +62,10 @@ class _StudioScreenState extends State<StudioScreen> {
     }
   }
 
+  Future<void> _boostItem(ThriftItem item) async {
+    await BoostListingSheet.show(context, item);
+  }
+
   Future<void> _remove(ThriftItem item) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -315,6 +319,200 @@ class _StudioScreenState extends State<StudioScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet: pick duration + tier, deducts from wallet, boosts the listing.
+class BoostListingSheet extends StatefulWidget {
+  final ThriftItem item;
+  const BoostListingSheet({super.key, required this.item});
+
+  static Future<void> show(BuildContext context, ThriftItem item) {
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: DobhaColors.surface,
+      showDragHandle: true,
+      builder: (_) => BoostListingSheet(item: item),
+    );
+  }
+
+  @override
+  State<BoostListingSheet> createState() => _BoostListingSheetState();
+}
+
+class _BoostListingSheetState extends State<BoostListingSheet> {
+  String _tier = 'basic';
+  int _days = 7;
+  bool _busy = false;
+
+  static const _tiers = {
+    'basic':    (label: 'Basic',    price: 'R 50/day',   desc: 'Appear higher in search results'),
+    'standard': (label: 'Standard', price: 'R 150/day',  desc: 'Featured in category feeds'),
+    'premium':  (label: 'Premium',  price: 'R 500/day',  desc: 'Top of home feed + push to followers'),
+  };
+
+  static const _durations = [1, 3, 7, 14, 30];
+
+  double _totalCost() {
+    final pricePerDay = _tier == 'premium' ? 500.0 : _tier == 'standard' ? 150.0 : 50.0;
+    return pricePerDay * _days;
+  }
+
+  Future<void> _boost() async {
+    setState(() => _busy = true);
+    try {
+      final until = await AppState().promoteItem(widget.item, days: _days, tier: _tier);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+          '"${widget.item.title}" is now boosted until ${until.day}/${until.month}/${until.year}! 🚀',
+        ),
+      ));
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final balance = AppState().availableBalance;
+    final cost = _totalCost();
+    final canAfford = balance >= cost;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 20, right: 20, bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              Icon(Icons.rocket_launch_rounded, color: DobhaColors.amber, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Boost this listing',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: -0.3)),
+                  Text(
+                    widget.item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13, color: DobhaColors.muted),
+                  ),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 20),
+
+            const Text('Boost tier', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(height: 10),
+            for (final entry in _tiers.entries) ...[
+              GestureDetector(
+                onTap: () => setState(() => _tier = entry.key),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: _tier == entry.key ? DobhaColors.amber : DobhaColors.border,
+                      width: _tier == entry.key ? 2 : 1,
+                    ),
+                    color: _tier == entry.key ? DobhaColors.amber.withValues(alpha: 0.08) : DobhaColors.card,
+                  ),
+                  child: Row(children: [
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(entry.value.label,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: _tier == entry.key ? DobhaColors.amber : DobhaColors.text,
+                            )),
+                        Text(entry.value.desc,
+                            style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
+                      ],
+                    )),
+                    Text(entry.value.price,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: _tier == entry.key ? DobhaColors.amber : DobhaColors.muted,
+                        )),
+                  ]),
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+            const Text('Duration', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              children: [
+                for (final d in _durations)
+                  ChoiceChip(
+                    label: Text('${d}d'),
+                    selected: _days == d,
+                    onSelected: (_) => setState(() => _days = d),
+                    selectedColor: DobhaColors.amber,
+                    labelStyle: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: _days == d ? Colors.black : DobhaColors.text,
+                    ),
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+            AppWell(
+              radius: 14,
+              tint: canAfford ? DobhaColors.green : DobhaColors.red,
+              child: Row(children: [
+                Icon(
+                  canAfford ? Icons.account_balance_wallet_rounded : Icons.warning_amber_rounded,
+                  color: canAfford ? DobhaColors.green : DobhaColors.red,
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    canAfford
+                        ? 'Total: R ${cost.toStringAsFixed(0)} · Wallet: R ${balance.toStringAsFixed(0)}'
+                        : 'Not enough funds. Top up in the Orders tab (R ${cost.toStringAsFixed(0)} needed).',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: canAfford ? DobhaColors.green : DobhaColors.red,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+
+            const SizedBox(height: 16),
+            AppButton(
+              color: canAfford ? DobhaColors.amber : null,
+              foreground: canAfford ? Colors.black : null,
+              onPressed: (!canAfford || _busy) ? null : _boost,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: _busy
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4))
+                  : Text(
+                      'Boost for R ${_totalCost().toStringAsFixed(0)}',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }

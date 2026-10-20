@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "787923055628-8o9ea9cehfp2gju4di9vj0r2l5u0kmnl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dobhadobha.app",
+            "certificate_hash": "187112a355ff92117d803dd27a6b2005d8ecfb22"
+          }
+        },
+        {
           "client_id": "787923055628-acp8hnjbf4fcfa5b7bo377h6on5noqek.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -43,7 +51,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com",
+              "client_id": "787923055628-8heusm0carinbccpgb8t4aa6c1p0iasn.apps.googleusercontent.com",
               "client_type": 3
             },
             {

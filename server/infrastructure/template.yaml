@@ -616,6 +616,17 @@ Resources:
             NoncurrentVersionExpirationInDays: 1
             AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 1
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - '*'
+            AllowedMethods:
+              - PUT
+            AllowedHeaders:
+              - '*'
+            ExposedHeaders:
+              - ETag
+            MaxAge: 3000
 
   WebsiteBucket:
     Type: AWS::S3::Bucket
@@ -696,6 +707,13 @@ Resources:
     Type: AWS::Serverless::Api
     Properties:
       StageName: !Ref Stage
+      BinaryMediaTypes:
+        - image/jpeg
+        - image/png
+        - image/webp
+        - video/mp4
+        - video/quicktime
+        - video/webm
       DefinitionBody:
         openapi: '3.0'
         info:
@@ -799,6 +817,93 @@ Resources:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
+          /api/auth/logout:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/auth/forgot:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/auth/reset:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/auth/{proxy+}:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
           /api/me:
             options:
               x-amazon-apigateway-integration:
@@ -822,30 +927,90 @@ Resources:
                     Access-Control-Allow-Methods:
                       type: string
             get:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
             patch:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
             delete:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/me/password:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/me/avatar:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/uploads:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /media/{proxy+}:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AuthLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/saved:
+            options:
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: '{"statusCode": 200}'
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: "'*'"
+                      method.response.header.Access-Control-Allow-Headers: "'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token'"
+                      method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              responses:
+                '200':
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
           /api/items:
@@ -876,10 +1041,6 @@ Resources:
                 httpMethod: POST
                 type: aws_proxy
             post:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ItemsLambda.Arn}/invocations'
                 httpMethod: POST
@@ -908,19 +1069,11 @@ Resources:
                     Access-Control-Allow-Methods:
                       type: string
             get:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
             post:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
                 httpMethod: POST
@@ -948,10 +1101,6 @@ Resources:
                     Access-Control-Allow-Methods:
                       type: string
             get:
-              x-amazon-apigateway-authorizer:
-                type: cognito_user_pools
-                providerArns:
-                  - !GetAtt UserPool.Arn
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
                 httpMethod: POST
@@ -1160,6 +1309,7 @@ Resources:
           WALLET_TABLE: !Ref WalletsTable
           USER_POOL_ID: !Ref UserPool
           USER_POOL_CLIENT_ID: !Ref UserPoolClient
+          PHOTOS_BUCKET: !Ref PhotosBucket
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
@@ -1169,6 +1319,8 @@ Resources:
             TableName: !Ref ProfileTable
         - DynamoDBCrudPolicy:
             TableName: !Ref WalletsTable
+        - S3CrudPolicy:
+            BucketName: !Ref PhotosBucket
       Events:
         RegisterApi:
           Type: Api
@@ -1381,8 +1533,8 @@ Resources:
       Environment:
         Variables:
           LIVEKIT_URL: 'wss://dobha-dobha-7co038tw.livekit.cloud'
-          LIVEKIT_API_KEY: '***REMOVED***'
-          LIVEKIT_API_SECRET: '***REMOVED***'
+          LIVEKIT_API_KEY: !Sub '{{resolve:secretsmanager:${Stage}/dobha/livekit:SecretString:apiKey}}'
+          LIVEKIT_API_SECRET: !Sub '{{resolve:secretsmanager:${Stage}/dobha/livekit:SecretString:apiSecret}}'
           USERS_TABLE: !Ref UsersTable
           ITEMS_TABLE: !Ref ItemsTable
           SESSIONS_TABLE: !Ref SessionsTable
@@ -1449,6 +1601,7 @@ Resources:
             Headers:
               - Authorization
               - Content-Type
+              - Accept
             Cookies:
               Forward: all
           Compress: true

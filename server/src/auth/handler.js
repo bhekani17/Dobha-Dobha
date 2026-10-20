@@ -1,10 +1,37 @@
 'use strict';
 
 const crypto = require('crypto');
+const { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const dynamo = require('../utils/dynamo');
-const { json, error, handleCors, parseBody } = require('../utils/response');
+const { CORS_HEADERS, json, error, handleCors, parseBody } = require('../utils/response');
 const { id, now, zar } = require('../utils/id');
 const { hashToken, getUser, requireUser, extractBearer } = require('../utils/auth');
+
+const s3 = new S3Client({});
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+const MEDIA_MAX_BYTES = 60 * 1024 * 1024;
+const DIRECT_MEDIA_MAX_BYTES = 8 * 1024 * 1024;
+const AVATAR_TYPES = {
+  'image/jpeg': { extension: 'jpg', signature: (bytes) => bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff },
+  'image/png': {
+    extension: 'png',
+    signature: (bytes) => bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
+  },
+  'image/webp': {
+    extension: 'webp',
+    signature: (bytes) => bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP',
+  },
+};
+const MEDIA_TYPES = {
+  ...AVATAR_TYPES,
+  'video/mp4': { extension: 'mp4', signature: (bytes) => bytes.toString('ascii', 4, 8) === 'ftyp' },
+  'video/quicktime': { extension: 'mov', signature: (bytes) => bytes.toString('ascii', 4, 8) === 'ftyp' },
+  'video/webm': {
+    extension: 'webm',
+    signature: (bytes) => bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])),
+  },
+};
 
 function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
@@ -64,10 +91,41 @@ exports.handler = async (event) => {
   const usersTable = process.env.USERS_TABLE;
   const sessionsTable = process.env.SESSIONS_TABLE;
   const walletsTable = process.env.WALLET_TABLE || process.env.WALLETS_TABLE;
+  const photosBucket = process.env.PHOTOS_BUCKET;
   const path = event.path || (event.requestContext && event.requestContext.http && event.requestContext.http.path) || '';
   const method = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || '').toUpperCase();
 
   try {
+    const mediaMatch = path.match(/^\/media\/(.+)$/);
+    if (mediaMatch && method === 'GET') {
+      if (!photosBucket) return error(503, 'Media storage is not configured');
+      let key;
+      try {
+        key = decodeURIComponent(mediaMatch[1]);
+      } catch {
+        return error(400, 'Invalid media key');
+      }
+      if (key.split('/').some((part) => !part || part === '.' || part === '..') || key.includes('\\')) {
+        return error(400, 'Invalid media key');
+      }
+      try {
+        const media = await s3.send(new GetObjectCommand({ Bucket: photosBucket, Key: key }));
+        return {
+          statusCode: 200,
+          headers: {
+            ...CORS_HEADERS,
+            'Content-Type': media.ContentType || 'application/octet-stream',
+            'Cache-Control': 'public, max-age=86400',
+          },
+          body: await media.Body.transformToString('base64'),
+          isBase64Encoded: true,
+        };
+      } catch (err) {
+        if (err.name === 'NoSuchKey' || err.name === 'NotFound') return error(404, 'Media not found');
+        throw err;
+      }
+    }
+
     // -------------------------------------------------------------
     // POST /api/auth/register
     // -------------------------------------------------------------
@@ -405,6 +463,232 @@ exports.handler = async (event) => {
       });
 
       return json(200, { message: 'Account deleted and anonymized successfully' });
+    }
+
+    // -------------------------------------------------------------
+    // PUT /api/me/avatar and DELETE /api/me/avatar
+    // -------------------------------------------------------------
+    if (path.endsWith('/api/me/avatar') && (method === 'PUT' || method === 'DELETE')) {
+      const user = await requireUser(event);
+      if (!photosBucket) return error(503, 'Media storage is not configured');
+
+      if (method === 'PUT') {
+        const contentType = (event.headers?.['content-type'] || event.headers?.['Content-Type'] || '').split(';')[0].trim().toLowerCase();
+        const type = AVATAR_TYPES[contentType];
+        if (!type) return error(400, 'Choose a JPEG, PNG or WebP image');
+        if (!event.body) return error(400, 'An image file is required');
+        if (event.isBase64Encoded && event.body.length > Math.ceil(AVATAR_MAX_BYTES * 4 / 3)) {
+          return error(413, 'Profile photos must be 5 MB or smaller');
+        }
+
+        const image = Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'binary');
+        if (image.length === 0) return error(400, 'An image file is required');
+        if (image.length > AVATAR_MAX_BYTES) return error(413, 'Profile photos must be 5 MB or smaller');
+        if (!type.signature(image)) return error(400, 'The image content does not match its file type');
+
+        const avatarKey = `avatars/${user.id}/${id('img')}.${type.extension}`;
+        await s3.send(new PutObjectCommand({
+          Bucket: photosBucket,
+          Key: avatarKey,
+          Body: image,
+          ContentType: contentType,
+          CacheControl: 'public, max-age=31536000, immutable',
+        }));
+        await dynamo.update({
+          TableName: usersTable,
+          Key: { id: user.id },
+          UpdateExpression: 'SET avatar_key = :key REMOVE avatar_url',
+          ExpressionAttributeValues: { ':key': avatarKey },
+        });
+        if (user.avatar_key) {
+          await s3.send(new DeleteObjectCommand({ Bucket: photosBucket, Key: user.avatar_key }));
+        }
+      } else {
+        if (user.avatar_key) {
+          await s3.send(new DeleteObjectCommand({ Bucket: photosBucket, Key: user.avatar_key }));
+        }
+        await dynamo.update({
+          TableName: usersTable,
+          Key: { id: user.id },
+          UpdateExpression: 'REMOVE avatar_key, avatar_url',
+        });
+      }
+
+      const updatedUser = await dynamo.get(usersTable, { id: user.id });
+      let wallet = null;
+      if (walletsTable) wallet = await dynamo.get(walletsTable, { user_id: user.id });
+      return json(200, { user: sanitizeUser(updatedUser, wallet) });
+    }
+
+    // -------------------------------------------------------------
+    // POST /api/uploads: issue a short-lived S3 upload URL or store a small legacy upload
+    // -------------------------------------------------------------
+    if (path.endsWith('/api/uploads') && method === 'POST') {
+      const user = await requireUser(event);
+      if (!photosBucket) return error(503, 'Media storage is not configured');
+
+      const contentType = (event.headers?.['content-type'] || event.headers?.['Content-Type'] || '')
+        .split(';')[0].trim().toLowerCase();
+
+      if (contentType === 'application/json') {
+        const body = parseBody(event);
+        const requestedType = String(body.contentType || '').split(';')[0].trim().toLowerCase();
+        const type = MEDIA_TYPES[requestedType];
+        const size = Number(body.size);
+        if (!type) return error(400, 'Unsupported media type');
+        if (!Number.isSafeInteger(size) || size < 1) return error(400, 'A valid media size is required');
+        if (size > MEDIA_MAX_BYTES) return error(413, 'Media must be 60 MB or smaller');
+
+        const key = `uploads/${user.id}/${id('media')}.${type.extension}`;
+        const uploadUrl = await getSignedUrl(
+          s3,
+          new PutObjectCommand({ Bucket: photosBucket, Key: key, ContentType: requestedType, ContentLength: size }),
+          { expiresIn: 300 },
+        );
+        return json(200, { key, uploadUrl });
+      }
+
+      const mediaType = MEDIA_TYPES[contentType];
+      if (!mediaType) return error(400, 'Choose a JPEG, PNG, WebP, MP4, MOV or WebM file');
+      if (!event.body) return error(400, 'A media file is required');
+      if (event.isBase64Encoded && event.body.length > Math.ceil(DIRECT_MEDIA_MAX_BYTES * 4 / 3)) {
+        return error(413, 'Direct uploads must be 8 MB or smaller; request an upload URL for larger files');
+      }
+      const media = Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'binary');
+      if (media.length === 0) return error(400, 'A media file is required');
+      if (media.length > DIRECT_MEDIA_MAX_BYTES) {
+        return error(413, 'Direct uploads must be 8 MB or smaller; request an upload URL for larger files');
+      }
+      if (!mediaType.signature(media)) return error(400, 'The file content does not match its media type');
+
+      const key = `uploads/${user.id}/${id('media')}.${mediaType.extension}`;
+      await s3.send(new PutObjectCommand({
+        Bucket: photosBucket,
+        Key: key,
+        Body: media,
+        ContentType: contentType,
+      }));
+      return json(201, { key });
+    }
+
+    // -------------------------------------------------------------
+    // POST /api/auth/forgot  — send a 6-digit reset code via email
+    // -------------------------------------------------------------
+    if (path.endsWith('/api/auth/forgot') && method === 'POST') {
+      const body = parseBody(event);
+      const email = (body.email || '').trim().toLowerCase();
+      if (!email) return error(400, 'Email is required');
+
+      // Always respond success to prevent user enumeration
+      const res = await dynamo.query({
+        TableName: usersTable,
+        IndexName: 'EmailIndex',
+        KeyConditionExpression: 'email = :email',
+        ExpressionAttributeValues: { ':email': email },
+        Limit: 1,
+      });
+
+      if (res.items.length > 0) {
+        const user = res.items[0];
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = Math.floor(Date.now() / 1000) + 15 * 60; // 15 minutes
+
+        // Store the reset code on the user record
+        await dynamo.update({
+          TableName: usersTable,
+          Key: { id: user.id },
+          UpdateExpression: 'SET reset_code = :code, reset_expires = :exp',
+          ExpressionAttributeValues: { ':code': code, ':exp': expires },
+        });
+
+        // TODO: Send email via SES. For now, log the code (dev only).
+        console.log(`[DEV] Password reset code for ${email}: ${code}`);
+      }
+
+      return json(200, { message: 'If the account exists, a reset code has been sent to its email address.' });
+    }
+
+    // -------------------------------------------------------------
+    // POST /api/auth/reset  — verify code and set new password
+    // -------------------------------------------------------------
+    if (path.endsWith('/api/auth/reset') && method === 'POST') {
+      const body = parseBody(event);
+      const email = (body.email || '').trim().toLowerCase();
+      const code = (body.code || '').trim();
+      const password = body.password || '';
+
+      if (!email || !code || !password) return error(400, 'Email, code and new password are required');
+      if (password.length < 8) return error(400, 'Password must be at least 8 characters');
+
+      const res = await dynamo.query({
+        TableName: usersTable,
+        IndexName: 'EmailIndex',
+        KeyConditionExpression: 'email = :email',
+        ExpressionAttributeValues: { ':email': email },
+        Limit: 1,
+      });
+
+      if (res.items.length === 0) return error(400, 'Invalid or expired reset code');
+
+      const user = res.items[0];
+      const nowTs = Math.floor(Date.now() / 1000);
+
+      if (!user.reset_code || user.reset_code !== code || !user.reset_expires || user.reset_expires < nowTs) {
+        return error(400, 'Invalid or expired reset code');
+      }
+
+      const salt = crypto.randomBytes(16).toString('hex');
+      const passwordHash = hashPassword(password, salt);
+
+      await dynamo.update({
+        TableName: usersTable,
+        Key: { id: user.id },
+        UpdateExpression: 'SET password_hash = :hash, password_salt = :salt, updated_at = :ts REMOVE reset_code, reset_expires',
+        ExpressionAttributeValues: {
+          ':hash': passwordHash,
+          ':salt': salt,
+          ':ts': now(),
+        },
+      });
+
+      const token = await createSession(user.id, sessionsTable);
+      let wallet = null;
+      if (walletsTable) wallet = await dynamo.get(walletsTable, { user_id: user.id });
+
+      return json(200, { token, user: sanitizeUser(user, wallet) });
+    }
+
+    // -------------------------------------------------------------
+    // POST /api/me/password  — change password (must know current)
+    // -------------------------------------------------------------
+    if (path.endsWith('/api/me/password') && method === 'POST') {
+      const user = await requireUser(event);
+      const body = parseBody(event);
+      const current = body.current || '';
+      const password = body.password || '';
+
+      if (!current || !password) return error(400, 'Current and new password are required');
+      if (password.length < 8) return error(400, 'New password must be at least 8 characters');
+
+      const fullUser = await dynamo.get(usersTable, { id: user.id });
+      if (!fullUser.password_hash || !fullUser.password_salt) {
+        return error(400, 'Account uses Google sign-in — no password to change');
+      }
+
+      const valid = verifyPassword(current, fullUser.password_hash, fullUser.password_salt);
+      if (!valid) return error(401, 'Current password is incorrect');
+
+      const salt = crypto.randomBytes(16).toString('hex');
+      const passwordHash = hashPassword(password, salt);
+
+      await dynamo.update({
+        TableName: usersTable,
+        Key: { id: user.id },
+        UpdateExpression: 'SET password_hash = :hash, password_salt = :salt, updated_at = :ts',
+        ExpressionAttributeValues: { ':hash': passwordHash, ':salt': salt, ':ts': now() },
+      });
+
+      return json(200, { message: 'Password changed successfully' });
     }
 
     return error(404, `Route not found: ${method} ${path}`);

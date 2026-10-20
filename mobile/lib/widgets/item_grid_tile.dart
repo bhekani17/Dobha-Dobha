@@ -111,6 +111,26 @@ class _ItemGridTileState extends State<ItemGridTile> with SingleTickerProviderSt
                             child: Icon(Icons.favorite, size: 14, color: DobhaColors.green),
                           ),
                         ),
+                      if (item.isPromoted)
+                        Positioned(
+                          bottom: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: DobhaColors.amber,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.rocket_launch_rounded, size: 11, color: Colors.black),
+                                SizedBox(width: 3),
+                                Text('Boosted', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.black)),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),

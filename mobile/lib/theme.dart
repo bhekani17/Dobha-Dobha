@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 /// actions and the live dot; everything else is a shade of grey.
 class _Palette {
   final Color bg, surface, well, cardElevated, text, textSecondary, muted, border, borderLight;
-  final Color green, red;
+  final Color green, red, amber;
 
   const _Palette({
     required this.bg,
@@ -21,6 +21,7 @@ class _Palette {
     required this.borderLight,
     required this.green,
     required this.red,
+    required this.amber,
   });
 }
 
@@ -36,6 +37,7 @@ const _dark = _Palette(
   borderLight: Color(0xFF2E2E2E),
   green: Color(0xFF00A93B),
   red: Color(0xFFFF453A),
+  amber: Color(0xFFFFB800),
 );
 
 // Green is deeper on white so text in it stays readable.
@@ -51,6 +53,7 @@ const _light = _Palette(
   borderLight: Color(0xFFD4D4D4),
   green: Color(0xFF00A650),
   red: Color(0xFFD92D20),
+  amber: Color(0xFFF59E0B),
 );
 
 class DobhaColors {
@@ -72,10 +75,10 @@ class DobhaColors {
 
   static Color get green => _p.green;
   static Color get red => _p.red;
+  static Color get amber => _p.amber;
 
   // Older accent names, folded into the black/white/green palette.
   static Color get gold => _p.green;
-  static Color get amber => _p.textSecondary;
   static Color get cyan => _p.text;
 
   /// The app's typeface, bundled in assets/fonts.

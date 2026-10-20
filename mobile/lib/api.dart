@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -75,9 +76,23 @@ class Api {
 
   /// Uploads a photo or video and returns the storage key to attach to an item.
   Future<String> uploadMedia(Uint8List bytes, String contentType) async {
-    final res = await _send('POST', '/api/uploads',
-        raw: bytes, contentType: contentType, timeout: const Duration(minutes: 5));
-    return res['key'] as String;
+    final request = await post('/api/uploads', {'contentType': contentType, 'size': bytes.length}) as Map<String, dynamic>;
+    final key = request['key'] as String;
+    final uploadUrl = request['uploadUrl'] as String;
+    final http.Response response;
+    try {
+      response = await http
+          .put(Uri.parse(uploadUrl), headers: {'content-type': contentType}, body: bytes)
+          .timeout(const Duration(minutes: 5));
+    } on TimeoutException {
+      throw ApiException(0, 'Media upload timed out. Please try again.');
+    } on http.ClientException {
+      throw ApiException(0, 'Media upload failed. Check your internet and try again.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(response.statusCode, 'Media upload failed (${response.statusCode})');
+    }
+    return key;
   }
 
   Future<List<LiveRoom>> rooms() async {

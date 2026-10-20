@@ -56,8 +56,9 @@ exports.handler = async (event) => {
         Limit: 50,
       });
 
-      const unreadCount = res.items.filter((n) => !n.read).length;
-      return json(200, { unreadCount });
+      const unread = res.items.filter((n) => !n.read).length;
+      const messages = res.items.filter((n) => !n.read && n.kind === 'message').length;
+      return json(200, { unread, messages });
     }
 
     // -------------------------------------------------------------

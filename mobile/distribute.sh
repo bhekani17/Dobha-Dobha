@@ -24,8 +24,7 @@ echo "Uploading to Firebase App Distribution using Firebase CLI..."
 firebase appdistribution:distribute "$OUTPUT_PATH" \
   --app 1:787923055628:android:4e2787b23f9f600c7f2a29 \
   --release-notes "$RELEASE_NOTES" \
-  --testers "ndlovubhekani17@gmail.com" \
-  --groups "default"
+  --testers "ndlovubhekani17@gmail.com"
 
 echo "Distribution complete!"
 echo "Output: $OUTPUT_PATH"

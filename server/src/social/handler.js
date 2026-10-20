@@ -136,7 +136,7 @@ exports.handler = async (event) => {
           stallLocation: targetUser.stall_location || '',
           bio: targetUser.bio || '',
           avatarUrl: targetUser.avatar_key ? `/media/${targetUser.avatar_key}` : (targetUser.avatar_url || null),
-          followersCount: followersRes.items.length,
+          followerCount: followersRes.items.length,
           followingCount: followingRes.items.length,
           reviewsCount: reviewsRes.items.length,
           averageRating,

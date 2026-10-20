@@ -104,6 +104,8 @@ class ThriftItem {
     this.sellerRating,
     this.sellerReviewCount = 0,
     required this.createdAt,
+    this.isPromoted = false,
+    this.promotedUntil,
   });
 
   String get formattedPrice => 'R ${priceZar.toStringAsFixed(0)}';
@@ -139,10 +141,12 @@ class ThriftItem {
         sellerRating: (json['sellerRating'] as num?)?.toDouble(),
         sellerReviewCount: json['sellerReviewCount'] as int? ?? 0,
         createdAt: DateTime.parse(json['createdAt'] as String),
+        isPromoted: json['isPromoted'] as bool? ?? false,
+        promotedUntil: json['promotedUntil'] == null ? null : DateTime.tryParse(json['promotedUntil'] as String),
       );
 
   /// The same item with some fields changed.
-  ThriftItem copyWith({int? commentsCount, bool? inCart}) => ThriftItem(
+  ThriftItem copyWith({int? commentsCount, bool? inCart, bool? isPromoted, DateTime? promotedUntil}) => ThriftItem(
         id: id,
         title: title,
         description: description,
@@ -169,6 +173,8 @@ class ThriftItem {
         sellerRating: sellerRating,
         sellerReviewCount: sellerReviewCount,
         createdAt: createdAt,
+        isPromoted: isPromoted ?? this.isPromoted,
+        promotedUntil: promotedUntil ?? this.promotedUntil,
       );
 }
 

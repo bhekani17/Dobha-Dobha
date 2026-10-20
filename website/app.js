@@ -1212,11 +1212,11 @@ function init() {
   byId('auth-form').addEventListener('submit', submitAuth);
   byId('auth-switch').addEventListener('click', () => showAuth(state.authMode === 'register' ? 'login' : 'register'));
   byId('forgot-link').addEventListener('click', () => showAuth('forgot'));
-  byId('google-signin').addEventListener('click', () => {
-    if (!window.google?.accounts?.id || !window.DOBHA_CONFIG?.googleClientId) {
-      setMessage('auth-message', 'Google sign-in is not available right now.', true);
-      return;
-    }
+  // Initialize Google Sign-In exactly once when the GSI library is ready.
+  function initGoogleSignIn() {
+    if (!window.google?.accounts?.id || !window.DOBHA_CONFIG?.googleClientId) return;
+    if (initGoogleSignIn._done) return;
+    initGoogleSignIn._done = true;
     window.google.accounts.id.initialize({
       client_id: window.DOBHA_CONFIG.googleClientId,
       callback: async ({ credential }) => {
@@ -1231,6 +1231,17 @@ function init() {
         }
       },
     });
+  }
+  // Try immediately (script may already be loaded) and also on load.
+  initGoogleSignIn();
+  window.addEventListener('load', initGoogleSignIn);
+
+  byId('google-signin').addEventListener('click', () => {
+    initGoogleSignIn();
+    if (!window.google?.accounts?.id) {
+      setMessage('auth-message', 'Google sign-in is not available right now.', true);
+      return;
+    }
     window.google.accounts.id.prompt();
   });
   byId('vendor-submit').addEventListener('click', createVendor);
