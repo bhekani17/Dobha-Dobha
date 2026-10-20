@@ -327,9 +327,8 @@ async function addToCart(itemId) {
     return;
   }
   try {
-    const { items } = await api(`/api/cart/${itemId}`, { method: 'POST' });
-    state.cart = items;
-    updateCartBadge();
+    await api(`/api/cart/${itemId}`, { method: 'POST' });
+    await refreshCart();
     notify('Added to your bag.');
   } catch (error) {
     notify(error.message, true);
@@ -788,9 +787,7 @@ async function loadCart() {
   if (!requireSignIn()) return;
   byId('cart-list').innerHTML = '<p class="muted">Loading your bag…</p>';
   try {
-    const { items } = await api('/api/cart');
-    state.cart = items;
-    updateCartBadge();
+    const items = await refreshCart();
     byId('cart-list').innerHTML = items.length ? items.map((item) => `<article class="order-card"><div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.sellerName || '')}</span><span class="order-status">${item.available ? 'Available' : 'No longer available'}</span></div><button class="button button-outline" data-remove-cart="${escapeHtml(item.id)}">Remove</button></article>`).join('') : '<p class="muted">Your bag is empty. Browse the shop to find something good.</p>';
     byId('cart-list').querySelectorAll('[data-remove-cart]').forEach((button) => button.addEventListener('click', () => removeFromCart(button.dataset.removeCart)));
     byId('checkout-form').classList.toggle('hidden', !items.some((item) => item.available));
@@ -798,11 +795,15 @@ async function loadCart() {
     byId('cart-list').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
   }
 }
+async function refreshCart() {
+  const { items } = await api('/api/cart');
+  state.cart = items;
+  updateCartBadge();
+  return items;
+}
 async function removeFromCart(itemId) {
   try {
-    const { items } = await api(`/api/cart/${itemId}`, { method: 'DELETE' });
-    state.cart = items;
-    updateCartBadge();
+    await api(`/api/cart/${itemId}`, { method: 'DELETE' });
     await loadCart();
   } catch (error) {
     notify(error.message, true);
