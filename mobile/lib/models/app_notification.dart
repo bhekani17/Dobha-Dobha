@@ -1,3 +1,5 @@
+import 'json_date.dart';
+
 /// Something that happened to the user's orders or listings (a sale, a dispatch, a payout...).
 class AppNotification {
   final String id;
@@ -28,6 +30,6 @@ class AppNotification {
         orderId: json['orderId'] as String?,
         itemId: json['itemId'] as String?,
         read: json['read'] as bool? ?? false,
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: parseJsonDateTime(json['createdAt']),
       );
 }

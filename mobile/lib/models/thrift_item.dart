@@ -1,3 +1,5 @@
+import 'json_date.dart';
+
 enum MediaKind { image, video }
 
 /// One photo or video in a listing's gallery.
@@ -140,9 +142,9 @@ class ThriftItem {
         inCart: json['inCart'] as bool? ?? false,
         sellerRating: (json['sellerRating'] as num?)?.toDouble(),
         sellerReviewCount: json['sellerReviewCount'] as int? ?? 0,
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: parseJsonDateTime(json['createdAt']),
         isPromoted: json['isPromoted'] as bool? ?? false,
-        promotedUntil: json['promotedUntil'] == null ? null : DateTime.tryParse(json['promotedUntil'] as String),
+        promotedUntil: parseNullableJsonDateTime(json['promotedUntil']),
       );
 
   /// The same item with some fields changed.
@@ -194,6 +196,6 @@ class ItemComment {
         userId: json['userId'] as String?,
         name: json['name'] as String,
         handle: json['handle'] as String,
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: parseJsonDateTime(json['createdAt']),
       );
 }

@@ -5,6 +5,8 @@
 # Editor / OS
 .DS_Store
 Thumbs.db
+.vscode/
+.aws-sam/
 
 # JVM crash logs (Gradle)
 hs_err_pid*.log

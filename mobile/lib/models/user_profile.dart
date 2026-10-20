@@ -1,3 +1,5 @@
+import 'json_date.dart';
+
 enum UserRole {
   shopper,
   vendor,
@@ -41,7 +43,7 @@ class WalletTransaction {
         subtitle: json['subtitle'] as String? ?? '',
         amountZar: (json['amountZar'] as num).toDouble(),
         type: TransactionType.values.firstWhere((t) => t.name == json['type'], orElse: () => TransactionType.topup),
-        date: DateTime.parse(json['date'] as String),
+        date: parseJsonDateTime(json['date']),
         status: json['status'] as String? ?? '',
         reference: json['reference'] as String? ?? '',
       );
@@ -103,7 +105,7 @@ class UserProfile {
         avatarUrl: json['avatarUrl'] as String?,
         bio: json['bio'] as String? ?? '',
         location: json['location'] as String? ?? '',
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: parseJsonDateTime(json['createdAt']),
         salesCount: json['salesCount'] as int? ?? 0,
         hasPassword: json['hasPassword'] as bool? ?? true,
       );

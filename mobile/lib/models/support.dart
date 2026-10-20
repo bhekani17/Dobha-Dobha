@@ -1,3 +1,5 @@
+import 'json_date.dart';
+
 /// What a support question is about. [id] matches the server's topic list.
 class SupportTopic {
   final String id;
@@ -50,7 +52,7 @@ class SupportRequest {
         orderId: json['orderId'] as String?,
         status: json['status'] as String,
         reply: json['reply'] as String?,
-        repliedAt: json['repliedAt'] == null ? null : DateTime.parse(json['repliedAt'] as String),
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        repliedAt: parseNullableJsonDateTime(json['repliedAt']),
+        createdAt: parseJsonDateTime(json['createdAt']),
       );
 }

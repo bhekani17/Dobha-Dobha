@@ -1,3 +1,4 @@
+import 'json_date.dart';
 import 'thrift_item.dart';
 
 /// A 24-hour story posted by a user or vendor.
@@ -39,20 +40,8 @@ class Story {
         mediaUrl: json['mediaUrl'] as String? ?? json['media_url'] as String,
         mediaType: json['mediaType'] as String? ?? json['media_type'] as String? ?? 'image',
         caption: json['caption'] as String? ?? '',
-        createdAt: DateTime.fromMillisecondsSinceEpoch(
-          json['createdAt'] is int
-              ? json['createdAt'] as int
-              : json['created_at'] is int
-                  ? json['created_at'] as int
-                  : DateTime.parse(json['createdAt'] as String? ?? json['created_at'] as String).millisecondsSinceEpoch,
-        ),
-        expiresAt: DateTime.fromMillisecondsSinceEpoch(
-          json['expiresAt'] is int
-              ? json['expiresAt'] as int
-              : json['expires_at'] is int
-                  ? json['expires_at'] as int
-                  : DateTime.parse(json['expiresAt'] as String? ?? json['expires_at'] as String).millisecondsSinceEpoch,
-        ),
+        createdAt: parseJsonDateTime(json['createdAt'] ?? json['created_at']),
+        expiresAt: parseJsonDateTime(json['expiresAt'] ?? json['expires_at']),
       );
 }
 
@@ -91,9 +80,7 @@ class Subscription {
         sellerId: json['seller_id'] as String? ?? json['sellerId'] as String,
         sellerName: json['sellerName'] as String? ?? json['seller_name'] as String? ?? '',
         sellerAvatarUrl: json['sellerAvatarUrl'] as String? ?? json['avatar_url'] as String?,
-        createdAt: DateTime.fromMillisecondsSinceEpoch(
-          json['created_at'] is int ? json['created_at'] as int : DateTime.now().millisecondsSinceEpoch,
-        ),
+        createdAt: parseJsonDateTime(json['created_at'] ?? json['createdAt']),
       );
 }
 
@@ -136,8 +123,8 @@ class Offer {
         status: json['status'] as String,
         isSeller: json['isSeller'] as bool? ?? false,
         buyerName: json['buyerName'] as String? ?? '',
-        expiresAt: json['expiresAt'] == null ? null : DateTime.parse(json['expiresAt'] as String),
-        updatedAt: DateTime.parse(json['updatedAt'] as String),
+        expiresAt: parseNullableJsonDateTime(json['expiresAt']),
+        updatedAt: parseJsonDateTime(json['updatedAt']),
       );
 }
 
@@ -192,7 +179,7 @@ class SellerProfile {
         avatarUrl: json['avatarUrl'] as String?,
         bio: json['bio'] as String? ?? '',
         isVendor: json['isVendor'] as bool? ?? false,
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: parseJsonDateTime(json['createdAt']),
         salesCount: json['salesCount'] as int? ?? 0,
         rating: (json['rating'] as num?)?.toDouble(),
         reviewCount: json['reviewCount'] as int? ?? 0,
@@ -263,7 +250,7 @@ class Review {
         text: json['text'] as String? ?? '',
         buyerName: json['buyerName'] as String? ?? '',
         itemTitle: json['itemTitle'] as String? ?? '',
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: parseJsonDateTime(json['createdAt']),
       );
 }
 
@@ -297,7 +284,7 @@ class ChatSummary {
         lastMessage: json['lastMessage'] as String? ?? '',
         lastFromMe: json['lastFromMe'] as bool? ?? false,
         unread: json['unread'] as int? ?? 0,
-        updatedAt: DateTime.parse(json['updatedAt'] as String),
+        updatedAt: parseJsonDateTime(json['updatedAt']),
       );
 }
 
@@ -325,7 +312,7 @@ class ChatMessage {
       id: json['id'] as String,
       text: json['text'] as String,
       fromMe: json['fromMe'] as bool? ?? false,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: parseJsonDateTime(json['createdAt']),
       item: item == null
           ? null
           : ChatItemRef(

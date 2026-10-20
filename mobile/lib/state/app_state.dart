@@ -9,6 +9,7 @@ import '../google_auth.dart';
 import '../legal/terms.dart';
 import '../models/app_notification.dart';
 import '../models/escrow_order.dart';
+import '../models/json_date.dart';
 import '../models/social.dart';
 import '../models/support.dart';
 import '../models/thrift_item.dart';
@@ -853,7 +854,7 @@ class AppState extends ChangeNotifier {
   /// Boosts [item] for [days] at [tier]. Deducts the cost from the seller's wallet.
   Future<DateTime> promoteItem(ThriftItem item, {required int days, String tier = 'basic'}) async {
     final res = await _call(() => _api.promoteItem(item.id, days: days, tier: tier)) as Map<String, dynamic>;
-    final until = DateTime.parse(res['promotedUntil'] as String);
+    final until = parseJsonDateTime(res['promotedUntil']);
     // Reload the item in the inventory so the promoted badge appears
     await loadMyItems().catchError((_) {});
     await loadWallet().catchError((_) {});

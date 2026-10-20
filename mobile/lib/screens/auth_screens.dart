@@ -75,50 +75,57 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Spacer(),
-              const Center(child: DobhaLogo(size: 150)),
-              const SizedBox(height: 20),
-              const Text(
-                "Thrift Joburg's streets\nfrom your phone",
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.8, height: 1.15),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Dig through downtown bales from your phone. Watch sellers live and buy pieces in one tap.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: DobhaColors.muted, height: 1.5, fontSize: 15),
-              ),
-              const SizedBox(height: 32),
-              _Feature(icon: Icons.sensors_rounded, color: DobhaColors.green, text: 'Live drops from Joburg stalls'),
-              _Feature(icon: Icons.flash_on_rounded, color: DobhaColors.green, text: 'Buy a piece in one tap'),
-              _Feature(icon: Icons.verified_user_rounded, color: DobhaColors.green, text: 'Sellers are paid only once you have it'),
-              const Spacer(),
-              AppButton(
-                color: DobhaColors.green,
-                padding: const EdgeInsets.symmetric(vertical: 17),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                child: const Text('Create account', style: TextStyle(fontSize: 16)),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  side: BorderSide(color: DobhaColors.borderLight),
-                  padding: const EdgeInsets.symmetric(vertical: 17),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Center(child: DobhaLogo(size: 150)),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Thrift Joburg's streets\nfrom your phone",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -0.8, height: 1.15),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Dig through downtown bales from your phone. Watch sellers live and buy pieces in one tap.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: DobhaColors.muted, height: 1.5, fontSize: 15),
+                    ),
+                    const SizedBox(height: 32),
+                    _Feature(icon: Icons.sensors_rounded, color: DobhaColors.green, text: 'Live drops from Joburg stalls'),
+                    _Feature(icon: Icons.flash_on_rounded, color: DobhaColors.green, text: 'Buy a piece in one tap'),
+                    _Feature(icon: Icons.verified_user_rounded, color: DobhaColors.green, text: 'Sellers are paid only once you have it'),
+                    const SizedBox(height: 16),
+                    AppButton(
+                      color: DobhaColors.green,
+                      padding: const EdgeInsets.symmetric(vertical: 17),
+                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                      child: const Text('Create account', style: TextStyle(fontSize: 16)),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        side: BorderSide(color: DobhaColors.borderLight),
+                        padding: const EdgeInsets.symmetric(vertical: 17),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
+                      child: const Text('I already have an account', style: TextStyle(fontSize: 16)),
+                    ),
+                    const GoogleSignInSection(),
+                    const _HelpLink(),
+                  ],
                 ),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LoginScreen())),
-                child: const Text('I already have an account', style: TextStyle(fontSize: 16)),
               ),
-              const GoogleSignInSection(),
-              const _HelpLink(),
-            ],
+            ),
           ),
         ),
       ),

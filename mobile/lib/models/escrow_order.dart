@@ -1,5 +1,7 @@
 import 'thrift_item.dart';
 
+import 'json_date.dart';
+
 enum EscrowStatus {
   paymentHeld, // Buyer paid; money locked in the Dobha escrow vault
   vendorDispatched, // Vendor shipped or dropped off at the locker/hub
@@ -111,7 +113,7 @@ class EscrowOrder {
   bool get isHubCollection => deliveryMethod == 'Downtown Joburg Safe Hub';
 
   factory EscrowOrder.fromJson(Map<String, dynamic> json) {
-    DateTime? date(String key) => json[key] == null ? null : DateTime.parse(json[key] as String);
+    DateTime? date(String key) => parseNullableJsonDateTime(json[key]);
     return EscrowOrder(
       id: json['id'] as String,
       item: ThriftItem.fromJson(json['item'] as Map<String, dynamic>),
@@ -121,7 +123,7 @@ class EscrowOrder {
       deliveryMethod: json['deliveryMethod'] as String,
       deliveryAddress: json['deliveryAddress'] as String,
       paymentMethod: json['paymentMethod'] as String,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      createdAt: parseJsonDateTime(json['createdAt']),
       dispatchedAt: date('dispatchedAt'),
       confirmedAt: date('confirmedAt'),
       escrowVaultRef: json['escrowVaultRef'] as String,
