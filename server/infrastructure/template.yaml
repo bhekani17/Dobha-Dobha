@@ -613,7 +613,6 @@ Resources:
         Rules:
           - Id: CleanupUnattached
             Status: Enabled
-            ExpirationInDays: 7
             NoncurrentVersionExpirationInDays: 1
             AbortIncompleteMultipartUpload:
               DaysAfterInitiation: 1

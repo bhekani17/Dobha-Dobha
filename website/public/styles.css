@@ -5001,3 +5001,9 @@ footer {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}

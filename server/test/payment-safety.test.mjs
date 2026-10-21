@@ -52,3 +52,27 @@ describe('financial operations without a payment provider', () => {
     });
   }
 });
+
+describe('listing media fields', () => {
+  it('stores listing photos and video URLs for the Reels feed', async () => {
+    mutations = [];
+    const response = await itemsHandler({
+      path: '/api/items',
+      httpMethod: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        title: 'Vintage jacket',
+        priceZar: 100,
+        photos: ['/media/uploads/usr_test/photo.jpg'],
+        videoUrl: '/media/uploads/usr_test/video.mp4',
+      }),
+      requestContext: { authorizer: { claims: { sub: 'usr_test', email: 'seller@example.com', role: 'vendor' } } },
+    });
+
+    assert.equal(response.statusCode, 201);
+    const storedItem = mutations.find((mutation) => mutation.method === 'put').args[1];
+    assert.deepEqual(storedItem.photos, ['/media/uploads/usr_test/photo.jpg']);
+    assert.equal(storedItem.video_url, '/media/uploads/usr_test/video.mp4');
+    assert.equal(JSON.parse(response.body).item.videoUrl, '/media/uploads/usr_test/video.mp4');
+  });
+});

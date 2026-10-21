@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "deploy:aws": "sam build --template-file infrastructure/template.yaml && sam deploy --template-file infrastructure/template.yaml",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {

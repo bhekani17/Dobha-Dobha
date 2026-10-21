@@ -68,7 +68,10 @@ guide before production use.
 The root `buildspec.yml` runs tests, JavaScript syntax checks, the website
 production bundle, SAM validation, and SAM build only. It does not create
 buckets, delete stacks, or deploy AWS resources. Treat both SAM templates as
-legacy artifacts and do not promote them as the target service.
+legacy artifacts and do not promote them as the target service. The
+`deploy:aws` package script was removed so it cannot accidentally deploy the
+legacy Lambda/DynamoDB template. There is no approved API deployment command
+until the ECS target and its reviewed infrastructure are production-ready.
 
 ## Infrastructure
 
@@ -82,6 +85,9 @@ Before implementing ECS infrastructure or a client cutover, define and review:
   and RDS Proxy connectivity.
 - Secrets Manager integration, TLS, least-privilege IAM, and private media
   access.
+- Media upload uses short-lived S3 URLs for larger files, and media reads
+  redirect to short-lived S3 URLs so browsers can stream videos without
+  buffering them through Lambda.
 - CloudWatch logs, metrics, alarms, audit events, and operational runbooks.
 - Database/media migration, backups, rollback, route parity, and load tests.
 - Verified payment-provider webhooks, idempotent ledger operations, disputes,

@@ -70,6 +70,16 @@ and escrow domain service. Module directories that do not yet have behavior are
 deliberately only part of the target layout above; no placeholder handlers are
 added.
 
+The ECS API test suite covers configuration validation, liveness/readiness
+responses, and escrow idempotency and transaction boundaries. Run it after
+installing dependencies and generating the Prisma client:
+
+```sh
+npm ci
+npm run prisma:generate
+npm test
+```
+
 ## Database and escrow rules
 
 - PostgreSQL is the source of truth. Store money as integer minor units (ZAR
