@@ -33,6 +33,14 @@
         <div class="hero-photo-credit"><a href="https://commons.wikimedia.org/wiki/File:Street_vendor_Joubert_street_Johannesburg_01.jpg" target="_blank" rel="noopener noreferrer">Street market · Ossewa · CC BY-SA 4.0</a><br><a href="https://commons.wikimedia.org/wiki/File:7th_Street_(Johannesburg).jpg" target="_blank" rel="noopener noreferrer">7th Street · LittleT889 · CC BY 4.0</a></div>
       </div>
       </section>
+      <section class="home-live">
+        <div class="section-heading live-heading"><div><p class="eyebrow">HAPPENING RIGHT NOW</p><h2>People live in the market</h2></div><a class="text-button page-link" href="#live" data-page-link="live">See all live streams →</a></div>
+        <div id="home-live-list" class="live-list"><p class="muted">Checking who's live...</p></div>
+      </section>
+      <section class="home-trending">
+        <div class="section-heading"><div><p class="eyebrow">GETTING ATTENTION</p><h2>Finds people are loving</h2></div><a class="text-button page-link" href="#shop" data-page-link="shop">Browse the market →</a></div>
+        <div id="home-trending-grid" class="listing-grid"></div>
+      </section>
       <section class="home-stories">
         <div class="section-heading"><div><p class="eyebrow">FRESH FROM THE STALLS</p><h2>Stories</h2></div></div>
         <div id="stories-row" class="stories-row"><p class="muted">Loading stories…</p></div>
@@ -40,10 +48,6 @@
       <section class="home-categories">
         <div class="section-heading"><div><p class="eyebrow">A MARKETPLACE FOR MORE</p><h2>Find all kinds of good things</h2></div><a class="text-button page-link" href="#shop" data-page-link="shop">Explore everything →</a></div>
         <div id="home-categories" class="category-grid"></div>
-      </section>
-      <section class="home-live">
-        <div class="section-heading"><div><p class="eyebrow">HAPPENING RIGHT NOW</p><h2>Catch the community live</h2></div><a class="text-button page-link" href="#live" data-page-link="live">See all live streams →</a></div>
-        <div id="home-live-list" class="live-list"><p class="muted">Checking who's live...</p></div>
       </section>
       <section class="home-featured">
         <div class="section-heading"><div><p class="eyebrow">JUST ADDED</p><h2>Fresh finds</h2></div><a class="text-button page-link" href="#shop" data-page-link="shop">Browse listings →</a></div>
@@ -101,6 +105,7 @@
                   <button class="button button-outline" id="toggle-host-camera" type="button" disabled>Turn camera off</button>
                   <button class="button button-outline" id="toggle-host-mic" type="button" disabled>Mute microphone</button>
                   <button class="button button-dark" id="start-live-host" type="submit">Start live stream</button>
+                  <button class="button button-outline hidden" id="toggle-live-fullscreen" type="button" aria-pressed="false">Exit full screen</button>
                   <button class="button button-outline hidden" id="stop-live-host" type="button">End live stream</button>
                 </div>
               </div>
@@ -129,13 +134,13 @@
             <div class="form-row"><label class="field">Item name<input name="title" required minlength="3" maxlength="80"></label><label class="field">Price (ZAR)<input name="priceZar" type="number" min="1" step="0.01" required></label></div>
             <div class="form-row"><label class="field">Category<select name="category" required></select></label><label class="field">Condition<input name="condition" required maxlength="40" placeholder="New, good, pre-loved..."></label></div>
             <label class="field">Details<textarea name="description" maxlength="1000" rows="3" placeholder="Describe the item, its size, features, or anything buyers should know."></textarea></label>
-            <label class="field upload-field">Item photos and product video<input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" multiple required><span class="field-hint">Add multiple photos and optionally one product video (60 seconds). Up to 10 files, 60 MB each.</span></label>
+            <label class="field upload-field">Item photos and product video<input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" multiple required><span class="field-hint">Add at least one photo and optionally one product video (up to 60 seconds). Up to 10 files total, 60 MB each.</span></label>
             <div id="listing-media-preview" class="listing-media-preview" aria-live="polite"></div>
             <button class="button button-dark form-submit" id="listing-submit">Publish listing</button>
           </div>
         </form>
         <p class="form-message sell-form-message" id="sell-message" role="status"></p>
-        <section class="seller-inventory"><div class="section-heading"><div><p class="eyebrow">YOUR SHOP</p><h2>Your listings</h2></div></div><div id="my-listings" class="orders-list"></div></section>
+        <section class="seller-inventory"><div class="section-heading"><div><p class="eyebrow">YOUR SHOP</p><h2>Manage your listings</h2></div><a id="my-shop-preview" class="button button-outline button-small hidden" href="#">View public shop ↗</a></div><div id="my-listings" class="seller-inventory-list orders-list"></div></section>
         <section id="seller-story-section" class="form-stack hidden">
           <h2>Share a story</h2>
           <p class="field-hint">Stories expire after 24 hours. Choose an image or short video.</p>
@@ -158,7 +163,7 @@
     </section>
 
     <section class="page hidden" id="page-cart" data-page="cart">
-      <section class="page-intro"><p class="eyebrow">YOUR FINDS</p><h1>Your <span>shopping bag.</span></h1><p>Review availability and delivery before checkout.</p></section>
+      <section class="page-intro"><p class="eyebrow">YOUR FINDS</p><h1>Your <span>shopping bag.</span></h1><p>Review the items you have saved in your bag. Checkout is not available yet.</p></section>
       <section class="feature-section"><div id="cart-list" class="orders-list"></div>
         <section id="checkout-form" class="form-stack checkout-form hidden">
           <h2>Checkout</h2>
@@ -185,8 +190,11 @@
     </section>
 
     <section class="page hidden" id="page-messages" data-page="messages">
-      <section class="page-intro"><p class="eyebrow">BUYER & SELLER CHAT</p><h1>Your <span>messages.</span></h1><p>Message sellers and buyers about listings and orders.</p></section>
-      <section class="feature-section messages-layout"><div id="chat-list" class="orders-list"></div><div id="chat-thread" class="chat-thread"><p class="muted">Choose a conversation.</p></div></section>
+      <section class="page-intro"><p class="eyebrow">BUYER & SELLER CHAT</p><h1>Your <span>messages.</span></h1><p>Keep listing conversations together and message buyers and sellers in real time.</p></section>
+      <section class="feature-section messages-layout" id="messages-layout">
+        <aside class="chat-list-panel"><div class="chat-list-heading"><h2>Chats</h2><span>Marketplace messages</span></div><div id="chat-list" class="orders-list"></div></aside>
+        <div id="chat-thread" class="chat-thread"><div class="chat-empty"><strong>Your conversations</strong><span>Choose a chat to continue, or message a seller from any listing.</span></div></div>
+      </section>
     </section>
 
     <section class="page hidden" id="page-notifications" data-page="notifications">

@@ -2,6 +2,19 @@
 
 This directory contains the React/Vite website, built to static files for hosting from a private Amazon S3 bucket through CloudFront; see [the server deployment guide](../server/README.md). `src/legacy.html` remains the single source of the existing marketplace markup while interactive features are progressively migrated to React components; it is not a second separately maintained website. The Discover page is a React feed with vertical listing navigation, horizontal photo/video galleries, story links, listing actions, and cursor-based pagination. Existing account, chat, seller, and live-stream flows remain wired through the shared website application.
 
+The homepage puts current live streams and popular listings near the top so
+visitors can see who is live and what is getting attention. Live status and
+popular listings come from the marketplace API; “popular” is ordered by listing
+likes and is not a sales or transaction claim.
+
+Signed-in sellers can preview their public shop and manage their listings,
+including viewing listing photos and the optional product video. A listing
+requires at least one photo and supports up to one product video.
+
+The messages page uses a conversation list and chat bubbles for buyer/seller
+messages. The live studio expands to a full-window view when a host goes live,
+with camera, microphone, end-stream, and chat controls floating over the stream.
+
 The homepage uses credited, optimized Johannesburg photography; see
 [the image credits](./ASSETS.md). Product photos and videos, profile images,
 and stories are member-uploaded rather than fabricated. Listing uploads use

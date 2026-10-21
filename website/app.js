@@ -341,7 +341,12 @@ function renderItems() {
   const cards = visible.map((item) => listingCard(item));
   byId('listing-grid').innerHTML = cards.join('');
   byId('home-grid').innerHTML = visible.slice(0, 8).map((item) => cards[visible.indexOf(item)]).join('');
-  for (const grid of [byId('listing-grid'), byId('home-grid')]) {
+  const trending = [...state.items]
+    .filter((item) => item.available !== false && !item.isClaimed)
+    .sort((left, right) => Number(right.likesCount || 0) - Number(left.likesCount || 0))
+    .slice(0, 4);
+  byId('home-trending-grid').innerHTML = trending.map(listingCard).join('');
+  for (const grid of [byId('listing-grid'), byId('home-grid'), byId('home-trending-grid')]) {
     grid.querySelectorAll('[data-item]').forEach((card) => {
       card.addEventListener('click', () => showProduct(card.dataset.item));
       card.addEventListener('keydown', (event) => {
@@ -529,7 +534,7 @@ async function loadLiveRooms() {
           <div class="live-avatar">${avatar}<span>${escapeHtml(hostName.slice(0, 1).toUpperCase())}</span></div>
           <span class="live-status"><span class="live-status-dot"></span>Live now</span>
         </div>
-        <div class="live-info"><strong>${escapeHtml(hostName)}</strong><span>${Number(room.viewers) || 0} watching · Join the stream</span></div>
+        <div class="live-info"><strong>${escapeHtml(hostName)}</strong><span>${escapeHtml(room.name)} · ${Number(room.viewers) || 0} watching</span></div>
         <button class="button button-dark" data-room="${escapeHtml(room.name)}" aria-label="Watch ${escapeHtml(hostName)} live">Watch live <span aria-hidden="true">↗</span></button>
       </article>`;
     }).join('');
@@ -792,6 +797,8 @@ async function startLiveHost(event) {
     byId('host-mic-select').disabled = true;
     byId('host-live-viewers').textContent = `${room.remoteParticipants.size} watching`;
     setMessage('host-live-message', `You are live in “${roomName}”. Keep this page open while streaming.`);
+    byId('toggle-live-fullscreen').classList.remove('hidden');
+    setHostFullscreen(true);
     populateHostDevices().catch((error) => setMessage('host-live-message', error.message, true));
   } catch (error) {
     if (room) await room.disconnect().catch((disconnectError) => console.error('Live room cleanup failed:', disconnectError));
@@ -802,6 +809,7 @@ async function startLiveHost(event) {
     byId('stop-live-host').classList.add('hidden');
     byId('host-camera-select').disabled = false;
     byId('host-mic-select').disabled = false;
+    setHostFullscreen(false);
     if (/sign in required/i.test(error.message)) {
       signOut();
       showAuth();
@@ -865,6 +873,8 @@ async function stopLiveHost() {
     }
     byId('start-live-host')?.classList.remove('hidden');
     byId('stop-live-host')?.classList.add('hidden');
+    byId('toggle-live-fullscreen')?.classList.add('hidden');
+    setHostFullscreen(false);
     byId('host-live-status').textContent = 'STUDIO READY';
     byId('host-live-status').classList.remove('is-live');
     byId('host-live-viewers').textContent = '0 watching';
@@ -875,6 +885,15 @@ async function stopLiveHost() {
     byId('host-camera-select').disabled = false;
     byId('host-mic-select').disabled = false;
     if (byId('host-live-message')) setMessage('host-live-message', 'Live stream ended.');
+  }
+}
+function setHostFullscreen(fullscreen) {
+  const studio = byId('web-live-studio');
+  const button = byId('toggle-live-fullscreen');
+  studio?.classList.toggle('live-studio-fullscreen', fullscreen);
+  if (button) {
+    button.setAttribute('aria-pressed', String(fullscreen));
+    button.textContent = fullscreen ? 'Exit full screen' : 'Full screen';
   }
 }
 function handleLiveData(data, participant) {
@@ -1069,13 +1088,32 @@ async function createListing(event) {
 }
 async function loadMyListings() {
     const target = byId('my-listings');
+    const previewLink = byId('my-shop-preview');
+    if (state.user?.id) {
+      previewLink.href = `#profile?id=${encodeURIComponent(state.user.id)}`;
+      previewLink.classList.remove('hidden');
+    } else {
+      previewLink.classList.add('hidden');
+    }
     if (!state.token || state.user?.role !== 'vendor') {
       target.innerHTML = '<p class="muted">Become a seller to manage your listings here.</p>';
       return;
     }
     try {
       const { items } = await api('/api/items/mine');
-      target.innerHTML = items.length ? items.map((item) => `<article class="order-card"><div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.category)} · ${Number(item.quantity)} in stock</span><span class="order-status">${item.isClaimed ? 'Sold' : 'Active'}</span></div><div class="action-row">${!item.isClaimed ? `<button class="button button-outline" data-edit-listing="${escapeHtml(item.id)}">Edit</button><button class="button button-outline" data-delete-listing="${escapeHtml(item.id)}">Remove</button>` : ''}</div></article>`).join('') : '<p class="muted">You have not listed anything yet.</p>';
+      target.innerHTML = items.length ? items.map((item) => {
+        const media = listingMediaEntries(item);
+        const image = media.find((entry) => entry.kind === 'image');
+        const hasVideo = media.some((entry) => entry.kind === 'video');
+        const thumbnail = image
+          ? `<img src="${escapeHtml(resolveMedia(image.url))}" alt="${escapeHtml(item.title)}" loading="lazy">`
+          : categoryPlaceholder(item.category);
+        return `<article class="seller-listing-card">
+          <div class="seller-listing-image">${thumbnail}${hasVideo ? '<span class="item-video-label">Video</span>' : ''}</div>
+          <div class="seller-listing-info"><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.category)} · ${Number(item.quantity)} in stock</span><span class="order-status">${item.isClaimed || item.available === false ? 'Unavailable' : 'Active'} · ${media.filter((entry) => entry.kind === 'image').length} photos${hasVideo ? ' · video' : ''}</span></div>
+          <div class="action-row">${!item.isClaimed ? `<button class="button button-outline" data-edit-listing="${escapeHtml(item.id)}">Edit</button><button class="button button-outline" data-delete-listing="${escapeHtml(item.id)}">Remove</button>` : ''}</div>
+        </article>`;
+      }).join('') : '<p class="muted">You have not listed anything yet.</p>';
       target.querySelectorAll('[data-edit-listing]').forEach((button) => button.addEventListener('click', () => editListing(button.dataset.editListing)));
       target.querySelectorAll('[data-delete-listing]').forEach((button) => button.addEventListener('click', () => removeListing(button.dataset.deleteListing)));
     } catch (error) {
@@ -1413,7 +1451,11 @@ async function loadChats() {
   try {
     const { chats } = await api('/api/chats');
     state.chats = chats;
-    byId('chat-list').innerHTML = chats.length ? chats.map((chat) => `<button class="chat-row" data-chat="${escapeHtml(chat.userId)}"><strong>${escapeHtml(chat.name)} ${escapeHtml(chat.handle)}</strong><span>${escapeHtml(chat.lastMessage)}</span>${chat.unread ? `<b>${Number(chat.unread)}</b>` : ''}</button>`).join('') : '<p class="muted">No conversations yet. Open a listing and contact its seller.</p>';
+    byId('chat-list').innerHTML = chats.length ? chats.map((chat) => `<button class="chat-row${chat.userId === state.selectedChat ? ' active' : ''}" data-chat="${escapeHtml(chat.userId)}">
+      <span class="chat-row-avatar" aria-hidden="true">${escapeHtml((chat.name || '?').slice(0, 1).toUpperCase())}</span>
+      <span class="chat-row-copy"><strong>${escapeHtml(chat.name)} ${escapeHtml(chat.handle)}</strong><span>${escapeHtml(chat.lastMessage || 'Start a conversation')}</span></span>
+      ${chat.unread ? `<b class="chat-unread">${Number(chat.unread)}</b>` : ''}
+    </button>`).join('') : '<p class="muted chat-empty-list">No conversations yet. Open a listing and message its seller.</p>';
     byId('chat-list').querySelectorAll('[data-chat]').forEach((button) => button.addEventListener('click', () => loadChat(button.dataset.chat)));
     if (state.selectedChat) await loadChat(state.selectedChat);
   } catch (error) {
@@ -1422,9 +1464,15 @@ async function loadChats() {
 }
 async function loadChat(userId) {
   state.selectedChat = userId;
+  byId('messages-layout').classList.add('chat-open');
   try {
     const result = await api(`/api/chats/${encodeURIComponent(userId)}`);
-    byId('chat-thread').innerHTML = `<h2>${escapeHtml(result.with.name)} ${escapeHtml(result.with.handle)}</h2><div class="chat-messages">${result.messages.map((message) => `<article class="chat-message ${message.fromMe ? 'mine' : ''}"><p>${escapeHtml(message.text)}</p><small>${escapeHtml(new Date(message.createdAt).toLocaleString())}</small></article>`).join('')}</div><form id="chat-form" class="chat-send"><label class="field"><span class="visually-hidden">Message</span><input name="text" maxlength="1000" required placeholder="Write a message…"></label><button class="button button-dark">Send</button></form>`;
+    byId('chat-thread').innerHTML = `<header class="chat-thread-header"><button type="button" class="chat-back" aria-label="Back to chats">‹</button><span class="chat-thread-avatar" aria-hidden="true">${escapeHtml((result.with.name || '?').slice(0, 1).toUpperCase())}</span><div><h2>${escapeHtml(result.with.name)} ${escapeHtml(result.with.handle)}</h2><small>Dobha marketplace chat</small></div></header><div class="chat-messages">${result.messages.map((message) => `<article class="chat-message ${message.fromMe ? 'mine' : ''}"><p>${escapeHtml(message.text)}</p><small>${escapeHtml(new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))}</small></article>`).join('')}</div><form id="chat-form" class="chat-send"><label class="field"><span class="visually-hidden">Message</span><input name="text" maxlength="1000" autocomplete="off" required placeholder="Write a message…"></label><button class="button button-dark" aria-label="Send message">Send</button></form>`;
+    byId('chat-thread').querySelector('.chat-back').addEventListener('click', () => {
+      state.selectedChat = '';
+      byId('messages-layout').classList.remove('chat-open');
+      byId('chat-thread').innerHTML = '<div class="chat-empty"><strong>Your conversations</strong><span>Choose a chat to continue, or message a seller from any listing.</span></div>';
+    });
     byId('chat-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       const text = new FormData(event.currentTarget).get('text');
@@ -1438,7 +1486,12 @@ async function loadChat(userId) {
     const messages = document.querySelector('.chat-messages');
     messages.scrollTop = messages.scrollHeight;
   } catch (error) {
-    byId('chat-thread').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
+    byId('chat-thread').innerHTML = `<header class="chat-thread-header"><button type="button" class="chat-back" aria-label="Back to chats">‹</button><div><h2>Chat unavailable</h2></div></header><p class="form-message error">${escapeHtml(error.message)}</p>`;
+    byId('chat-thread').querySelector('.chat-back').addEventListener('click', () => {
+      state.selectedChat = '';
+      byId('messages-layout').classList.remove('chat-open');
+      byId('chat-thread').innerHTML = '<div class="chat-empty"><strong>Your conversations</strong><span>Choose a chat to continue, or message a seller from any listing.</span></div>';
+    });
   }
 }
 async function loadSupport() {
@@ -1688,6 +1741,10 @@ function init() {
   byId('live-host-form').addEventListener('submit', startLiveHost);
   byId('toggle-host-camera').addEventListener('click', () => toggleHostTrack('video'));
   byId('toggle-host-mic').addEventListener('click', () => toggleHostTrack('audio'));
+  byId('toggle-live-fullscreen').addEventListener('click', () => {
+    const fullscreen = byId('web-live-studio').classList.contains('live-studio-fullscreen');
+    setHostFullscreen(!fullscreen);
+  });
   byId('stop-live-host').addEventListener('click', () => {
     stopLiveHost().catch((error) => setMessage('host-live-message', error.message, true));
   });

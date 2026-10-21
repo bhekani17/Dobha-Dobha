@@ -1,6 +1,25 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const PAGE_SIZE = 40;
+const DISCOVERY_CATEGORIES = [
+  'All categories',
+  'Jackets',
+  'Denim',
+  'Sneakers',
+  'Workwear',
+  'Vintage Tees',
+  'Knitwear',
+  'Clothing & Accessories',
+  'Shoes',
+  'Electronics',
+  'Home & Living',
+  'Books & Media',
+  'Sports & Outdoors',
+  'Toys & Games',
+  'Beauty & Personal Care',
+  'Collectibles',
+  'Other',
+];
 
 function listingMedia(item, resolveMedia) {
   const media = Array.isArray(item.media)
@@ -147,6 +166,7 @@ function FeedCard({ item, active, onAction, onMediaChange, mediaIndex, onReport,
 
 export function DiscoveryFeed() {
   const feedRef = useRef(null);
+  const paginationRef = useRef(null);
   const cursorRef = useRef('');
   const loadingMoreRef = useRef(false);
   const [items, setItems] = useState([]);
@@ -154,10 +174,41 @@ export function DiscoveryFeed() {
   const [storiesError, setStoriesError] = useState('');
   const [activeId, setActiveId] = useState('');
   const [mediaIndices, setMediaIndices] = useState({});
+  const [selectedCategory, setSelectedCategory] = useState('All categories');
+  const [sortBy, setSortBy] = useState('featured');
+  const [savedOnly, setSavedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const app = window.DobhaWeb;
+
+  const visibleItems = useMemo(() => {
+    const nextItems = [...items].filter((item) => {
+      const matchesCategory = selectedCategory === 'All categories' || item.category === selectedCategory;
+      const matchesSaved = !savedOnly || Boolean(item.isSaved);
+      return matchesCategory && matchesSaved;
+    });
+
+    if (sortBy === 'featured') return nextItems;
+
+    return nextItems.sort((left, right) => {
+      switch (sortBy) {
+        case 'price-low':
+          return Number(left.priceZar || 0) - Number(right.priceZar || 0);
+        case 'price-high':
+          return Number(right.priceZar || 0) - Number(left.priceZar || 0);
+        case 'likes':
+          return Number(right.likesCount || 0) - Number(left.likesCount || 0);
+        case 'newest': {
+          const leftTime = Date.parse(left.createdAt || left.created_at || left.updatedAt || left.updated_at || 0);
+          const rightTime = Date.parse(right.createdAt || right.created_at || right.updatedAt || right.updated_at || 0);
+          return rightTime - leftTime;
+        }
+        default:
+          return 0;
+      }
+    });
+  }, [items, savedOnly, selectedCategory, sortBy]);
 
   const fetchPage = useCallback(async (cursor = '') => {
     const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
@@ -199,7 +250,7 @@ export function DiscoveryFeed() {
         .filter((entry) => entry.isIntersecting)
         .sort((left, right) => right.intersectionRatio - left.intersectionRatio)[0];
       if (visible) setActiveId(visible.target.dataset.feedCard || '');
-    }, { root, threshold: [0.35, 0.65] });
+    }, { threshold: [0.35, 0.65] });
 
     root.querySelectorAll('[data-feed-card]').forEach((card) => observer.observe(card));
     return () => observer.disconnect();
@@ -225,10 +276,16 @@ export function DiscoveryFeed() {
     }
   }, [fetchPage]);
 
-  const handleScroll = (event) => {
-    const element = event.currentTarget;
-    if (element.scrollHeight - element.scrollTop - element.clientHeight < 600) loadMore();
-  };
+  useEffect(() => {
+    const sentinel = paginationRef.current;
+    if (!sentinel || !cursorRef.current) return undefined;
+
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) loadMore();
+    }, { rootMargin: '700px 0px' });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [items, loadMore]);
 
   const handleAction = async (item, action) => {
     const updated = await app.itemAction(item.id, action, action === 'like' ? 'Likes' : 'Saved items');
@@ -266,12 +323,50 @@ export function DiscoveryFeed() {
     if (sellerId) window.location.hash = `profile?id=${encodeURIComponent(sellerId)}`;
   };
 
+  const clearFilters = () => {
+    setSelectedCategory('All categories');
+    setSortBy('featured');
+    setSavedOnly(false);
+  };
+
   if (loading) return <p className="muted reel-status" role="status">Finding the good stuff…</p>;
   if (error && !items.length) return <div className="reel-status" role="alert"><p>{error}</p><button className="button button-outline" onClick={() => window.location.reload()}>Reload feed</button></div>;
-  if (!items.length) return <p className="muted reel-status">No listings yet. Check back when sellers share their next find.</p>;
 
   return (
     <>
+      <div className="feed-toolbar" aria-label="Discovery controls">
+        <div className="feed-filter-group" aria-label="Listing categories">
+          {DISCOVERY_CATEGORIES.map((category) => (
+            <button
+              key={category}
+              type="button"
+              className={`filter-chip${selectedCategory === category ? ' active' : ''}`}
+              onClick={() => setSelectedCategory(category)}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+        <div className="feed-toolbar-row">
+          <label className="feed-sort">
+            <span>Sort</span>
+            <select value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+              <option value="featured">Featured</option>
+              <option value="newest">Newest</option>
+              <option value="price-low">Price: low to high</option>
+              <option value="price-high">Price: high to low</option>
+              <option value="likes">Most liked</option>
+            </select>
+          </label>
+          <button type="button" className={`feed-toggle${savedOnly ? ' active' : ''}`} onClick={() => setSavedOnly((value) => !value)}>
+            {savedOnly ? 'Saved only' : 'Saved only off'}
+          </button>
+          <button type="button" className="button button-outline button-small" onClick={clearFilters}>
+            Clear filters
+          </button>
+        </div>
+      </div>
+
       {stories.length > 0 && (
         <nav className="feed-stories" aria-label="Seller stories">
           {stories.map((group, index) => (
@@ -284,24 +379,36 @@ export function DiscoveryFeed() {
           ))}
         </nav>
       )}
-      <section className="reels-feed-scroll" ref={feedRef} onScroll={handleScroll} aria-label="Marketplace discovery feed">
-        {items.map((item) => (
-          <FeedCard
-            key={item.id}
-            item={item}
-            active={activeId === item.id}
-            mediaIndex={mediaIndices[item.id] || 0}
-            onAction={handleAction}
-            onMediaChange={(id, index) => setMediaIndices((current) => ({ ...current, [id]: index }))}
-            onReport={handleReport}
-            onShare={handleShare}
-            openListing={openListing}
-            openSeller={openSeller}
-          />
-        ))}
-        {loadingMore && <p className="reel-loading-more" role="status">Finding more listings…</p>}
-        {error && <p className="reel-loading-more" role="alert">{error}</p>}
-      </section>
+      {!visibleItems.length ? (
+        <p className="muted reel-status">No listings match this filter yet. Try another category or clear the filters.</p>
+      ) : (
+        <section className="reels-feed-scroll" ref={feedRef} aria-label="Marketplace discovery feed">
+          {visibleItems.map((item) => (
+            <FeedCard
+              key={item.id}
+              item={item}
+              active={activeId === item.id}
+              mediaIndex={mediaIndices[item.id] || 0}
+              onAction={handleAction}
+              onMediaChange={(id, index) => setMediaIndices((current) => ({ ...current, [id]: index }))}
+              onReport={handleReport}
+              onShare={handleShare}
+              openListing={openListing}
+              openSeller={openSeller}
+            />
+          ))}
+          {loadingMore && <p className="reel-loading-more" role="status">Finding more listings…</p>}
+          {error && <p className="reel-loading-more" role="alert">{error}</p>}
+          {cursorRef.current && (
+            <div className="feed-pagination">
+              <span ref={paginationRef} aria-hidden="true" />
+              <button type="button" className="button button-outline" onClick={loadMore} disabled={loadingMore}>
+                {loadingMore ? 'Loading listings…' : 'Load more listings'}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
       {storiesError && <p className="reel-story-error" role="status">{storiesError}</p>}
     </>
   );
