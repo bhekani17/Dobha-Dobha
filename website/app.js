@@ -324,7 +324,6 @@ function showAuth(mode = 'login') {
   setMessage('google-auth-message', '');
   openDialog('auth-dialog');
   initGoogleSignIn();
-  initGoogleSignIn();
 }
 function renderFilters() {
   byId('filters').innerHTML = categories.map((category) => `<button class="filter-chip${state.category === category ? ' active' : ''}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`).join('');
