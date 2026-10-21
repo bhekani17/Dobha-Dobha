@@ -126,16 +126,18 @@ describe('avatar endpoints', () => {
     assert.equal(commands[0].input.Key, user.avatar_key);
   });
 
-  it('serves stored media as a binary API response', async () => {
+  it('redirects stored media to a short-lived S3 URL', async () => {
     const response = await handler({
       path: '/media/avatars/usr_test/photo.png',
       httpMethod: 'GET',
     });
 
-    assert.equal(response.statusCode, 200);
-    assert.equal(response.isBase64Encoded, true);
-    assert.equal(response.headers['Content-Type'], 'image/png');
-    assert.equal(Buffer.from(response.body, 'base64').toString(), 'image');
+    assert.equal(response.statusCode, 302);
+    assert.match(response.headers.Location, /^https:\/\/photos\.s3\.af-south-1\.amazonaws\.com\/avatars\/usr_test\/photo\.png\?/);
+    assert.match(response.headers.Location, /X-Amz-Expires=900/);
+    assert.equal(response.headers['Cache-Control'], 'private, no-store');
+    assert.equal(response.body, '');
+    assert.equal(commands.length, 0);
   });
 
   it('creates a short-lived S3 upload URL for supported mobile media', async () => {

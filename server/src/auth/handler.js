@@ -110,22 +110,20 @@ exports.handler = async (event) => {
       if (key.split('/').some((part) => !part || part === '.' || part === '..') || key.includes('\\')) {
         return error(400, 'Invalid media key');
       }
-      try {
-        const media = await s3.send(new GetObjectCommand({ Bucket: photosBucket, Key: key }));
-        return {
-          statusCode: 200,
-          headers: {
-            ...CORS_HEADERS,
-            'Content-Type': media.ContentType || 'application/octet-stream',
-            'Cache-Control': 'public, max-age=86400',
-          },
-          body: await media.Body.transformToString('base64'),
-          isBase64Encoded: true,
-        };
-      } catch (err) {
-        if (err.name === 'NoSuchKey' || err.name === 'NotFound') return error(404, 'Media not found');
-        throw err;
-      }
+      const mediaUrl = await getSignedUrl(
+        s3,
+        new GetObjectCommand({ Bucket: photosBucket, Key: key }),
+        { expiresIn: 900 },
+      );
+      return {
+        statusCode: 302,
+        headers: {
+          ...CORS_HEADERS,
+          Location: mediaUrl,
+          'Cache-Control': 'private, no-store',
+        },
+        body: '',
+      };
     }
 
     // -------------------------------------------------------------

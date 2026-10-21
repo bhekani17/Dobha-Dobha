@@ -10,6 +10,19 @@ function mediaUrl(entry) {
   return value.startsWith('uploads/') ? `/media/${value}` : value;
 }
 
+function formatMediaReferences(item) {
+  const photos = Array.isArray(item.photos)
+    ? item.photos
+    : (item.photo_keys || []).map((key) => `/media/${key}`);
+  const videos = Array.isArray(item.video_urls)
+    ? item.video_urls
+    : (item.video_url ? [item.video_url] : []);
+  return {
+    photos: photos.map(mediaUrl).filter(Boolean),
+    videos: videos.map(mediaUrl).filter(Boolean),
+  };
+}
+
 function isVideoMedia(entry) {
   const kind = typeof entry === 'object' && entry
     ? String(entry.kind || entry.type || '').toLowerCase()
@@ -47,6 +60,7 @@ function normalizeListingMedia(body) {
 }
 
 function formatItem(item, seller = null, viewerId = null, isLiked = false, isSaved = false) {
+  const mediaReferences = formatMediaReferences(item);
   const sellerInfo = seller || {
     id: item.seller_id,
     name: item.seller_name || 'Vendor',
@@ -62,7 +76,7 @@ function formatItem(item, seller = null, viewerId = null, isLiked = false, isSav
     description: item.description || '',
     priceCents: item.price_cents,
     priceZar: zar(item.price_cents),
-    photos: item.photos || (item.photo_keys ? item.photo_keys.map((k) => `/media/${k}`) : []),
+    photos: mediaReferences.photos,
     category: item.category || 'General',
     condition: item.condition || 'Pre-loved',
     size: item.size || 'One Size',
@@ -79,12 +93,10 @@ function formatItem(item, seller = null, viewerId = null, isLiked = false, isSav
     // --- new fields ---
     viewCount: item.view_count || 0,
     trendingScore: item.trending_score || 0,
-    videoUrl: item.video_url || item.video_urls?.[0] || null,
+    videoUrl: mediaReferences.videos[0] || null,
     media: [
-      ...(item.photos || (item.photo_keys ? item.photo_keys.map((key) => `/media/${key}`) : []))
-        .map((url) => ({ kind: 'image', url })),
-      ...(item.video_urls || (item.video_url ? [item.video_url] : []))
-        .map((url) => ({ kind: 'video', url })),
+      ...mediaReferences.photos.map((url) => ({ kind: 'image', url })),
+      ...mediaReferences.videos.map((url) => ({ kind: 'video', url })),
     ],
     createdAt: item.created_at ? new Date(item.created_at).toISOString() : null,
     seller: sellerInfo,
@@ -92,6 +104,7 @@ function formatItem(item, seller = null, viewerId = null, isLiked = false, isSav
 }
 
 exports.normalizeListingMedia = normalizeListingMedia;
+exports.formatMediaReferences = formatMediaReferences;
 
 exports.handler = async (event) => {
   const cors = handleCors(event);

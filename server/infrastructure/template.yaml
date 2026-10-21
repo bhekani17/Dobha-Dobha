@@ -622,10 +622,15 @@ Resources:
           - AllowedOrigins:
               - !Ref AllowedOrigin
             AllowedMethods:
+              - GET
+              - HEAD
               - PUT
             AllowedHeaders:
-              - Content-Type
+              - '*'
             ExposedHeaders:
+              - Accept-Ranges
+              - Content-Range
+              - Content-Length
               - ETag
             MaxAge: 3000
 

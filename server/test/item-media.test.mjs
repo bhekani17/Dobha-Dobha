@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { normalizeListingMedia } = require('../src/items/handler.js');
+const { normalizeListingMedia, formatMediaReferences } = require('../src/items/handler.js');
 
 describe('listing media normalization', () => {
   it('separates uploaded product photos and video keys', () => {
@@ -16,6 +16,29 @@ describe('listing media normalization', () => {
       photos: ['/media/uploads/user/photo.jpg'],
       videoUrls: ['/media/uploads/user/clip.mp4'],
       videoUrl: '/media/uploads/user/clip.mp4',
+    });
+
+  });
+
+  describe('listing media URL formatting', () => {
+    it('converts stored upload keys to media endpoints and keeps existing URLs', () => {
+      assert.deepEqual(formatMediaReferences({
+        photos: ['uploads/user/photo.jpg', '/media/uploads/user/old.png'],
+        video_url: 'uploads/user/clip.mp4',
+      }), {
+        photos: ['/media/uploads/user/photo.jpg', '/media/uploads/user/old.png'],
+        videos: ['/media/uploads/user/clip.mp4'],
+      });
+    });
+
+    it('formats legacy photo keys and video arrays', () => {
+      assert.deepEqual(formatMediaReferences({
+        photo_keys: ['uploads/user/photo.jpg'],
+        video_urls: ['uploads/user/clip-one.mp4', '/media/uploads/user/clip-two.webm'],
+      }), {
+        photos: ['/media/uploads/user/photo.jpg'],
+        videos: ['/media/uploads/user/clip-one.mp4', '/media/uploads/user/clip-two.webm'],
+      });
     });
   });
 

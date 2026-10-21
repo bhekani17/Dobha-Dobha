@@ -97,8 +97,7 @@ function FeedCard({ item, active, onAction, onMediaChange, mediaIndex, onReport,
           </div>
         )) : (
           <div className="reel-media-empty" role="img" aria-label={`No photo available for ${title}`}>
-            <span aria-hidden="true">✳</span>
-            <p>{title}</p>
+            <p>{title}</p><small>Photo not provided</small>
           </div>
         )}
       </div>
@@ -125,13 +124,13 @@ function FeedCard({ item, active, onAction, onMediaChange, mediaIndex, onReport,
 
       <div className="reel-actions" aria-label={`${title} actions`}>
         <button type="button" aria-label={item.isLiked ? 'Unlike listing' : 'Like listing'} onClick={() => onAction(item, 'like')}>
-          <span aria-hidden="true">{item.isLiked ? '♥' : '♡'}</span><small>{Number(item.likesCount) || 0}</small>
+          <span>{item.isLiked ? 'Liked' : 'Like'}</span><small>{Number(item.likesCount) || 0}</small>
         </button>
         <button type="button" aria-label="Open listing and comments" onClick={() => openListing(item)}>
-          <span aria-hidden="true">▢</span><small>{Number(item.commentsCount) || 0}</small>
+          <span>Comments</span><small>{Number(item.commentsCount) || 0}</small>
         </button>
         <button type="button" aria-label={item.isSaved ? 'Remove saved listing' : 'Save listing'} onClick={() => onAction(item, 'save')}>
-          <span aria-hidden="true">{item.isSaved ? '▣' : '▢'}</span><small>{item.isSaved ? 'Saved' : 'Save'}</small>
+          <span>{item.isSaved ? 'Saved' : 'Save'}</span>
         </button>
         <details className="reel-more">
           <summary aria-label="More listing options"><span aria-hidden="true">•••</span><small>More</small></summary>
