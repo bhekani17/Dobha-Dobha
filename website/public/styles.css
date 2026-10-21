@@ -4865,3 +4865,139 @@ footer {
     transition: none;
   }
 }
+
+/* Fluid layout refinements */
+.hero {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 390px), 1fr));
+  gap: clamp(24px, 5vw, 64px);
+}
+
+.home-live,
+.home-trending,
+.home-stories,
+.home-categories,
+.home-featured {
+  padding-right: clamp(16px, 7vw, 112px);
+  padding-left: clamp(16px, 7vw, 112px);
+}
+
+.live-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+}
+
+.listing-grid,
+.home-trending .listing-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+}
+
+.item-image {
+  height: auto;
+  aspect-ratio: 0.9;
+}
+
+.sell-form-section {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: clamp(20px, 5vw, 72px);
+}
+
+.studio-layout {
+  grid-template-columns: minmax(0, 1.6fr) minmax(min(100%, 250px), 0.8fr);
+}
+
+.messages-layout {
+  grid-template-columns: clamp(220px, 27vw, 340px) minmax(0, 1fr);
+  min-height: clamp(440px, 65svh, 760px);
+}
+
+.chat-thread {
+  min-height: 0;
+}
+
+.chat-messages {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.seller-listing-card {
+  grid-template-columns: clamp(64px, 8vw, 92px) minmax(0, 1fr) auto;
+}
+
+.seller-listing-image {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.reels-feed-scroll {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));
+}
+
+.live-studio-fullscreen .studio-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(min(30vw, 280px), 340px);
+  height: calc(100svh - 28px);
+}
+
+@media (max-width: 760px) {
+  .studio-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .live-studio-fullscreen .studio-layout {
+    display: block;
+    height: 100svh;
+  }
+
+  .live-studio-fullscreen .studio-preview-column {
+    height: 100%;
+  }
+
+  .live-studio-fullscreen .studio-chat-panel {
+    position: fixed;
+    z-index: 31;
+    right: 10px;
+    bottom: calc(82px + env(safe-area-inset-bottom));
+    width: min(340px, calc(100vw - 20px));
+    height: min(29svh, 260px);
+    min-height: 150px;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-live,
+  .home-trending,
+  .home-stories,
+  .home-categories,
+  .home-featured {
+    padding-right: clamp(16px, 5vw, 28px);
+    padding-left: clamp(16px, 5vw, 28px);
+  }
+
+  .messages-layout {
+    min-height: 65svh;
+  }
+
+  .chat-list-panel,
+  .chat-thread {
+    min-height: 65svh;
+  }
+
+  .seller-listing-card {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .reels-feed-scroll {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 155px), 1fr));
+  }
+}
+
+@media (max-width: 360px) {
+  .reels-feed-scroll,
+  .listing-grid,
+  .home-trending .listing-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
