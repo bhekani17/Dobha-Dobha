@@ -5,6 +5,47 @@ const { json, error, handleCors, parseBody } = require('../utils/response');
 const { getUser, requireUser } = require('../utils/auth');
 const { id, now, zar, toCents } = require('../utils/id');
 
+function mediaUrl(entry) {
+  const value = typeof entry === 'string' ? entry : entry?.url || entry?.key || '';
+  return value.startsWith('uploads/') ? `/media/${value}` : value;
+}
+
+function isVideoMedia(entry) {
+  const kind = typeof entry === 'object' && entry
+    ? String(entry.kind || entry.type || '').toLowerCase()
+    : '';
+  return kind === 'video' || /\.(mp4|mov|webm)(?:[?#].*)?$/i.test(mediaUrl(entry));
+}
+
+function normalizeListingMedia(body) {
+  if (!Array.isArray(body.media)) {
+    const videoUrl = body.videoUrl || body.video_url || null;
+    return {
+      photos: Array.isArray(body.photos) ? body.photos : [],
+      videoUrls: videoUrl ? [videoUrl] : [],
+      videoUrl,
+    };
+  }
+
+  const photos = body.media.filter((entry) => !isVideoMedia(entry)).map(mediaUrl).filter(Boolean);
+  const videos = [...new Set(body.media.filter(isVideoMedia).map(mediaUrl).filter(Boolean))];
+  const explicitVideoUrl = Object.prototype.hasOwnProperty.call(body, 'videoUrl')
+    ? body.videoUrl
+    : Object.prototype.hasOwnProperty.call(body, 'video_url')
+      ? body.video_url
+      : undefined;
+  const videoUrls = explicitVideoUrl === undefined
+    ? videos
+    : explicitVideoUrl
+      ? [explicitVideoUrl, ...videos.filter((url) => url !== explicitVideoUrl)]
+      : [];
+  return {
+    photos,
+    videoUrls,
+    videoUrl: videoUrls[0] || null,
+  };
+}
+
 function formatItem(item, seller = null, viewerId = null, isLiked = false, isSaved = false) {
   const sellerInfo = seller || {
     id: item.seller_id,
@@ -38,11 +79,19 @@ function formatItem(item, seller = null, viewerId = null, isLiked = false, isSav
     // --- new fields ---
     viewCount: item.view_count || 0,
     trendingScore: item.trending_score || 0,
-    videoUrl: item.video_url || null,
+    videoUrl: item.video_url || item.video_urls?.[0] || null,
+    media: [
+      ...(item.photos || (item.photo_keys ? item.photo_keys.map((key) => `/media/${key}`) : []))
+        .map((url) => ({ kind: 'image', url })),
+      ...(item.video_urls || (item.video_url ? [item.video_url] : []))
+        .map((url) => ({ kind: 'video', url })),
+    ],
     createdAt: item.created_at ? new Date(item.created_at).toISOString() : null,
     seller: sellerInfo,
   };
 }
+
+exports.normalizeListingMedia = normalizeListingMedia;
 
 exports.handler = async (event) => {
   const cors = handleCors(event);
@@ -216,7 +265,7 @@ exports.handler = async (event) => {
       const description = (body.description || '').trim();
       const priceZar = body.priceZar || body.price;
       const priceCents = body.priceCents || toCents(priceZar);
-      const photos = Array.isArray(body.photos) ? body.photos : [];
+      const { photos, videoUrls, videoUrl } = normalizeListingMedia(body);
       const category = (body.category || 'Vintage').trim();
       const condition = (body.condition || 'Grade A Thrift').trim();
       const size = (body.size || 'M').trim();
@@ -227,6 +276,9 @@ exports.handler = async (event) => {
 
       if (!title || title.length < 3) return error(400, 'Title must be at least 3 characters');
       if (priceCents < 500) return error(400, 'Price must be at least R5.00');
+      if (!photos.length) return error(400, 'At least one product photo is required');
+      if (videoUrls.length > 3) return error(400, 'A listing can have no more than three product videos');
+      if (photos.length + videoUrls.length > 10) return error(400, 'A listing can have no more than 10 media files');
 
       const itemId = id('itm');
       const timestamp = now();
@@ -242,6 +294,8 @@ exports.handler = async (event) => {
         description,
         price_cents: priceCents,
         photos,
+        video_url: videoUrl,
+        video_urls: videoUrls,
         category,
         condition,
         size,
@@ -344,6 +398,14 @@ exports.handler = async (event) => {
       const updates = [];
       const attrNames = {};
       const attrValues = { ':time': now() };
+      const mediaUpdate = Array.isArray(body.media) ? normalizeListingMedia(body) : null;
+      if (mediaUpdate && !mediaUpdate.photos.length) return error(400, 'At least one product photo is required');
+      if (mediaUpdate && mediaUpdate.videoUrls.length > 3) {
+        return error(400, 'A listing can have no more than three product videos');
+      }
+      if (mediaUpdate && mediaUpdate.photos.length + mediaUpdate.videoUrls.length > 10) {
+        return error(400, 'A listing can have no more than 10 media files');
+      }
 
       if (body.title !== undefined) {
         updates.push('#title = :title');
@@ -369,9 +431,22 @@ exports.handler = async (event) => {
         attrNames['#st'] = 'status';
         attrValues[':status'] = body.status;
       }
-      if (body.photos !== undefined && Array.isArray(body.photos)) {
+      if (mediaUpdate) {
+        updates.push('photos = :photos');
+        attrValues[':photos'] = mediaUpdate.photos;
+        updates.push('video_url = :video');
+        attrValues[':video'] = mediaUpdate.videoUrl;
+        updates.push('video_urls = :videos');
+        attrValues[':videos'] = mediaUpdate.videoUrls;
+      } else if (body.photos !== undefined && Array.isArray(body.photos)) {
         updates.push('photos = :photos');
         attrValues[':photos'] = body.photos;
+      }
+      if (!mediaUpdate && (Object.prototype.hasOwnProperty.call(body, 'videoUrl') || Object.prototype.hasOwnProperty.call(body, 'video_url'))) {
+        updates.push('video_url = :video');
+        attrValues[':video'] = body.videoUrl || body.video_url || null;
+        updates.push('video_urls = :videos');
+        attrValues[':videos'] = attrValues[':video'] ? [attrValues[':video']] : [];
       }
 
       if (updates.length > 0) {
@@ -428,8 +503,8 @@ exports.handler = async (event) => {
       await dynamo.update({
         TableName: itemsTable,
         Key: { id: itemId },
-        UpdateExpression: 'SET video_url = :vurl, updated_at = :time',
-        ExpressionAttributeValues: { ':vurl': videoUrl, ':time': now() },
+        UpdateExpression: 'SET video_url = :vurl, video_urls = :vurls, updated_at = :time',
+        ExpressionAttributeValues: { ':vurl': videoUrl, ':vurls': [videoUrl], ':time': now() },
       });
 
       const updated = await dynamo.get(itemsTable, { id: itemId });

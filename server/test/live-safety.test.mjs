@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
+const corsOrigin = process.env.ALLOWED_WEB_ORIGINS;
+process.env.ALLOWED_WEB_ORIGINS = '*';
 const { handler } = require('../src/live/handler.js');
+if (corsOrigin === undefined) delete process.env.ALLOWED_WEB_ORIGINS;
+else process.env.ALLOWED_WEB_ORIGINS = corsOrigin;
 const liveKitEnvironment = ['LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET']
   .map((key) => [key, process.env[key]]);
 
@@ -25,6 +29,53 @@ describe('live streaming without provider configuration', () => {
     });
 
     assert.equal(response.statusCode, 503);
+    assert.equal(response.headers['Access-Control-Allow-Origin'], '*');
     assert.match(JSON.parse(response.body).error, /LiveKit is configured/);
+  });
+});
+
+describe('live hosting authorization', () => {
+  it('issues a publish token to a signed-in buyer', async () => {
+    process.env.LIVEKIT_URL = 'wss://live.example.test';
+    process.env.LIVEKIT_API_KEY = 'test-key';
+    process.env.LIVEKIT_API_SECRET = 'test-secret';
+
+    const response = await handler({
+      path: '/api/token',
+      httpMethod: 'GET',
+      queryStringParameters: { room: 'community-stream', role: 'host' },
+      requestContext: {
+        authorizer: {
+          claims: {
+            sub: 'buyer-123',
+            email: 'buyer@example.test',
+            name: 'Dobha Buyer',
+          },
+        },
+      },
+    });
+
+    assert.equal(response.statusCode, 200);
+    const result = JSON.parse(response.body);
+    assert.equal(result.role, 'host');
+    assert.equal(result.room, 'community-stream');
+    const claims = JSON.parse(Buffer.from(result.token.split('.')[1], 'base64url').toString('utf8'));
+    assert.equal(claims.video.room, 'community-stream');
+    assert.equal(claims.video.canPublish, true);
+    assert.equal(claims.name, 'Dobha Buyer');
+  });
+
+  it('still requires sign-in to host', async () => {
+    process.env.LIVEKIT_URL = 'wss://live.example.test';
+    process.env.LIVEKIT_API_KEY = 'test-key';
+    process.env.LIVEKIT_API_SECRET = 'test-secret';
+
+    const response = await handler({
+      path: '/api/token',
+      httpMethod: 'GET',
+      queryStringParameters: { room: 'community-stream', role: 'host' },
+    });
+
+    assert.equal(response.statusCode, 401);
   });
 });

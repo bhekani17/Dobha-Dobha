@@ -6,7 +6,7 @@
     </button>
     <nav class="top-actions" id="top-actions" aria-label="Main navigation">
       <a class="text-button page-link" href="#shop" data-page-link="shop">Shop</a>
-      <a class="text-button page-link" href="#reels" data-page-link="reels">Reels</a>
+      <a class="text-button page-link" href="#reels" data-page-link="reels">Discover</a>
       <a class="text-button page-link" href="#live" data-page-link="live">Live <span class="live-dot"></span></a>
       <a class="text-button page-link" href="#sell" data-page-link="sell">Sell</a>
       <a class="text-button page-link" href="#orders" data-page-link="orders" id="orders-nav">Orders</a>
@@ -23,14 +23,14 @@
       <div class="hero-copy">
         <p class="eyebrow">GOOD FINDS, GOOD PEOPLE</p>
         <h1>Make room for<br><em>something</em> special.</h1>
-        <p class="hero-subtitle">A marketplace for one-of-a-kind pieces and the people who find them. Shop the drop, or catch a seller live.</p>
+        <p class="hero-subtitle">A marketplace for one-of-a-kind pieces and the people who find them. Shop the drop, or watch and host live.</p>
         <div class="hero-actions"><a class="button button-dark page-link" href="#shop" data-page-link="shop">Explore the market <span aria-hidden="true">↘</span></a><a class="button button-outline page-link" href="#sell" data-page-link="sell">Start selling</a></div>
       </div>
-      <div class="hero-art" aria-label="Curated marketplace collection">
-        <div class="hero-stamp">THE<br>GOOD<br>STUFF<br><span>EST. 2025</span></div>
-        <div class="art-tile art-one"><span>PRE-LOVED<br>PERFECTED</span></div>
-        <div class="art-tile art-two"><span>FIND YOUR<br>OWN WAY</span></div>
-        <div class="hero-note">A little less ordinary <span>✳</span></div>
+      <div class="hero-art" aria-label="Johannesburg street market and local neighbourhood">
+        <img class="hero-market-photo" src="/assets/images/market/joubert-street-market.jpg" alt="Street vendor at a market stall on Joubert Street, Johannesburg" fetchpriority="high">
+        <div class="hero-market-inset"><img src="/assets/images/market/7th-street-melville.jpg" alt="A view along 7th Street in Melville, Johannesburg" loading="lazy"></div>
+        <div class="hero-stamp">GOOD<br>FINDS<br>LIVE<br><span>FROM JOBURG</span></div>
+        <div class="hero-photo-credit"><a href="https://commons.wikimedia.org/wiki/File:Street_vendor_Joubert_street_Johannesburg_01.jpg" target="_blank" rel="noopener noreferrer">Street market · Ossewa · CC BY-SA 4.0</a><br><a href="https://commons.wikimedia.org/wiki/File:7th_Street_(Johannesburg).jpg" target="_blank" rel="noopener noreferrer">7th Street · LittleT889 · CC BY 4.0</a></div>
       </div>
       </section>
       <section class="home-stories">
@@ -42,7 +42,7 @@
         <div id="home-categories" class="category-grid"></div>
       </section>
       <section class="home-live">
-        <div class="section-heading"><div><p class="eyebrow">HAPPENING RIGHT NOW</p><h2>Catch a seller live</h2></div><a class="text-button page-link" href="#live" data-page-link="live">See all live streams →</a></div>
+        <div class="section-heading"><div><p class="eyebrow">HAPPENING RIGHT NOW</p><h2>Catch the community live</h2></div><a class="text-button page-link" href="#live" data-page-link="live">See all live streams →</a></div>
         <div id="home-live-list" class="live-list"><p class="muted">Checking who's live...</p></div>
       </section>
       <section class="home-featured">
@@ -53,8 +53,8 @@
     </section>
 
     <section class="page hidden" id="page-reels" data-page="reels">
-      <section class="page-intro"><p class="eyebrow">SHORT-FORM FINDS</p><h1>Dobha <span>Reels.</span></h1><p>Watch listing videos from sellers across the market. Checkout is unavailable; no purchases or claims can be made here.</p></section>
-      <section id="reels-feed" class="reels-feed"><p class="muted">Loading video finds…</p></section>
+      <section class="page-intro"><p class="eyebrow">FINDS FROM ACROSS THE MARKET</p><h1>Discover <span>Dobha.</span></h1><p>Swipe through real listing photos and product videos, follow the people behind them, and save the finds you want to revisit. Checkout is unavailable; no purchases or claims can be made here.</p></section>
+      <section id="reels-feed" class="discovery-feed" aria-live="polite"><p class="muted">Finding the good stuff…</p></section>
     </section>
 
     <section class="page hidden" id="page-shop" data-page="shop">
@@ -70,7 +70,7 @@
     </section>
 
     <section class="page hidden" id="page-live" data-page="live">
-      <section class="page-intro"><p class="eyebrow">WATCH LIVE</p><h1>Live from the market</h1><p>Watch sellers live for free. No account needed.</p></section>
+      <section class="page-intro"><p class="eyebrow">WATCH OR HOST LIVE</p><h1>Live from the market</h1><p>Watch streams for free, or sign in to host your own. Any Dobha member can go live with a camera and microphone.</p></section>
       <section class="live-strip live-page-section">
         <div class="section-heading live-heading"><div><p class="eyebrow">HAPPENING RIGHT NOW</p><h2>Live from the market</h2></div><button class="text-button" id="refresh-live">Refresh streams ↻</button></div>
         <section id="inline-live-player" class="inline-live-player hidden" aria-label="Live stream player">
@@ -81,6 +81,37 @@
           <div class="live-chat"><div class="live-chat-messages" data-live-chat aria-live="polite"></div><form data-live-chat-form><input name="message" maxlength="300" autocomplete="off" placeholder="Say something…" required><button class="button button-dark">Send</button></form></div>
         </section>
         <div id="live-list" class="live-list"><p class="muted">Checking who's live...</p></div>
+      </section>
+      <section class="feature-section live-host-entry">
+        <div class="section-heading"><div><p class="eyebrow">YOUR TURN</p><h2>Host a live stream</h2></div></div>
+        <p class="field-hint">Buyers and sellers can host. Keep this page open while live; viewers can watch and chat. Live shopping claims and checkout are unavailable.</p>
+        <div id="live-host-auth"><button class="button button-dark" id="live-host-signin" type="button">Sign in to go live</button></div>
+        <section id="web-live-studio" class="form-stack hidden">
+          <form id="live-host-form" class="form-stack">
+            <label class="field">Stream name<input name="room" required minlength="1" maxlength="40" placeholder="Your stream name"></label>
+            <div class="studio-layout">
+              <div class="studio-preview-column">
+                <div class="studio-status-row"><span class="studio-live-status" id="host-live-status">STUDIO READY</span><span id="host-live-viewers">0 watching</span></div>
+                <div class="video-frame studio-video-frame"><video id="host-preview" autoplay muted playsinline></video><p id="host-preview-placeholder">Your camera preview will appear when you go live.</p></div>
+                <div class="studio-devices">
+                  <label class="field">Camera<select id="host-camera-select"><option value="">Default camera</option></select></label>
+                  <label class="field">Microphone<select id="host-mic-select"><option value="">Default microphone</option></select></label>
+                </div>
+                <div class="studio-controls">
+                  <button class="button button-outline" id="toggle-host-camera" type="button" disabled>Turn camera off</button>
+                  <button class="button button-outline" id="toggle-host-mic" type="button" disabled>Mute microphone</button>
+                  <button class="button button-dark" id="start-live-host" type="submit">Start live stream</button>
+                  <button class="button button-outline hidden" id="stop-live-host" type="button">End live stream</button>
+                </div>
+              </div>
+              <section class="studio-chat-panel" aria-label="Host live chat">
+                <h3>Live chat</h3><div class="live-chat-messages" data-live-chat aria-live="polite"></div>
+                <form data-live-chat-form><input name="message" maxlength="300" autocomplete="off" placeholder="Say something…" required><button class="button button-dark">Send</button></form>
+              </section>
+            </div>
+            <p id="host-live-message" class="form-message" role="status"></p>
+          </form>
+        </section>
       </section>
     </section>
 
@@ -98,7 +129,8 @@
             <div class="form-row"><label class="field">Item name<input name="title" required minlength="3" maxlength="80"></label><label class="field">Price (ZAR)<input name="priceZar" type="number" min="1" step="0.01" required></label></div>
             <div class="form-row"><label class="field">Category<select name="category" required></select></label><label class="field">Condition<input name="condition" required maxlength="40" placeholder="New, good, pre-loved..."></label></div>
             <label class="field">Details<textarea name="description" maxlength="1000" rows="3" placeholder="Describe the item, its size, features, or anything buyers should know."></textarea></label>
-            <label class="field upload-field">Photos or video<input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" multiple required><span class="field-hint">Add at least one photo. Images up to 8 MB, videos up to 60 MB.</span></label>
+            <label class="field upload-field">Item photos and product videos<input name="media" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm" multiple required><span class="field-hint">Add at least one photo and up to three product videos (60 seconds each). Up to 10 files, 60 MB each.</span></label>
+            <div id="listing-media-preview" class="listing-media-preview" aria-live="polite"></div>
             <button class="button button-dark form-submit" id="listing-submit">Publish listing</button>
           </div>
         </form>
@@ -112,17 +144,6 @@
             <label class="field">Caption (optional)<input name="caption" maxlength="200"></label>
             <button class="button button-outline" type="submit">Post story</button>
             <p id="story-message" class="form-message" role="status"></p>
-          </form>
-        </section>
-        <section id="web-live-studio" class="form-stack hidden">
-          <h2>Host a live stream</h2>
-          <p class="field-hint">Allow camera and microphone access when prompted. Viewers can watch and chat; paid claims and checkout are unavailable.</p>
-          <form id="live-host-form" class="form-stack">
-            <label class="field">Stream name<input name="room" required minlength="1" maxlength="40" pattern="[A-Za-z0-9_-]+" placeholder="Your shop name"></label>
-            <div class="video-frame"><video id="host-preview" autoplay muted playsinline></video><p id="host-preview-placeholder">Your camera preview will appear here.</p></div>
-            <button class="button button-dark" id="start-live-host" type="submit">Start live stream</button>
-            <button class="button button-outline hidden" id="stop-live-host" type="button">End live stream</button>
-            <p id="host-live-message" class="form-message" role="status"></p>
           </form>
         </section>
       </section>
@@ -194,12 +215,12 @@
     </section>
 
     <section class="page hidden" id="page-people" data-page="people">
-      <section class="page-intro"><p class="eyebrow">DOBHA COMMUNITY</p><h1>Find your <span>people.</span></h1><p>Search sellers and community members, follow their shops, and see new listings from people you follow.</p></section>
+      <section class="page-intro"><p class="eyebrow">DOBHA COMMUNITY</p><h1>Find your <span>people.</span></h1><p>Search for any community member, follow one another, and discover listings from people you follow.</p></section>
       <section class="feature-section"><form id="people-search-form" class="chat-send"><label class="field"><span class="visually-hidden">Find people</span><input name="query" minlength="2" placeholder="Name, shop, or @username"></label><button class="button button-dark">Search</button></form><div id="people-results" class="orders-list"></div></section>
     </section>
 
     <section class="page hidden" id="page-profile" data-page="profile">
-      <section class="page-intro"><p class="eyebrow">SELLER PROFILE</p><h1 id="seller-name">Meet the <span>seller.</span></h1><div id="seller-profile"></div></section>
+      <section class="page-intro"><p class="eyebrow">COMMUNITY PROFILE</p><h1 id="seller-name">Meet the <span>community.</span></h1><div id="seller-profile"></div></section>
       <section class="feature-section"><div id="seller-items" class="listing-grid"></div><div id="seller-reviews" class="orders-list"></div><div id="seller-follow-list" class="orders-list"></div></section>
     </section>
 
@@ -209,7 +230,7 @@
     </section>
   </main>
 
-  <footer><a class="brand page-link" href="#home" data-page-link="home"><span class="brand-symbol"><img src="/assets/images/logo.svg" alt=""></span><span>Dobha-Dobha</span></a><nav class="footer-nav"><a class="page-link" href="#about" data-page-link="about">About</a><a class="page-link" href="#shop" data-page-link="shop">Shop</a><a class="page-link" href="#reels" data-page-link="reels">Reels</a><a class="page-link" href="#sell" data-page-link="sell">Sell</a><a class="page-link" href="#cart" data-page-link="cart">Cart</a><a class="page-link" href="#account" data-page-link="account">Account</a><a class="page-link" href="#people" data-page-link="people">People</a><a class="page-link" href="#support" data-page-link="support">Support</a><a href="https://dobha-live.ndlovubhekani17.workers.dev/terms.html" target="_blank" rel="noopener noreferrer">Terms</a><a href="https://dobha-live.ndlovubhekani17.workers.dev/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a></nav><span>© <span id="year"></span> Dobha-Dobha</span></footer>
+  <footer><a class="brand page-link" href="#home" data-page-link="home"><span class="brand-symbol"><img src="/assets/images/logo.svg" alt=""></span><span>Dobha-Dobha</span></a><nav class="footer-nav"><a class="page-link" href="#about" data-page-link="about">About</a><a class="page-link" href="#shop" data-page-link="shop">Shop</a><a class="page-link" href="#reels" data-page-link="reels">Discover</a><a class="page-link" href="#sell" data-page-link="sell">Sell</a><a class="page-link" href="#cart" data-page-link="cart">Cart</a><a class="page-link" href="#account" data-page-link="account">Account</a><a class="page-link" href="#people" data-page-link="people">People</a><a class="page-link" href="#support" data-page-link="support">Support</a><a href="https://dobha-live.ndlovubhekani17.workers.dev/terms.html" target="_blank" rel="noopener noreferrer">Terms</a><a href="https://dobha-live.ndlovubhekani17.workers.dev/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a></nav><span>© <span id="year"></span> Dobha-Dobha</span></footer>
 
   <dialog id="auth-dialog" class="dialog">
     <button class="dialog-close" data-close aria-label="Close">×</button>

@@ -39,7 +39,7 @@ async function fetchLiveRooms(cfg) {
     const roomDetails = await Promise.all(
       live.map(async (room) => {
         let hostId = null;
-        let hostName = 'Dobha Vendor';
+        let hostName = 'Dobha member';
         try {
           const participants = await service.listParticipants(room.name);
           for (const p of participants) {
@@ -115,7 +115,7 @@ exports.handler = async (event) => {
               }
             : {
                 id: r.hostId,
-                name: r.hostName || 'Dobha Vendor',
+                name: r.hostName || 'Dobha member',
               },
         };
       });
@@ -135,10 +135,6 @@ exports.handler = async (event) => {
       }
 
       const user = role === 'host' ? await requireUser(event) : await getUser(event);
-
-      if (role === 'host' && user.role !== 'vendor') {
-        return error(403, 'Switch your account to vendor mode to start a live stream');
-      }
 
       const cfg = getLiveKitConfig();
       if (!cfg) {

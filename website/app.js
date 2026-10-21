@@ -64,6 +64,7 @@ const state = {
   hostRoom: null,
   hostTracks: [],
   hostRoomName: '',
+  listingPreviewUrls: [],
   resetEmail: '',
 };
 const byId = (id) => document.getElementById(id);
@@ -73,6 +74,16 @@ function setFieldGroup(group, visible) {
   group.querySelectorAll('input,select,textarea,button').forEach((field) => {
     field.disabled = !visible;
   });
+}
+async function loadSharedProduct(itemId) {
+  if (!itemId) return;
+  try {
+    const { item } = await api(`/api/items/${encodeURIComponent(itemId)}`);
+    state.items = [item, ...state.items.filter((listing) => listing.id !== item.id)];
+    showProduct(item.id);
+  } catch (error) {
+    notify(error.message, true);
+  }
 }
 async function uploadAvatar(event) {
   event.preventDefault();
@@ -175,6 +186,7 @@ function setSignedIn(user, token) {
   localStorage.setItem('dobha-user', JSON.stringify(user));
   byId('auth-button').textContent = user.name?.split(' ')[0] || 'Account';
   byId('account-nav').classList.remove('hidden');
+  updateLiveHostAccess();
   if (state.page === 'sell') renderPage();
   loadItems();
 }
@@ -189,6 +201,19 @@ function signOut() {
   localStorage.removeItem('dobha-user');
   byId('auth-button').textContent = 'Sign in';
   byId('account-nav').classList.add('hidden');
+  updateLiveHostAccess();
+}
+function updateLiveHostAccess() {
+  const studio = byId('web-live-studio');
+  const signIn = byId('live-host-auth');
+  if (!studio || !signIn) return;
+  const canHost = Boolean(state.token && state.user);
+  setFieldGroup(studio, canHost);
+  signIn.classList.toggle('hidden', canHost);
+  const roomInput = byId('live-host-form')?.elements.room;
+  if (roomInput && !roomInput.value) {
+    roomInput.placeholder = state.user?.shopName || state.user?.shop_name || state.user?.name || 'Your stream name';
+  }
 }
 async function loadProfile() {
   if (!state.token) return;
@@ -198,6 +223,7 @@ async function loadProfile() {
     localStorage.setItem('dobha-user', JSON.stringify(user));
     byId('auth-button').textContent = user.name?.split(' ')[0] || 'Account';
     byId('account-nav').classList.remove('hidden');
+    updateLiveHostAccess();
     if (state.page === 'sell') renderPage();
     if (state.page === 'account') renderAccount();
     loadItems();
@@ -289,26 +315,6 @@ async function loadItems(append = false) {
     renderItems();
   } catch (error) {
     byId('listing-grid').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
-  }
-}
-async function loadReels() {
-  const target = byId('reels-feed');
-  target.innerHTML = '<p class="muted">Loading video finds…</p>';
-  try {
-    const { items } = await api('/api/items?limit=100');
-    const reels = items.filter((item) => item.videoUrl);
-    state.items = [...state.items.filter((item) => !reels.some((reel) => reel.id === item.id)), ...reels];
-    target.innerHTML = reels.length ? reels.map((item) => `<article class="reel-card" data-reel="${escapeHtml(item.id)}">
-      <video src="${escapeHtml(resolveMedia(item.videoUrl))}" autoplay muted loop playsinline controls preload="metadata"></video>
-      <div class="reel-caption"><p class="eyebrow">${escapeHtml(item.seller?.name || item.sellerName || 'Dobha seller')}</p><h2>${escapeHtml(item.title)}</h2><p>${money(item.priceZar)} · ${escapeHtml(item.condition || 'Pre-loved')}</p>
-        <div class="action-row"><button class="button button-light" data-reel-open="${escapeHtml(item.id)}">View listing</button><button class="button button-outline" data-reel-like="${escapeHtml(item.id)}">${item.isLiked ? 'Unlike' : 'Like'}</button><button class="button button-outline" data-reel-save="${escapeHtml(item.id)}">${item.isSaved ? 'Unsave' : 'Save'}</button></div>
-      </div>
-    </article>`).join('') : '<p class="muted">No listing videos yet. Sellers can add video to a listing from the Sell page.</p>';
-    target.querySelectorAll('[data-reel-open]').forEach((button) => button.addEventListener('click', () => showProduct(button.dataset.reelOpen)));
-    target.querySelectorAll('[data-reel-like]').forEach((button) => button.addEventListener('click', () => itemAction(button.dataset.reelLike, 'like', 'Likes')));
-    target.querySelectorAll('[data-reel-save]').forEach((button) => button.addEventListener('click', () => itemAction(button.dataset.reelSave, 'save', 'Saved items')));
-  } catch (error) {
-    target.innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
   }
 }
 async function loadStories() {
@@ -429,7 +435,7 @@ async function loadLiveRooms() {
       return;
     }
     const cards = rooms.map((room) => {
-      const hostName = room.host?.name || 'Dobha seller';
+      const hostName = room.host?.name || 'Dobha member';
       const avatar = room.host?.avatarUrl
         ? `<img src="${escapeHtml(resolveMedia(room.host.avatarUrl))}" alt="">`
         : '';
@@ -544,10 +550,74 @@ async function loadOrders() {
 async function uploadFile(file) {
   const upload = await api('/api/uploads', {
     method: 'POST',
-    raw: file,
-    contentType: file.type,
+    body: { contentType: file.type, size: file.size },
   });
-  return { key: upload.key };
+  const response = await fetch(upload.uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  });
+  if (!response.ok) throw new Error(`Media upload failed (${response.status}). Please try again.`);
+  return { key: upload.key, kind: file.type.startsWith('video/') ? 'video' : 'image' };
+}
+function validateListingMedia(files) {
+  const maxBytes = 60 * 1024 * 1024;
+  const allowedTypes = new Set([
+    'image/jpeg', 'image/png', 'image/webp',
+    'video/mp4', 'video/quicktime', 'video/webm',
+  ]);
+  if (!files.length) throw new Error('Choose at least one photo.');
+  if (files.length > 10) throw new Error('Choose no more than 10 photos and videos.');
+  if (!files.some((file) => file.type.startsWith('image/'))) throw new Error('Add at least one photo of the item.');
+  if (files.filter((file) => file.type.startsWith('video/')).length > 3) {
+    throw new Error('Choose no more than three product videos per listing.');
+  }
+  for (const file of files) {
+    if (!allowedTypes.has(file.type)) throw new Error(`${file.name} is not a supported image or video format.`);
+    if (file.size > maxBytes) throw new Error(`${file.name} is larger than 60 MB.`);
+  }
+}
+function readVideoDuration(file) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const url = URL.createObjectURL(file);
+    const cleanup = () => URL.revokeObjectURL(url);
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      cleanup();
+      if (!Number.isFinite(video.duration)) reject(new Error(`Could not read the duration of ${file.name}.`));
+      else resolve(video.duration);
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error(`Could not open ${file.name}. Choose a playable video file.`));
+    };
+    video.src = url;
+  });
+}
+function renderListingMediaPreview(files) {
+  state.listingPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+  state.listingPreviewUrls = [];
+  const target = byId('listing-media-preview');
+  target.replaceChildren();
+  for (const file of files) {
+    const url = URL.createObjectURL(file);
+    state.listingPreviewUrls.push(url);
+    const figure = document.createElement('figure');
+    const media = document.createElement(file.type.startsWith('video/') ? 'video' : 'img');
+    media.src = url;
+    if (media instanceof HTMLVideoElement) {
+      media.controls = true;
+      media.muted = true;
+      media.playsInline = true;
+    } else {
+      media.alt = `Preview of ${file.name}`;
+    }
+    const caption = document.createElement('figcaption');
+    caption.textContent = file.name;
+    figure.append(media, caption);
+    target.append(figure);
+  }
 }
 async function submitStory(event) {
   event.preventDefault();
@@ -584,10 +654,6 @@ async function submitStory(event) {
 async function startLiveHost(event) {
   event.preventDefault();
   if (!requireSignIn()) return;
-  if (state.user?.role !== 'vendor') {
-    setMessage('host-live-message', 'Create a seller profile before starting a stream.', true);
-    return;
-  }
   const client = window.LivekitClient;
   if (!client?.Room || !client?.createLocalTracks) {
     setMessage('host-live-message', 'Live video is unavailable because the browser SDK did not load.', true);
@@ -606,12 +672,22 @@ async function startLiveHost(event) {
   let tracks = [];
   try {
     const token = await api(`/api/token?room=${encodeURIComponent(roomName)}&role=host`);
-    tracks = await client.createLocalTracks({ audio: true, video: { facingMode: 'user' } });
+    const cameraId = byId('host-camera-select').value;
+    const microphoneId = byId('host-mic-select').value;
+    tracks = await client.createLocalTracks({
+      audio: microphoneId ? { deviceId: microphoneId } : true,
+      video: cameraId ? { deviceId: cameraId } : { facingMode: 'user' },
+    });
     if (!tracks.some((track) => track.kind === 'video')) {
       throw new Error('The camera could not be started.');
     }
     room = new client.Room();
     room.on(client.RoomEvent.DataReceived, handleLiveData);
+    const updateViewers = () => {
+      byId('host-live-viewers').textContent = `${room.remoteParticipants.size} watching`;
+    };
+    room.on(client.RoomEvent.ParticipantConnected, updateViewers);
+    room.on(client.RoomEvent.ParticipantDisconnected, updateViewers);
     await room.connect(token.url, token.token);
     for (const track of tracks) await room.localParticipant.publishTrack(track, { name: track.kind });
     state.hostRoom = room;
@@ -623,13 +699,68 @@ async function startLiveHost(event) {
     byId('host-preview-placeholder').classList.add('hidden');
     byId('start-live-host').classList.add('hidden');
     byId('stop-live-host').classList.remove('hidden');
+    byId('host-live-status').textContent = 'LIVE NOW';
+    byId('host-live-status').classList.add('is-live');
+    byId('toggle-host-camera').disabled = false;
+    byId('toggle-host-mic').disabled = false;
+    byId('host-camera-select').disabled = true;
+    byId('host-mic-select').disabled = true;
+    byId('host-live-viewers').textContent = `${room.remoteParticipants.size} watching`;
     setMessage('host-live-message', `You are live in “${roomName}”. Keep this page open while streaming.`);
+    populateHostDevices().catch((error) => setMessage('host-live-message', error.message, true));
   } catch (error) {
     if (room) await room.disconnect().catch((disconnectError) => console.error('Live room cleanup failed:', disconnectError));
     tracks.forEach((track) => track.stop());
+    byId('host-live-status').textContent = 'STUDIO READY';
+    byId('host-live-status').classList.remove('is-live');
+    byId('start-live-host').classList.remove('hidden');
+    byId('stop-live-host').classList.add('hidden');
+    byId('host-camera-select').disabled = false;
+    byId('host-mic-select').disabled = false;
+    if (/sign in required/i.test(error.message)) {
+      signOut();
+      showAuth();
+      return;
+    }
     setMessage('host-live-message', error.message, true);
   } finally {
     button.disabled = false;
+  }
+}
+async function populateHostDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) {
+    throw new Error('This browser does not support camera and microphone selection.');
+  }
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  for (const [kind, selectId, label] of [
+    ['videoinput', 'host-camera-select', 'Default camera'],
+    ['audioinput', 'host-mic-select', 'Default microphone'],
+  ]) {
+    const select = byId(selectId);
+    const selected = select.value;
+    select.replaceChildren(new Option(label, ''));
+    devices.filter((device) => device.kind === kind).forEach((device, index) => {
+      select.add(new Option(device.label || `${kind === 'videoinput' ? 'Camera' : 'Microphone'} ${index + 1}`, device.deviceId));
+    });
+    if ([...select.options].some((option) => option.value === selected)) select.value = selected;
+  }
+}
+async function toggleHostTrack(kind) {
+  const track = state.hostTracks.find((entry) => entry.kind === kind);
+  const button = byId(kind === 'video' ? 'toggle-host-camera' : 'toggle-host-mic');
+  if (!track) return;
+  try {
+    if (track.isMuted) {
+      await track.unmute();
+      button.textContent = kind === 'video' ? 'Turn camera off' : 'Mute microphone';
+      button.setAttribute('aria-pressed', 'false');
+    } else {
+      await track.mute();
+      button.textContent = kind === 'video' ? 'Turn camera on' : 'Unmute microphone';
+      button.setAttribute('aria-pressed', 'true');
+    }
+  } catch (error) {
+    setMessage('host-live-message', error.message, true);
   }
 }
 async function stopLiveHost() {
@@ -649,6 +780,15 @@ async function stopLiveHost() {
     }
     byId('start-live-host')?.classList.remove('hidden');
     byId('stop-live-host')?.classList.add('hidden');
+    byId('host-live-status').textContent = 'STUDIO READY';
+    byId('host-live-status').classList.remove('is-live');
+    byId('host-live-viewers').textContent = '0 watching';
+    byId('toggle-host-camera').disabled = true;
+    byId('toggle-host-mic').disabled = true;
+    byId('toggle-host-camera').textContent = 'Turn camera off';
+    byId('toggle-host-mic').textContent = 'Mute microphone';
+    byId('host-camera-select').disabled = false;
+    byId('host-mic-select').disabled = false;
     if (byId('host-live-message')) setMessage('host-live-message', 'Live stream ended.');
   }
 }
@@ -716,7 +856,7 @@ function renderPage() {
   const page = ['home', 'reels', 'shop', 'live', 'sell', 'orders', 'cart', 'saved', 'offers', 'wallet', 'messages', 'notifications', 'account', 'support', 'people', 'profile', 'about'].includes(requested) ? requested : 'home';
   state.page = page;
   if (state.inlineStream && page !== 'live') stopStream();
-  if (state.hostRoom && page !== 'sell') {
+  if (state.hostRoom && page !== 'live') {
     stopLiveHost().catch((error) => console.error('Unable to end the live stream:', error));
   }
   clearInterval(state.chatPoll);
@@ -739,10 +879,10 @@ function renderPage() {
       setFieldGroup(document.querySelector('.vendor-fields'), vendor);
       setFieldGroup(document.querySelector('.listing-fields'), !vendor);
       setFieldGroup(byId('seller-story-section'), !vendor);
-      setFieldGroup(byId('web-live-studio'), !vendor);
       byId('sell-title').textContent = vendor ? 'Your corner of the marketplace' : 'List your next find';
     }
   }
+  updateLiveHostAccess();
   if (page === 'orders') loadOrders();
   if (page === 'cart') loadCart();
   if (page === 'saved') loadSaved();
@@ -762,11 +902,11 @@ function renderPage() {
   if (page === 'people') byId('people-results').innerHTML = '';
   if (page === 'sell' && state.user?.role === 'vendor') loadMyListings();
   if (page === 'profile') loadSellerProfile(new URLSearchParams(location.hash.split('?')[1] || '').get('id'));
+  if (requested === 'product') loadSharedProduct(new URLSearchParams(location.hash.split('?')[1] || '').get('id'));
   if (page === 'shop') {
     renderFilters();
     loadItems();
   }
-  if (page === 'reels') loadReels();
   if (page === 'home') loadStories();
   if (page === 'home' || page === 'live') {
     loadLiveRooms();
@@ -804,13 +944,18 @@ async function createListing(event) {
   const form = byId('sell-form');
   const data = new FormData(form);
   const files = [...form.elements.media.files];
-  if (!files.length) {
-    setMessage('sell-message', 'Choose at least one photo.', true);
+  try {
+    validateListingMedia(files);
+    for (const file of files.filter((entry) => entry.type.startsWith('video/'))) {
+      if (await readVideoDuration(file) > 60) throw new Error(`${file.name} is longer than 60 seconds.`);
+    }
+  } catch (error) {
+    setMessage('sell-message', error.message, true);
     return;
   }
   const button = byId('listing-submit');
   button.disabled = true;
-  setMessage('sell-message', 'Uploading your photos and publishing the listing…');
+  setMessage('sell-message', 'Uploading your media and publishing the listing…');
   try {
     const media = [];
     for (const file of files) media.push(await uploadFile(file));
@@ -969,8 +1114,8 @@ function bindListingCards(target) {
     });
   });
 }
-async function itemAction(itemId, action, label) {
-  if (!requireSignIn()) return;
+async function itemAction(itemId, action, label, { openDetail = true } = {}) {
+  if (!requireSignIn()) return null;
   try {
     const { item } = await api(`/api/items/${itemId}/${action}`, { method: 'POST' });
     if (state.items.some((listing) => listing.id === itemId)) {
@@ -981,10 +1126,12 @@ async function itemAction(itemId, action, label) {
     state.savedItems = item.isSaved
       ? [...state.savedItems.filter((listing) => listing.id !== itemId), item]
       : state.savedItems.filter((listing) => listing.id !== itemId);
-    showProduct(itemId);
+    if (openDetail) showProduct(itemId);
     notify(`${label} updated.`);
+    return item;
   } catch (error) {
     notify(error.message, true);
+    return null;
   }
 }
 async function loadComments(itemId) {
@@ -1008,14 +1155,16 @@ async function addComment(event, itemId) {
 }
 async function reportItem(itemId) {
   const reason = prompt('Why are you reporting this listing? Choose one: Fake or counterfeit; Misleading photos or description; Prohibited item; Scam or spam; Offensive');
-  if (!reason) return;
+  if (!reason) return false;
   try {
     await api(`/api/items/${itemId}/report`, { method: 'POST', body: { reason } });
     notify('Thanks. The listing has been hidden from your feed and reported.');
     closeDialog('product-dialog');
     await loadItems();
+    return true;
   } catch (error) {
     notify(error.message, true);
+    return false;
   }
 }
 async function makeOffer(item) {
@@ -1291,7 +1440,7 @@ async function loadSellerProfile(userId) {
     const result = await api(`/api/users/${encodeURIComponent(userId)}`);
     const profile = result.profile;
     byId('seller-name').innerHTML = `${escapeHtml(profile.shopName || profile.name)} <span>${escapeHtml(profile.handle)}</span>`;
-    target.innerHTML = `<p>${escapeHtml(profile.bio || 'A Dobha-Dobha community seller.')} · ${escapeHtml(profile.stallLocation || profile.location || '')}</p><p><button class="text-button" data-follow-list="followers">${Number(profile.followerCount)} followers</button> · <button class="text-button" data-follow-list="following">${Number(profile.followingCount)} following</button> · ${Number(profile.salesCount)} sales${profile.rating ? ` · ${escapeHtml(profile.rating)} ★ (${Number(profile.reviewCount)} reviews)` : ''}</p><button class="button button-outline" id="follow-button">${profile.isFollowing ? 'Unfollow' : 'Follow'}</button><button class="button button-dark" id="message-seller">Message seller</button>`;
+    target.innerHTML = `<p>${escapeHtml(profile.bio || 'A Dobha-Dobha community member.')} · ${escapeHtml(profile.stallLocation || profile.location || '')}</p><p><button class="text-button" data-follow-list="followers">${Number(profile.followerCount)} followers</button> · <button class="text-button" data-follow-list="following">${Number(profile.followingCount)} following</button> · ${Number(profile.salesCount)} sales${profile.rating ? ` · ${escapeHtml(profile.rating)} ★ (${Number(profile.reviewCount)} reviews)` : ''}</p><button class="button button-outline" id="follow-button">${profile.isFollowing ? 'Unfollow' : 'Follow'}</button><button class="button button-dark" id="message-seller">Message member</button>`;
     target.querySelectorAll('[data-follow-list]').forEach((button) => button.addEventListener('click', async () => {
       try {
         const { users } = await api(`/api/users/${encodeURIComponent(userId)}/${button.dataset.followList}`);
@@ -1478,6 +1627,10 @@ function init() {
   });
   byId('vendor-submit').addEventListener('click', createVendor);
   byId('sell-form').addEventListener('submit', createListing);
+  byId('sell-form').elements.media.addEventListener('change', (event) => {
+    renderListingMediaPreview([...event.currentTarget.files]);
+    setMessage('sell-message', '');
+  });
   byId('profile-form').addEventListener('submit', saveProfile);
   byId('avatar-form').addEventListener('submit', uploadAvatar);
   byId('remove-avatar').addEventListener('click', removeAvatar);
@@ -1487,9 +1640,12 @@ function init() {
   byId('people-search-form').addEventListener('submit', searchPeople);
   byId('story-form').addEventListener('submit', submitStory);
   byId('live-host-form').addEventListener('submit', startLiveHost);
+  byId('toggle-host-camera').addEventListener('click', () => toggleHostTrack('video'));
+  byId('toggle-host-mic').addEventListener('click', () => toggleHostTrack('audio'));
   byId('stop-live-host').addEventListener('click', () => {
     stopLiveHost().catch((error) => setMessage('host-live-message', error.message, true));
   });
+  byId('live-host-signin').addEventListener('click', () => showAuth());
   document.querySelectorAll('[data-live-chat-form]').forEach((form) => form.addEventListener('submit', sendLiveChat));
   byId('story-previous').addEventListener('click', () => stepStory(-1));
   byId('story-next').addEventListener('click', () => stepStory(1));
@@ -1522,6 +1678,12 @@ function init() {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (event) => {
     if (!localStorage.getItem('dobha-theme')) applyTheme(event.matches ? 'dark' : 'light');
   });
+  if (navigator.mediaDevices?.enumerateDevices) {
+    populateHostDevices().catch((error) => setMessage('host-live-message', error.message, true));
+    navigator.mediaDevices.addEventListener?.('devicechange', () => {
+      populateHostDevices().catch((error) => setMessage('host-live-message', error.message, true));
+    });
+  }
   const categorySelect = byId('sell-form').elements.category;
   categorySelect.innerHTML = categories.slice(1).map((category) => `<option value="${escapeHtml(category)}">${escapeHtml(category)}</option>`).join('');
   byId('location-filter').addEventListener('change', (event) => {
@@ -1536,4 +1698,22 @@ function init() {
   loadProfile();
   loadItems();
 }
+window.DobhaWeb = {
+  api,
+  resolveMedia,
+  money,
+  notify,
+  reportItem,
+  itemAction: (itemId, action, label) => itemAction(itemId, action, label, { openDetail: false }),
+  openProduct(item) {
+    state.items = [item, ...state.items.filter((listing) => listing.id !== item.id)];
+    showProduct(item.id);
+  },
+  viewStories(groups, groupIndex) {
+    state.stories = groups;
+    state.storyQueue = groups.flatMap((group, groupedIndex) =>
+      (group.stories || []).map((story, storyIndex) => ({ groupIndex: groupedIndex, storyIndex, group, story })));
+    openStory(groupIndex);
+  },
+};
 init();

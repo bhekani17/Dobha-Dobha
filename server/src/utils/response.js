@@ -2,10 +2,10 @@
 
 const allowedWebOrigin = (process.env.ALLOWED_WEB_ORIGINS || '').trim();
 const CORS_HEADERS = {
-  ...(allowedWebOrigin && allowedWebOrigin !== '*'
+  ...(allowedWebOrigin
     ? {
         'Access-Control-Allow-Origin': allowedWebOrigin,
-        Vary: 'Origin',
+        ...(allowedWebOrigin === '*' ? {} : { Vary: 'Origin' }),
       }
     : {}),
   'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token',
