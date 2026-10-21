@@ -5,8 +5,8 @@ This directory contains the React/Vite website, built to static files for hostin
 The homepage uses credited, optimized Johannesburg photography; see
 [the image credits](./ASSETS.md). Product photos and videos, profile images,
 and stories are member-uploaded rather than fabricated. Listing uploads use
-short-lived S3 pre-signed PUT URLs, with up to three product videos (up to 60
-seconds each) and up to 10 media files per listing.
+short-lived S3 pre-signed PUT URLs, with multiple photos and at most one
+product video (up to 60 seconds), capped at 10 media files per listing.
 
 The Discover page displays listing photos and videos. Community members can
 follow one another, and signed-in members have a live studio with camera and

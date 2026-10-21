@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { normalizeListingMedia, formatMediaReferences } = require('../src/items/handler.js');
+const {
+  normalizeListingMedia,
+  formatMediaReferences,
+  validateListingMedia,
+} = require('../src/items/handler.js');
 
 describe('listing media normalization', () => {
   it('separates uploaded product photos and video keys', () => {
@@ -37,9 +41,27 @@ describe('listing media normalization', () => {
         video_urls: ['uploads/user/clip-one.mp4', '/media/uploads/user/clip-two.webm'],
       }), {
         photos: ['/media/uploads/user/photo.jpg'],
-        videos: ['/media/uploads/user/clip-one.mp4', '/media/uploads/user/clip-two.webm'],
+        videos: ['/media/uploads/user/clip-one.mp4'],
       });
     });
+  });
+
+  it('accepts multiple photos with one optional product video', () => {
+    assert.equal(validateListingMedia({
+      photos: ['photo-one.jpg', 'photo-two.jpg', 'photo-three.jpg'],
+      videoUrls: ['/media/uploads/user/clip.mp4'],
+    }), null);
+    assert.equal(validateListingMedia({
+      photos: ['photo-one.jpg', 'photo-two.jpg'],
+      videoUrls: [],
+    }), null);
+  });
+
+  it('rejects listings with more than one product video', () => {
+    assert.equal(validateListingMedia({
+      photos: ['photo-one.jpg'],
+      videoUrls: ['/media/uploads/user/clip-one.mp4', '/media/uploads/user/clip-two.mp4'],
+    }), 'A listing can have no more than one product video');
   });
 
   it('recognizes video keys from older mobile clients', () => {
@@ -52,19 +74,18 @@ describe('listing media normalization', () => {
     });
   });
 
-  it('preserves all supported product videos', () => {
+  it('preserves multiple photos and one product video', () => {
     const normalized = normalizeListingMedia({
       media: [
         { key: 'uploads/user/front.jpg' },
-        { key: 'uploads/user/clip-one.mp4' },
         { key: 'uploads/user/side.jpg' },
-        { key: 'uploads/user/clip-two.webm' },
+        { key: 'uploads/user/clip.mp4' },
       ],
     });
     assert.deepEqual(normalized, {
       photos: ['/media/uploads/user/front.jpg', '/media/uploads/user/side.jpg'],
-      videoUrls: ['/media/uploads/user/clip-one.mp4', '/media/uploads/user/clip-two.webm'],
-      videoUrl: '/media/uploads/user/clip-one.mp4',
+      videoUrls: ['/media/uploads/user/clip.mp4'],
+      videoUrl: '/media/uploads/user/clip.mp4',
     });
   });
 

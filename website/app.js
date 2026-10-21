@@ -654,8 +654,8 @@ function validateListingMedia(files) {
   if (!files.length) throw new Error('Choose at least one photo.');
   if (files.length > 10) throw new Error('Choose no more than 10 photos and videos.');
   if (!files.some((file) => file.type.startsWith('image/'))) throw new Error('Add at least one photo of the item.');
-  if (files.filter((file) => file.type.startsWith('video/')).length > 3) {
-    throw new Error('Choose no more than three product videos per listing.');
+  if (files.filter((file) => file.type.startsWith('video/')).length > 1) {
+    throw new Error('Choose no more than one product video per listing.');
   }
   for (const file of files) {
     if (!allowedTypes.has(file.type)) throw new Error(`${file.name} is not a supported image or video format.`);

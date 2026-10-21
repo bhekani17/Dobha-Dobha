@@ -19,7 +19,7 @@ function formatMediaReferences(item) {
     : (item.video_url ? [item.video_url] : []);
   return {
     photos: photos.map(mediaUrl).filter(Boolean),
-    videos: videos.map(mediaUrl).filter(Boolean),
+    videos: videos.map(mediaUrl).filter(Boolean).slice(0, 1),
   };
 }
 
@@ -57,6 +57,13 @@ function normalizeListingMedia(body) {
     videoUrls,
     videoUrl: videoUrls[0] || null,
   };
+}
+
+function validateListingMedia({ photos, videoUrls }) {
+  if (!photos.length) return 'At least one product photo is required';
+  if (videoUrls.length > 1) return 'A listing can have no more than one product video';
+  if (photos.length + videoUrls.length > 10) return 'A listing can have no more than 10 media files';
+  return null;
 }
 
 function formatItem(item, seller = null, viewerId = null, isLiked = false, isSaved = false) {
@@ -105,6 +112,7 @@ function formatItem(item, seller = null, viewerId = null, isLiked = false, isSav
 
 exports.normalizeListingMedia = normalizeListingMedia;
 exports.formatMediaReferences = formatMediaReferences;
+exports.validateListingMedia = validateListingMedia;
 
 exports.handler = async (event) => {
   const cors = handleCors(event);
@@ -289,9 +297,8 @@ exports.handler = async (event) => {
 
       if (!title || title.length < 3) return error(400, 'Title must be at least 3 characters');
       if (priceCents < 500) return error(400, 'Price must be at least R5.00');
-      if (!photos.length) return error(400, 'At least one product photo is required');
-      if (videoUrls.length > 3) return error(400, 'A listing can have no more than three product videos');
-      if (photos.length + videoUrls.length > 10) return error(400, 'A listing can have no more than 10 media files');
+      const mediaError = validateListingMedia({ photos, videoUrls });
+      if (mediaError) return error(400, mediaError);
 
       const itemId = id('itm');
       const timestamp = now();
@@ -412,13 +419,8 @@ exports.handler = async (event) => {
       const attrNames = {};
       const attrValues = { ':time': now() };
       const mediaUpdate = Array.isArray(body.media) ? normalizeListingMedia(body) : null;
-      if (mediaUpdate && !mediaUpdate.photos.length) return error(400, 'At least one product photo is required');
-      if (mediaUpdate && mediaUpdate.videoUrls.length > 3) {
-        return error(400, 'A listing can have no more than three product videos');
-      }
-      if (mediaUpdate && mediaUpdate.photos.length + mediaUpdate.videoUrls.length > 10) {
-        return error(400, 'A listing can have no more than 10 media files');
-      }
+      const mediaError = mediaUpdate ? validateListingMedia(mediaUpdate) : null;
+      if (mediaError) return error(400, mediaError);
 
       if (body.title !== undefined) {
         updates.push('#title = :title');
