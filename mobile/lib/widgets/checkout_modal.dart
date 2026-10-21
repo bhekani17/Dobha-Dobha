@@ -7,7 +7,7 @@ import '../theme.dart';
 import 'item_photo.dart';
 import 'ui.dart';
 
-/// Checkout for one piece (optionally at an accepted offer's price) or for the whole cart.
+/// Demo checkout for one piece (optionally at an accepted offer's price) or the cart.
 class CheckoutModal extends StatefulWidget {
   final List<ThriftItem> items;
   final Offer? offer;
@@ -22,7 +22,7 @@ class CheckoutModal extends StatefulWidget {
     );
   }
 
-  /// Buys every available piece in the cart; each becomes its own order.
+  /// Opens the demo checkout for every available piece in the cart.
   static Future<bool?> showCart(BuildContext context) {
     return showModalBottomSheet<bool>(
       context: context,
@@ -36,23 +36,28 @@ class CheckoutModal extends StatefulWidget {
 }
 
 class _CheckoutModalState extends State<CheckoutModal> {
-  String _selectedDelivery = 'PUDO Locker-to-Locker';
-  double _shippingFee = 50.0;
+  String _selectedDelivery = 'Seller-arranged courier';
+  String _selectedPayment = 'PayFast';
+  bool _demoComplete = false;
 
-  // Names and prices must match the server's DELIVERY table.
   final _deliveryOptions = const [
-    {'name': 'PUDO Locker-to-Locker', 'cost': 50.0, 'sub': 'Collect from your nearest smart locker'},
-    {'name': 'Courier Guy Door-to-Door', 'cost': 65.0, 'sub': 'Courier delivery to your address'},
-    {'name': 'Downtown Joburg Safe Hub', 'cost': 0.0, 'sub': 'Free pickup at the Braamfontein hub'},
+    {'name': 'Seller-arranged courier', 'sub': 'Demo only; delivery is not booked'},
+    {'name': 'Uber Direct', 'sub': 'Demo only; provider is not connected'},
+    {'name': 'Courier service', 'sub': 'Demo only; provider is not connected'},
+    {'name': 'Buyer pickup', 'sub': 'Demo only; pickup is not arranged'},
+  ];
+
+  final _paymentOptions = const [
+    {'name': 'PayFast', 'sub': 'Demo only; no payment is taken'},
+    {'name': 'Card payment', 'sub': 'Demo only; no card details requested'},
+    {'name': 'Dobha wallet', 'sub': 'Demo only; no funds are available or moved'},
+    {'name': 'Escrow protection', 'sub': 'Demo only; no funds are held'},
   ];
 
   @override
   Widget build(BuildContext context) {
     final items = widget.items;
     final itemsTotal = widget.offer?.amountZar ?? items.fold<double>(0, (sum, i) => sum + i.priceZar);
-    // Each seller sends their piece separately, so delivery is per piece.
-    final shippingTotal = _shippingFee * items.length;
-    final total = itemsTotal + shippingTotal;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -90,7 +95,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Checkout', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
-                      Text('Review a potential purchase', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+                      Text('Demo checkout · no real purchase', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -146,30 +151,23 @@ class _CheckoutModalState extends State<CheckoutModal> {
                 ],
               ),
             ),
-            if (items.length > 1)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text('Each seller sends their piece separately, so delivery is charged per piece.',
-                    style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
-              ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 16),
 
-            Text('How do you want it?',
+            Text('Delivery option · demo only',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.textSecondary)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             ..._deliveryOptions.map((opt) {
               final isSelected = _selectedDelivery == opt['name'];
-              final cost = opt['cost'] as double;
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: AppButton(
                   selected: isSelected,
-                  radius: 16,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  radius: 14,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   onPressed: () {
                     setState(() {
                       _selectedDelivery = opt['name'] as String;
-                      _shippingFee = cost;
+                      _demoComplete = false;
                     });
                   },
                   child: Row(
@@ -188,39 +186,92 @@ class _CheckoutModalState extends State<CheckoutModal> {
                           ],
                         ),
                       ),
-                      Text(cost == 0 ? 'FREE' : 'R ${cost.toStringAsFixed(0)}${items.length > 1 ? ' each' : ''}',
-                          style: TextStyle(fontWeight: FontWeight.w700, color: cost == 0 ? DobhaColors.green : DobhaColors.text)),
                     ],
                   ),
                 ),
               );
             }),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
+
+            Text('Payment option · demo only',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.textSecondary)),
+            const SizedBox(height: 8),
+            ..._paymentOptions.map((opt) {
+              final isSelected = _selectedPayment == opt['name'];
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: AppButton(
+                  selected: isSelected,
+                  radius: 14,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  onPressed: () {
+                    setState(() {
+                      _selectedPayment = opt['name'] as String;
+                      _demoComplete = false;
+                    });
+                  },
+                  child: Row(
+                    children: [
+                      Icon(isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                          size: 18, color: isSelected ? DobhaColors.green : DobhaColors.muted),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(opt['name'] as String,
+                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.text)),
+                            Text(opt['sub'] as String,
+                                style: TextStyle(fontSize: 11, color: DobhaColors.muted, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
 
             AppWell(
               radius: 14,
               tint: DobhaColors.amber,
-              margin: const EdgeInsets.only(bottom: 16),
+              margin: const EdgeInsets.only(top: 4, bottom: 12),
               child: const Text(
-                'Checkout is unavailable. Dobha does not currently process payments or hold funds. No order will be placed.',
+                'DEMO ONLY. No payment is taken, order is placed, delivery is booked, or wallet/escrow balance changed.',
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
             ),
+
+            if (_demoComplete)
+              AppWell(
+                radius: 14,
+                tint: DobhaColors.green,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'SIMULATED CHECKOUT — NO REAL ORDER\n'
+                  '${items.length} item${items.length == 1 ? '' : 's'} · R ${itemsTotal.toStringAsFixed(2)} subtotal\n'
+                  'Delivery: $_selectedDelivery · Payment: $_selectedPayment\n'
+                  'No provider was contacted and no money or order was created.',
+                  style: const TextStyle(fontWeight: FontWeight.w600, height: 1.45),
+                ),
+              ),
 
             Row(
               children: [
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total', style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
-                    Text('R ${total.toStringAsFixed(0)}', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+                    Text('Items subtotal', style: TextStyle(fontSize: 11, color: DobhaColors.muted)),
+                    Text('R ${itemsTotal.toStringAsFixed(2)}',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
                   ],
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: AppButton(
-                    onPressed: null,
-                    child: const Text('Checkout unavailable'),
+                    color: DobhaColors.green,
+                    onPressed: () => setState(() => _demoComplete = true),
+                    child: const Text('Run checkout demo'),
                   ),
                 ),
               ],

@@ -38,6 +38,14 @@
           }
         },
         {
+          "client_id": "787923055628-n1ffsa7vhu8teavfvhjenb9c48pgfjd2.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dobhadobha.app",
+            "certificate_hash": "0aa62256aff7629155cb21569b0ebebd47357867"
+          }
+        },
+        {
           "client_id": "787923055628-lbq5notkv2hommeurvt6k7sp6o6slliu.apps.googleusercontent.com",
           "client_type": 3
         }
