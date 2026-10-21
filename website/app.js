@@ -384,19 +384,21 @@ async function loadStories() {
   if (!target) return;
   try {
     const { stories } = await api('/api/stories');
-    state.stories = stories || [];
+    state.stories = (stories || []).filter((group) => (group.stories || []).length > 0);
     state.storyQueue = state.stories.flatMap((group, groupIndex) =>
       (group.stories || []).map((story, storyIndex) => ({ groupIndex, storyIndex, group, story })));
+    target.closest('.home-stories')?.classList.toggle('hidden', !state.stories.length);
     target.innerHTML = state.stories.length
       ? state.stories.map((group, index) => `<button class="story-ring" type="button" data-story-group="${index}" aria-label="View ${escapeHtml(group.userName)}'s stories">
           <span>${group.avatarUrl ? `<img src="${escapeHtml(resolveMedia(group.avatarUrl))}" alt="">` : escapeHtml((group.userName || '?').slice(0, 1).toUpperCase())}</span><small>${escapeHtml(group.userName || 'Seller')}</small>
         </button>`).join('')
-      : '<p class="muted">No active stories. Check back when sellers share a new find.</p>';
+      : '';
     target.querySelectorAll('[data-story-group]').forEach((button) => {
       button.addEventListener('click', () => openStory(Number(button.dataset.storyGroup)));
     });
   } catch (error) {
-    target.innerHTML = `<p class="muted">${escapeHtml(error.message)}</p>`;
+    target.closest('.home-stories')?.classList.remove('hidden');
+    target.innerHTML = `<p class="muted" role="status">Stories could not be loaded: ${escapeHtml(error.message)}</p>`;
   }
 }
 function openStory(groupIndex) {
