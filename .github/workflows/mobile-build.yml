@@ -1,0 +1,70 @@
+name: Build and Distribute Mobile App
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      release_notes:
+        description: 'Release notes for Firebase App Distribution'
+        required: false
+        default: 'Automated release from GitHub Actions'
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Get dependencies
+        working-directory: ./mobile
+        run: flutter pub get
+
+      - name: Build APK
+        working-directory: ./mobile
+        run: flutter build apk --release --dart-define-from-file=config/google.json
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools
+
+      - name: Upload to Firebase App Distribution
+        working-directory: ./mobile
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+          RELEASE_NOTES: ${{ github.event.inputs.release_notes || 'Automated release from GitHub Actions' }}
+        run: |
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "FIREBASE_TOKEN secret is required to distribute this build." >&2
+            exit 1
+          fi
+          firebase appdistribution:distribute build/app/outputs/flutter-apk/app-release.apk \
+            --app 1:787923055628:android:4e2787b23f9f600c7f2a29 \
+            --release-notes "$RELEASE_NOTES" \
+            --testers "ndlovubhekani17@gmail.com" \
+            --token "$FIREBASE_TOKEN"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
