@@ -59,6 +59,9 @@ npm ci
 npm test
 ```
 
+No demo seed script is included. Keep shared development data free of sample
+accounts, listings, and balances; use isolated test fixtures instead.
+
 The ECS API foundation and its escrow service tests are documented in
 [ecs-api/README.md](./ecs-api/README.md). It needs Node.js 22 and a generated
 Prisma client. Both backend projects now have committed npm lockfiles and the

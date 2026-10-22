@@ -17,7 +17,7 @@ const helpTopics = [
   HelpTopic('Buying', [
     HelpQuestion(
       'How do I buy a piece?',
-      'Browse listings and add finds to your bag, but checkout is not available yet. Dobha does not currently process payments, create paid orders, or hold funds.',
+      'Browse listings and add finds to your bag. The checkout simulator creates a temporary local demo record only; it does not place an order, process payment, book delivery, or contact the server.',
     ),
     HelpQuestion(
       'Does Dobha hold or protect my money?',
@@ -25,7 +25,7 @@ const helpTopics = [
     ),
     HelpQuestion(
       'Can I ask for a lower price?',
-      'Yes. Tap Make an offer on a listing. The seller can accept, decline or send a counter offer. Accepting an offer does not place an order; checkout is unavailable.',
+      'Yes. Tap Make an offer on a listing. The seller can accept, decline or send a counter offer. Accepting an offer does not place an order; the checkout simulator is not connected to offers.',
     ),
     HelpQuestion(
       'Can I ask the seller a question first?',
@@ -39,7 +39,7 @@ const helpTopics = [
     ),
     HelpQuestion(
       'How do I track an order?',
-      'Paid checkout is unavailable. Older order records may show demo or historical delivery statuses that are not verified by a shipping provider.',
+      'The checkout simulator can create temporary local-only demo statuses; these are not real orders and are not verified by a shipping provider. Historical records are also not proof of delivery.',
     ),
     HelpQuestion(
       'I have a problem with an order record. What now?',
@@ -71,7 +71,7 @@ const helpTopics = [
     ),
     HelpQuestion(
       'Can I complete a sale or arrange delivery here?',
-      'Listings and live video are available, but checkout and delivery services are not integrated. Do not treat a listing or accepted offer as a completed sale.',
+      'Listings and live video are available, but real checkout, payment, and delivery services are not integrated. Simulator activity does not complete a sale; do not treat a listing or accepted offer as a completed sale.',
     ),
     HelpQuestion(
       'Can I go live?',
@@ -81,11 +81,11 @@ const helpTopics = [
   HelpTopic('Wallet and payouts', [
     HelpQuestion(
       'How do I withdraw my money?',
-      'Real withdrawals are unavailable. The wallet can record a simulated withdrawal for demo purposes only; it does not send money or ask for bank details. Wallet balances are not spendable funds held by Dobha.',
+      'Real withdrawals are unavailable. You can try the temporary demo withdrawal using a local demo balance; it cannot send payouts or request bank details. Historical wallet balances are not spendable funds held by Dobha.',
     ),
     HelpQuestion(
       'What do the displayed balances mean?',
-      'They may reflect historical or demo records only. Dobha does not currently accept deposits, hold escrow funds, or make payouts.',
+      'The account balance is historical only and does not mean money was deposited, held, or is payable by Dobha. A separate demo balance can be simulated temporarily on your device; it clears when you sign out or restart the app.',
     ),
   ]),
   HelpTopic('Account and safety', [

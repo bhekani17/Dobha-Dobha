@@ -5,6 +5,38 @@ const { json, error, handleCors, parseBody } = require('../utils/response');
 const { getUser, requireUser } = require('../utils/auth');
 const { id, now, zar, toCents } = require('../utils/id');
 
+function formatPeer(user, id) {
+  return user
+    ? {
+        id: user.id,
+        name: user.shop_name || user.name,
+        handle: user.handle || '',
+        avatarUrl: user.avatar_key ? `/media/${user.avatar_key}` : (user.avatar_url || null),
+      }
+    : { id, name: 'Dobha User', handle: '', avatarUrl: null };
+}
+
+function formatMessage(message, viewerId, item = null) {
+  return {
+    id: message.id,
+    senderId: message.sender_id,
+    recipientId: message.recipient_id,
+    text: message.text,
+    fromMe: message.sender_id === viewerId,
+    createdAt: new Date(message.created_at).toISOString(),
+    ...(item
+      ? {
+          item: {
+            id: item.id,
+            title: item.title,
+            priceZar: Number(((item.price_cents || 0) / 100).toFixed(2)),
+            photoUrl: item.photos?.[0] || (item.photo_keys?.[0] ? `/media/${item.photo_keys[0]}` : null),
+          },
+        }
+      : {}),
+  };
+}
+
 exports.handler = async (event) => {
   const cors = handleCors(event);
   if (cors) return cors;
@@ -537,41 +569,48 @@ exports.handler = async (event) => {
     // -------------------------------------------------------------
     if (path === '/api/chats' && method === 'GET') {
       const authUser = await requireUser(event);
-      const res = await dynamo.query({
-        TableName: messagesTable,
-        IndexName: 'PairIndex',
-        KeyConditionExpression: 'sender_id = :uid',
-        ExpressionAttributeValues: { ':uid': authUser.id },
-        Limit: 50,
-      });
+      const [sent, received] = await Promise.all([
+        dynamo.query({
+          TableName: messagesTable,
+          IndexName: 'PairIndex',
+          KeyConditionExpression: 'sender_id = :uid',
+          ExpressionAttributeValues: { ':uid': authUser.id },
+          Limit: 100,
+        }),
+        dynamo.query({
+          TableName: messagesTable,
+          IndexName: 'RecipientIndex',
+          KeyConditionExpression: 'recipient_id = :uid',
+          ExpressionAttributeValues: { ':uid': authUser.id },
+          Limit: 100,
+        }),
+      ]);
 
-      // Find distinct peer conversation IDs
-      const chatsMap = new Map();
-      for (const m of res.items) {
-        const peerId = m.recipient_id;
-        if (!chatsMap.has(peerId)) {
-          chatsMap.set(peerId, m);
-        }
+      const conversations = new Map();
+      for (const message of [...sent.items, ...received.items]) {
+        const peerId = message.sender_id === authUser.id ? message.recipient_id : message.sender_id;
+        if (!peerId || peerId === authUser.id) continue;
+        const current = conversations.get(peerId) || { unread: 0 };
+        if (!current.latest || message.created_at > current.latest.created_at) current.latest = message;
+        if (message.recipient_id === authUser.id && !message.read_at) current.unread++;
+        conversations.set(peerId, current);
       }
 
-      const chats = [];
-      for (const [peerId, lastMsg] of chatsMap.entries()) {
-        const peer = await dynamo.get(usersTable, { id: peerId });
-        chats.push({
-          id: peerId,
-          peer: peer
-            ? {
-                id: peer.id,
-                name: peer.shop_name || peer.name,
-                handle: peer.handle,
-                avatarUrl: peer.avatar_key ? `/media/${peer.avatar_key}` : (peer.avatar_url || null),
-              }
-            : { id: peerId, name: 'Dobha User' },
-          lastMessage: lastMsg.text,
-          lastMessageAt: new Date(lastMsg.created_at).toISOString(),
-        });
-      }
-
+      const chats = await Promise.all([...conversations.entries()].map(async ([peerId, conversation]) => {
+        const peer = formatPeer(await dynamo.get(usersTable, { id: peerId }), peerId);
+        const latest = conversation.latest;
+        return {
+          userId: peer.id,
+          name: peer.name,
+          handle: peer.handle,
+          avatarUrl: peer.avatarUrl,
+          lastMessage: latest?.text || '',
+          lastFromMe: latest?.sender_id === authUser.id,
+          unread: conversation.unread,
+          updatedAt: new Date(latest?.created_at || 0).toISOString(),
+        };
+      }));
+      chats.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
       return json(200, { chats });
     }
 
@@ -579,61 +618,71 @@ exports.handler = async (event) => {
     if (chatMatch) {
       const authUser = await requireUser(event);
       const peerId = chatMatch[1];
+      if (peerId === authUser.id) return error(400, 'You cannot message yourself');
+      const peerUser = await dynamo.get(usersTable, { id: peerId });
+      if (!peerUser || peerUser.is_deleted) return error(404, 'User not found');
+      const peer = formatPeer(peerUser, peerId);
 
       if (method === 'GET') {
-        const sent = await dynamo.query({
+        const [sent, received] = await Promise.all([dynamo.query({
           TableName: messagesTable,
           IndexName: 'PairIndex',
           KeyConditionExpression: 'sender_id = :sid AND recipient_id = :rid',
           ExpressionAttributeValues: { ':sid': authUser.id, ':rid': peerId },
-          Limit: 50,
-        });
-        const received = await dynamo.query({
+          Limit: 100,
+        }), dynamo.query({
           TableName: messagesTable,
           IndexName: 'PairIndex',
           KeyConditionExpression: 'sender_id = :sid AND recipient_id = :rid',
           ExpressionAttributeValues: { ':sid': peerId, ':rid': authUser.id },
-          Limit: 50,
-        });
+          Limit: 100,
+        })]);
 
         const all = [...sent.items, ...received.items];
         all.sort((a, b) => (a.created_at || 0) - (b.created_at || 0));
+        const unread = all.filter((message) => message.recipient_id === authUser.id && !message.read_at);
+        await Promise.all(unread.map((message) => dynamo.update({
+          TableName: messagesTable,
+          Key: { id: message.id },
+          UpdateExpression: 'SET read_at = :time',
+          ExpressionAttributeValues: { ':time': now() },
+        })));
 
         return json(200, {
-          messages: all.map((m) => ({
-            id: m.id,
-            senderId: m.sender_id,
-            recipientId: m.recipient_id,
-            text: m.text,
-            isMe: m.sender_id === authUser.id,
-            createdAt: new Date(m.created_at).toISOString(),
+          with: peer,
+          messages: await Promise.all(all.map(async (message) => {
+            const item = message.item_id ? await dynamo.get(itemsTable, { id: message.item_id }) : null;
+            return formatMessage(message, authUser.id, item);
           })),
         });
       }
 
       if (method === 'POST') {
         const body = parseBody(event);
-        const text = (body.text || body.message || '').trim();
+        const text = typeof body.text === 'string'
+          ? body.text.trim()
+          : typeof body.message === 'string' ? body.message.trim() : '';
         if (!text) return error(400, 'Message text is required');
+        if (text.length > 1000) return error(400, 'Message must be 1000 characters or fewer');
 
         const messageId = id('msg');
         const timestamp = now();
+        const itemId = typeof body.itemId === 'string' ? body.itemId.trim() : '';
+        const item = itemId ? await dynamo.get(itemsTable, { id: itemId }) : null;
+        if (itemId && !item) return error(404, 'Item not found');
         const msg = {
           id: messageId,
           sender_id: authUser.id,
           recipient_id: peerId,
           text,
+          ...(itemId ? { item_id: itemId } : {}),
           created_at: timestamp,
           read_at: 0,
         };
 
         await dynamo.put(messagesTable, msg);
         return json(201, {
-          message: {
-            ...msg,
-            isMe: true,
-            createdAt: new Date(timestamp).toISOString(),
-          },
+          message: formatMessage(msg, authUser.id, item),
         });
       }
     }

@@ -26,16 +26,22 @@ Future<void> toggleCart(BuildContext context, ThriftItem item) async {
   try {
     if (item.inCart) {
       await AppState().removeFromCart(item.id);
-      messenger.showSnackBar(const SnackBar(content: Text('Removed from your cart')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Removed from your cart')),
+      );
     } else {
       await AppState().addToCart(item);
-      messenger.showSnackBar(SnackBar(
-        content: const Text('Added to your cart'),
-        action: SnackBarAction(
-          label: 'View',
-          onPressed: () => navigator.push(MaterialPageRoute(builder: (_) => const CartScreen())),
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Added to your cart'),
+          action: SnackBarAction(
+            label: 'View',
+            onPressed: () => navigator.push(
+              MaterialPageRoute(builder: (_) => const CartScreen()),
+            ),
+          ),
         ),
-      ));
+      );
     }
   } on ApiException catch (e) {
     messenger.showSnackBar(SnackBar(content: Text(e.message)));
@@ -43,8 +49,9 @@ Future<void> toggleCart(BuildContext context, ThriftItem item) async {
 }
 
 /// "Shop name · 4.8" (or just the name before anyone has rated them).
-String sellerLine(ThriftItem item) =>
-    item.sellerRating == null ? item.sellerName : '${item.sellerName} · ${item.sellerRating!.toStringAsFixed(1)} stars';
+String sellerLine(ThriftItem item) => item.sellerRating == null
+    ? item.sellerName
+    : '${item.sellerName} · ${item.sellerRating!.toStringAsFixed(1)} stars';
 
 class FeedScreen extends StatefulWidget {
   const FeedScreen({super.key});
@@ -87,7 +94,10 @@ class _FeedScreenState extends State<FeedScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(child: LiveNowRow()),
-                        Padding(padding: EdgeInsets.only(right: 12), child: CartButton(overlay: true)),
+                        Padding(
+                          padding: EdgeInsets.only(right: 12),
+                          child: CartButton(overlay: true),
+                        ),
                       ],
                     ),
                   ),
@@ -98,9 +108,7 @@ class _FeedScreenState extends State<FeedScreen> {
                 top: 88,
                 left: 0,
                 right: 0,
-                child: SafeArea(
-                  child: StoriesRow(),
-                ),
+                child: SafeArea(child: StoriesRow()),
               ),
             ],
           ),
@@ -116,9 +124,14 @@ class _FeedScreenState extends State<FeedScreen> {
         child: state.feedLoading
             ? Center(child: CircularProgressIndicator(color: DobhaColors.green))
             : _FeedMessage(
-                icon: state.feedError != null ? Icons.wifi_off_rounded : Icons.checkroom_rounded,
-                title: state.feedError != null ? 'Could not load drops' : 'No drops yet',
-                text: state.feedError ??
+                icon: state.feedError != null
+                    ? Icons.wifi_off_rounded
+                    : Icons.checkroom_rounded,
+                title: state.feedError != null
+                    ? 'Could not load drops'
+                    : 'No drops yet',
+                text:
+                    state.feedError ??
                     (state.isVendor
                         ? 'Be the first: list a piece from the Sell tab.'
                         : 'Sellers have not listed anything yet. Check back soon.'),
@@ -136,7 +149,8 @@ class _FeedScreenState extends State<FeedScreen> {
         scrollDirection: Axis.vertical,
         itemCount: items.length,
         onPageChanged: (i) => setState(() => _current = i),
-        itemBuilder: (context, index) => _ReelItemCard(item: items[index], active: index == _current),
+        itemBuilder: (context, index) =>
+            _ReelItemCard(item: items[index], active: index == _current),
       ),
     );
   }
@@ -148,7 +162,12 @@ class _FeedMessage extends StatelessWidget {
   final String text;
   final VoidCallback onRetry;
 
-  const _FeedMessage({required this.icon, required this.title, required this.text, required this.onRetry});
+  const _FeedMessage({
+    required this.icon,
+    required this.title,
+    required this.text,
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -158,11 +177,26 @@ class _FeedMessage extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AppWell(circle: true, padding: const EdgeInsets.all(22), child: Icon(icon, size: 40, color: DobhaColors.muted)),
+            AppWell(
+              circle: true,
+              padding: const EdgeInsets.all(22),
+              child: Icon(icon, size: 40, color: DobhaColors.muted),
+            ),
             const SizedBox(height: 18),
-            Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(text, textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted, height: 1.4)),
+            Text(
+              text,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: DobhaColors.muted, height: 1.4),
+            ),
             const SizedBox(height: 20),
             AppButton(onPressed: onRetry, child: const Text('Refresh')),
           ],
@@ -188,7 +222,8 @@ class _ReelItemCard extends StatefulWidget {
 class _ReelItemCardState extends State<_ReelItemCard> {
   bool _showHeartAnim = false;
 
-  void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _snack(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _run(Future<void> Function() action) async {
     try {
@@ -219,7 +254,10 @@ class _ReelItemCardState extends State<_ReelItemCard> {
           onDoubleTap: _onDoubleTap,
           child: widget.heroTag == null
               ? MediaCarousel(item: item, active: widget.active)
-              : Hero(tag: widget.heroTag!, child: MediaCarousel(item: item, active: widget.active)),
+              : Hero(
+                  tag: widget.heroTag!,
+                  child: MediaCarousel(item: item, active: widget.active),
+                ),
         ),
         // Soft fades top and bottom keep the text over the photo readable without boxes.
         const PhotoScrim(top: true),
@@ -231,7 +269,11 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                 duration: const Duration(milliseconds: 400),
                 builder: (context, scale, child) => Transform.scale(
                   scale: scale,
-                  child: Icon(Icons.favorite, color: DobhaColors.green, size: 110),
+                  child: Icon(
+                    Icons.favorite,
+                    color: DobhaColors.green,
+                    size: 110,
+                  ),
                 ),
               ),
             ),
@@ -267,8 +309,15 @@ class _ReelItemCardState extends State<_ReelItemCard> {
             onTap: () => SellerScreen.open(context, item.sellerId),
             child: Container(
               padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(color: DobhaColors.green, shape: BoxShape.circle),
-              child: UserAvatar(url: item.sellerAvatarUrl, name: item.sellerName, size: 46),
+              decoration: BoxDecoration(
+                color: DobhaColors.green,
+                shape: BoxShape.circle,
+              ),
+              child: UserAvatar(
+                url: item.sellerAvatarUrl,
+                name: item.sellerName,
+                size: 46,
+              ),
             ),
           ),
         ),
@@ -332,7 +381,10 @@ class _ReelItemCardState extends State<_ReelItemCard> {
             if (!isMine)
               ListTile(
                 leading: Icon(Icons.flag_outlined, color: DobhaColors.red),
-                title: Text('Report listing', style: TextStyle(color: DobhaColors.red)),
+                title: Text(
+                  'Report listing',
+                  style: TextStyle(color: DobhaColors.red),
+                ),
                 onTap: () => Navigator.of(ctx).pop('report'),
               ),
             const SizedBox(height: 8),
@@ -345,7 +397,12 @@ class _ReelItemCardState extends State<_ReelItemCard> {
       case 'details':
         ItemInfoSheet.show(context, item);
       case 'share':
-        Clipboard.setData(ClipboardData(text: '${item.title} (${item.formattedPrice}) from ${item.sellerName} on Dobha Dobha'));
+        Clipboard.setData(
+          ClipboardData(
+            text:
+                '${item.title} (${item.formattedPrice}) from ${item.sellerName} on Dobha Dobha',
+          ),
+        );
         _snack('Copied, paste it anywhere to share');
       case 'report':
         _report(item);
@@ -364,17 +421,35 @@ class _ReelItemCardState extends State<_ReelItemCard> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
-              child: Text('Report this listing', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: -0.3)),
+              child: Text(
+                'Report this listing',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 17,
+                  letterSpacing: -0.3,
+                ),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Text('It will be hidden for you and reviewed by the Dobha team.',
-                  style: TextStyle(fontSize: 13, color: DobhaColors.muted)),
+              child: Text(
+                'It will be hidden for you and reviewed by the Dobha team.',
+                style: TextStyle(fontSize: 13, color: DobhaColors.muted),
+              ),
             ),
             for (final r in AppState.reportReasons)
               ListTile(
-                title: Text(r, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                trailing: Icon(Icons.chevron_right_rounded, color: DobhaColors.muted),
+                title: Text(
+                  r,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                trailing: Icon(
+                  Icons.chevron_right_rounded,
+                  color: DobhaColors.muted,
+                ),
                 onTap: () => Navigator.of(ctx).pop(r),
               ),
             const SizedBox(height: 8),
@@ -389,7 +464,9 @@ class _ReelItemCardState extends State<_ReelItemCard> {
     final fullScreen = widget.heroTag != null;
     try {
       await AppState().reportItem(item.id, reason);
-      messenger.showSnackBar(const SnackBar(content: Text('Thanks, the Dobha team will review it')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Thanks, the Dobha team will review it')),
+      );
       // Opened full screen from a grid: the listing is gone for this user, so leave it.
       if (fullScreen && navigator.canPop()) navigator.pop();
     } on ApiException catch (e) {
@@ -400,7 +477,11 @@ class _ReelItemCardState extends State<_ReelItemCard> {
   Widget _details(ThriftItem item) {
     final isMine = AppState().user.id == item.sellerId;
     const shadow = [Shadow(color: Colors.black45, blurRadius: 8)];
-    final meta = ['Size ${item.size}', item.condition, item.stockLabel].where((s) => s.isNotEmpty).join('  ·  ');
+    final meta = [
+      'Size ${item.size}',
+      item.condition,
+      item.stockLabel,
+    ].where((s) => s.isNotEmpty).join('  ·  ');
     return DefaultTextStyle.merge(
       style: const TextStyle(color: Colors.white, shadows: shadow),
       child: Column(
@@ -417,24 +498,47 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                   onTap: () => SellerScreen.open(context, item.sellerId),
                   child: Text(
                     sellerLine(item),
-                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: Colors.white.withValues(alpha: 0.85),
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(item.title,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: -0.4),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  item.title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                    letterSpacing: -0.4,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 4),
-                Text(meta,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.75))),
+                Text(
+                  meta,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.white.withValues(alpha: 0.75),
+                  ),
+                ),
                 const SizedBox(height: 10),
-                Text(item.formattedPrice,
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.8, height: 1.1)),
+                Text(
+                  item.formattedPrice,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.8,
+                    height: 1.1,
+                  ),
+                ),
               ],
             ),
           ),
@@ -447,9 +551,16 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                   child: AppButton(
                     color: isMine ? Colors.white : DobhaColors.green,
                     radius: 14,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
-                    onPressed: isMine ? () => NewListingScreen.open(context, editing: item) : () => CheckoutModal.show(context, item),
-                    child: Text(isMine ? 'Edit listing' : 'Buy now'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 15,
+                    ),
+                    onPressed: isMine
+                        ? () => NewListingScreen.open(context, editing: item)
+                        : () => CheckoutModal.show(context, item),
+                    child: Text(
+                      isMine ? 'Edit listing' : 'Try checkout simulator',
+                    ),
                   ),
                 ),
                 if (!isMine) ...[
@@ -458,8 +569,13 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                     label: item.inCart ? 'Remove from cart' : 'Add to cart',
                     child: _GlassButton(
                       onTap: () => toggleCart(context, item),
-                      child: Icon(item.inCart ? Icons.shopping_bag_rounded : Icons.shopping_bag_outlined,
-                          size: 22, color: item.inCart ? DobhaColors.green : Colors.white),
+                      child: Icon(
+                        item.inCart
+                            ? Icons.shopping_bag_rounded
+                            : Icons.shopping_bag_outlined,
+                        size: 22,
+                        color: item.inCart ? DobhaColors.green : Colors.white,
+                      ),
                     ),
                   ),
                 ],
@@ -503,7 +619,8 @@ class ItemInfoSheet extends StatelessWidget {
   final ThriftItem item;
   const ItemInfoSheet({super.key, required this.item});
 
-  static Future<void> show(BuildContext context, ThriftItem item) => showModalBottomSheet(
+  static Future<void> show(BuildContext context, ThriftItem item) =>
+      showModalBottomSheet(
         context: context,
         isScrollControlled: true,
         backgroundColor: DobhaColors.surface,
@@ -513,94 +630,180 @@ class ItemInfoSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(listenable: AppState(), builder: (context, _) => _build(context));
+    return ListenableBuilder(
+      listenable: AppState(),
+      builder: (context, _) => _build(context),
+    );
   }
 
   Widget _build(BuildContext context) {
     final state = AppState();
-    final item = [...state.feedItems, ...state.searchResults, ...state.savedItems, ...state.cart]
-            .where((i) => i.id == this.item.id)
-            .firstOrNull ??
+    final item =
+        [
+          ...state.feedItems,
+          ...state.searchResults,
+          ...state.savedItems,
+          ...state.cart,
+        ].where((i) => i.id == this.item.id).firstOrNull ??
         this.item;
     final isMine = state.user.id == item.sellerId;
     Widget row(String label, String value) => Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: 92, child: Text(label, style: TextStyle(color: DobhaColors.muted, fontSize: 14))),
-              Expanded(child: Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600))),
-            ],
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: TextStyle(color: DobhaColors.muted, fontSize: 14),
+            ),
           ),
-        );
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
     return SafeArea(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(item.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+              Text(
+                item.title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(item.formattedPrice, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: DobhaColors.green, letterSpacing: -0.3)),
+              Text(
+                item.formattedPrice,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  color: DobhaColors.green,
+                  letterSpacing: -0.3,
+                ),
+              ),
               if (item.originalPriceZar != null)
-                Text('Was ${item.formattedOriginalPrice}',
-                    style: TextStyle(fontSize: 13, color: DobhaColors.muted, decoration: TextDecoration.lineThrough)),
+                Text(
+                  'Was ${item.formattedOriginalPrice}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: DobhaColors.muted,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
               if (item.haulCaption.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Text(item.haulCaption, style: TextStyle(fontSize: 14, color: DobhaColors.textSecondary, height: 1.4)),
+                Text(
+                  item.haulCaption,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: DobhaColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
               ],
               const SizedBox(height: 16),
               row('Size', item.size),
               if (item.quantity > 1) row('In stock', '${item.quantity}'),
               row('Condition', item.condition),
               row('Category', item.category),
-              if (item.sellerLocation.isNotEmpty) row('Stall', item.sellerLocation),
+              if (item.sellerLocation.isNotEmpty)
+                row('Stall', item.sellerLocation),
               const SizedBox(height: 4),
               AppCard(
                 radius: 14,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   SellerScreen.open(context, item.sellerId);
                 },
                 child: Row(
                   children: [
-                    UserAvatar(url: item.sellerAvatarUrl, name: item.sellerName, size: 36),
+                    UserAvatar(
+                      url: item.sellerAvatarUrl,
+                      name: item.sellerName,
+                      size: 36,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item.sellerName, style: const TextStyle(fontWeight: FontWeight.w700)),
+                          Text(
+                            item.sellerName,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
                           Text(
                             item.sellerRating == null
                                 ? 'No ratings yet'
                                 : '${item.sellerRating!.toStringAsFixed(1)} stars from ${item.sellerReviewCount} buyers',
-                            style: TextStyle(fontSize: 12, color: DobhaColors.muted),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: DobhaColors.muted,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    Text('View shop', style: TextStyle(color: DobhaColors.green, fontWeight: FontWeight.w600, fontSize: 13)),
+                    Text(
+                      'View shop',
+                      style: TextStyle(
+                        color: DobhaColors.green,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                   ],
                 ),
               ),
               if (item.description.isNotEmpty) ...[
                 const SizedBox(height: 8),
-                Text(item.description, style: TextStyle(fontSize: 14, color: DobhaColors.textSecondary, height: 1.45)),
+                Text(
+                  item.description,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: DobhaColors.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
               ],
               const SizedBox(height: 14),
               AppWell(
                 radius: 14,
                 child: Row(
                   children: [
-                    Icon(Icons.verified_user_outlined, size: 18, color: DobhaColors.green),
+                    Icon(
+                      Icons.verified_user_outlined,
+                      size: 18,
+                      color: DobhaColors.green,
+                    ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text('Checkout is unavailable. Dobha does not currently process payments or hold funds.',
-                          style: TextStyle(fontSize: 13, color: DobhaColors.textSecondary, height: 1.35)),
+                      child: Text(
+                        'Checkout is unavailable. Dobha does not currently process payments or hold funds.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: DobhaColors.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -613,7 +816,10 @@ class ItemInfoSheet extends StatelessWidget {
                     Navigator.of(context).pop();
                     CheckoutModal.show(context, item);
                   },
-                  child: Text('Buy for ${item.formattedPrice}', style: const TextStyle(fontSize: 15)),
+                  child: const Text(
+                    'Try checkout simulator',
+                    style: TextStyle(fontSize: 15),
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Row(
@@ -622,7 +828,9 @@ class ItemInfoSheet extends StatelessWidget {
                       child: AppButton(
                         selected: item.inCart,
                         onPressed: () => toggleCart(context, item),
-                        child: Text(item.inCart ? 'In your cart' : 'Add to cart'),
+                        child: Text(
+                          item.inCart ? 'In your cart' : 'Add to cart',
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -641,7 +849,12 @@ class ItemInfoSheet extends StatelessWidget {
                 TextButton.icon(
                   onPressed: () {
                     Navigator.of(context).pop();
-                    ChatScreen.open(context, userId: item.sellerId, name: item.sellerName, about: item);
+                    ChatScreen.open(
+                      context,
+                      userId: item.sellerId,
+                      name: item.sellerName,
+                      about: item,
+                    );
                   },
                   icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
                   label: const Text('Ask the seller a question'),
@@ -662,12 +875,15 @@ class ItemDetailScreen extends StatelessWidget {
   const ItemDetailScreen({super.key, required this.item});
 
   static Future<void> open(BuildContext context, ThriftItem item) {
-    return Navigator.of(context).push(PageRouteBuilder(
-      transitionDuration: const Duration(milliseconds: 320),
-      reverseTransitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (_, _, _) => ItemDetailScreen(item: item),
-      transitionsBuilder: (_, animation, _, child) => FadeTransition(opacity: animation, child: child),
-    ));
+    return Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 260),
+        pageBuilder: (_, _, _) => ItemDetailScreen(item: item),
+        transitionsBuilder: (_, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
   }
 
   @override
@@ -676,16 +892,24 @@ class ItemDetailScreen extends StatelessWidget {
       listenable: AppState(),
       builder: (context, _) {
         final state = AppState();
-        final latest = [...state.feedItems, ...state.searchResults, ...state.savedItems, ...state.vendorInventory]
-                .where((i) => i.id == item.id)
-                .firstOrNull ??
+        final latest =
+            [
+              ...state.feedItems,
+              ...state.searchResults,
+              ...state.savedItems,
+              ...state.vendorInventory,
+            ].where((i) => i.id == item.id).firstOrNull ??
             item;
         return Scaffold(
           backgroundColor: Colors.black,
           body: Stack(
             fit: StackFit.expand,
             children: [
-              _ReelItemCard(item: latest, active: true, heroTag: 'item-${item.id}'),
+              _ReelItemCard(
+                item: latest,
+                active: true,
+                heroTag: 'item-${item.id}',
+              ),
               SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
@@ -714,7 +938,11 @@ class CommentsSheet extends StatefulWidget {
   const CommentsSheet({super.key, required this.item});
 
   static Future<void> show(BuildContext context, ThriftItem item) {
-    return showModalBottomSheet(context: context, isScrollControlled: true, builder: (_) => CommentsSheet(item: item));
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => CommentsSheet(item: item),
+    );
   }
 
   @override
@@ -757,7 +985,10 @@ class _CommentsSheetState extends State<CommentsSheet> {
       _ctrl.clear();
       if (mounted) setState(() => _comments = [c, ...?_comments]);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -767,19 +998,37 @@ class _CommentsSheetState extends State<CommentsSheet> {
   Widget build(BuildContext context) {
     final comments = _comments;
     return Padding(
-      padding: EdgeInsets.only(left: 20, right: 20, top: 20, bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.7),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(
               children: [
-                Text('Comments${comments == null ? '' : ' (${comments.length})'}',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, letterSpacing: -0.3)),
+                Text(
+                  'Comments${comments == null ? '' : ' (${comments.length})'}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                    letterSpacing: -0.3,
+                  ),
+                ),
                 const Spacer(),
-                AppButton.icon(icon: Icons.close, size: 18, padding: 8, onPressed: () => Navigator.of(context).pop()),
+                AppButton.icon(
+                  icon: Icons.close,
+                  size: 18,
+                  padding: 8,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -789,17 +1038,30 @@ class _CommentsSheetState extends State<CommentsSheet> {
                       padding: const EdgeInsets.all(24),
                       child: Center(
                         child: _error != null
-                            ? Text(_error!, style: TextStyle(color: DobhaColors.muted))
-                            : CircularProgressIndicator(color: DobhaColors.green),
+                            ? Text(
+                                _error!,
+                                style: TextStyle(color: DobhaColors.muted),
+                              )
+                            : CircularProgressIndicator(
+                                color: DobhaColors.green,
+                              ),
                       ),
                     )
                   : comments.isEmpty
-                      ? Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Text('No comments yet. Ask the seller about fit or condition.',
-                              textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted)),
-                        )
-                      : ListView(shrinkWrap: true, children: [for (final c in comments) _Comment(comment: c)]),
+                  ? Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text(
+                        'No comments yet. Ask the seller about fit or condition.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: DobhaColors.muted),
+                      ),
+                    )
+                  : ListView(
+                      shrinkWrap: true,
+                      children: [
+                        for (final c in comments) _Comment(comment: c),
+                      ],
+                    ),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -810,7 +1072,14 @@ class _CommentsSheetState extends State<CommentsSheet> {
                 hintText: 'Ask the seller about fit or condition...',
                 suffixIcon: IconButton(
                   icon: _sending
-                      ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: DobhaColors.green))
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: DobhaColors.green,
+                          ),
+                        )
                       : Icon(Icons.send_rounded, color: DobhaColors.green),
                   onPressed: _send,
                 ),
@@ -841,8 +1110,13 @@ class _Comment extends StatelessWidget {
             height: 38,
             padding: EdgeInsets.zero,
             child: Center(
-              child: Text(comment.name.isEmpty ? '?' : comment.name[0].toUpperCase(),
-                  style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green)),
+              child: Text(
+                comment.name.isEmpty ? '?' : comment.name[0].toUpperCase(),
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: DobhaColors.green,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -851,11 +1125,25 @@ class _Comment extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 GestureDetector(
-                  onTap: comment.userId == null ? null : () => SellerScreen.open(context, comment.userId!),
-                  child: Text(comment.handle, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  onTap: comment.userId == null
+                      ? null
+                      : () => SellerScreen.open(context, comment.userId!),
+                  child: Text(
+                    comment.handle,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 2),
-                Text(comment.text, style: TextStyle(color: DobhaColors.textSecondary, fontSize: 13)),
+                Text(
+                  comment.text,
+                  style: TextStyle(
+                    color: DobhaColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
               ],
             ),
           ),
@@ -886,15 +1174,23 @@ class _SidebarAction extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         children: [
-          OverlayIconButton(icon: icon, color: iconColor, tooltip: tooltip, onTap: onTap, size: 26),
+          OverlayIconButton(
+            icon: icon,
+            color: iconColor,
+            tooltip: tooltip,
+            onTap: onTap,
+            size: 26,
+          ),
           const SizedBox(height: 2),
-          Text(label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
-              )),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              shadows: [Shadow(color: Colors.black54, blurRadius: 6)],
+            ),
+          ),
         ],
       ),
     );

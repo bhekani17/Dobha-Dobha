@@ -29,7 +29,8 @@ class _StudioScreenState extends State<StudioScreen> {
     super.dispose();
   }
 
-  void _snack(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _snack(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _goLive() async {
     final appState = AppState();
@@ -49,7 +50,12 @@ class _StudioScreenState extends State<StudioScreen> {
             host: true,
             initialPin: pinned == null || pinned.isClaimed
                 ? null
-                : PinnedItem(id: pinned.id, title: pinned.title, price: pinned.formattedPrice, size: pinned.size),
+                : PinnedItem(
+                    id: pinned.id,
+                    title: pinned.title,
+                    price: pinned.formattedPrice,
+                    size: pinned.size,
+                  ),
           ),
         ),
       );
@@ -69,9 +75,15 @@ class _StudioScreenState extends State<StudioScreen> {
         title: const Text('Remove listing?'),
         content: Text('"${item.title}" will no longer be shown to shoppers.'),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: DobhaColors.red, foregroundColor: Colors.white),
+            style: FilledButton.styleFrom(
+              backgroundColor: DobhaColors.red,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text('Remove'),
           ),
@@ -111,18 +123,33 @@ class _StudioScreenState extends State<StudioScreen> {
               circle: true,
               padding: EdgeInsets.all(22),
               tint: DobhaColors.green,
-              child: Icon(Icons.storefront_rounded, size: 40, color: DobhaColors.green),
+              child: Icon(
+                Icons.storefront_rounded,
+                size: 40,
+                color: DobhaColors.green,
+              ),
             ),
             const SizedBox(height: 20),
-            const Text('Sell on Dobha', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+            const Text(
+              'Sell on Dobha',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
-              'List pieces from your stall, go live to shoppers across SA, and get paid once the buyer has their piece.',
+              'List pieces from your stall and go live to shoppers across SA. Payments and payouts are not available; checkout is simulator-only.',
               textAlign: TextAlign.center,
               style: TextStyle(color: DobhaColors.textSecondary, height: 1.4),
             ),
             const SizedBox(height: 24),
-            AppButton(color: DobhaColors.green, onPressed: () => showBecomeVendorSheet(context), child: const Text('Start Selling')),
+            AppButton(
+              color: DobhaColors.green,
+              onPressed: () => showBecomeVendorSheet(context),
+              child: const Text('Start Selling'),
+            ),
           ],
         ),
       ),
@@ -149,20 +176,43 @@ class _StudioScreenState extends State<StudioScreen> {
                   circle: true,
                   padding: EdgeInsets.all(14),
                   tint: DobhaColors.green,
-                  child: Icon(Icons.storefront_rounded, color: DobhaColors.green, size: 26),
+                  child: Icon(
+                    Icons.storefront_rounded,
+                    color: DobhaColors.green,
+                    size: 26,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(user.shopName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16, letterSpacing: -0.3)),
+                      Text(
+                        user.shopName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.location_on_outlined, size: 13, color: DobhaColors.muted),
+                          Icon(
+                            Icons.location_on_outlined,
+                            size: 13,
+                            color: DobhaColors.muted,
+                          ),
                           const SizedBox(width: 3),
-                          Flexible(child: Text(user.stallLocation, style: TextStyle(fontSize: 12, color: DobhaColors.textSecondary))),
+                          Flexible(
+                            child: Text(
+                              user.stallLocation,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: DobhaColors.textSecondary,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -180,10 +230,18 @@ class _StudioScreenState extends State<StudioScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Stories', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                    Text(
+                      'Stories',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
                     SizedBox(height: 2),
-                    Text('Disappears in 24 hours — share a haul or a new drop.',
-                        style: TextStyle(fontSize: 12)),
+                    Text(
+                      'Disappears in 24 hours — share a haul or a new drop.',
+                      style: TextStyle(fontSize: 12),
+                    ),
                   ],
                 ),
               ),
@@ -195,33 +253,52 @@ class _StudioScreenState extends State<StudioScreen> {
           Row(
             children: [
               Expanded(
-                child: Text('Your Listings (${inventory.where((i) => !i.isClaimed).length} for sale)',
-                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                child: Text(
+                  'Your Listings (${inventory.where((i) => !i.isClaimed).length} for sale)',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
               ),
               AppButton(
                 radius: 12,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const NewListingScreen())),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const NewListingScreen()),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(Icons.add, size: 16, color: DobhaColors.green),
                     SizedBox(width: 4),
-                    Text('New Listing', style: TextStyle(color: DobhaColors.green, fontSize: 12)),
+                    Text(
+                      'New Listing',
+                      style: TextStyle(color: DobhaColors.green, fontSize: 12),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text('Tap a listing to pin it when you go live.', style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
+          Text(
+            'Tap a listing to pin it when you go live.',
+            style: TextStyle(fontSize: 12, color: DobhaColors.muted),
+          ),
           const SizedBox(height: 14),
 
           if (inventory.isEmpty)
             AppWell(
               radius: 18,
               padding: EdgeInsets.all(18),
-              child: Text('No listings yet. Add your first piece with "New Listing".', style: TextStyle(color: DobhaColors.muted, fontSize: 13)),
+              child: Text(
+                'No listings yet. Add your first piece with "New Listing".',
+                style: TextStyle(color: DobhaColors.muted, fontSize: 13),
+              ),
             )
           else
             ...inventory.map((item) {
@@ -232,7 +309,11 @@ class _StudioScreenState extends State<StudioScreen> {
                   selected: isSelected,
                   radius: 18,
                   padding: const EdgeInsets.all(10),
-                  onPressed: item.isClaimed ? null : () => isSelected ? appState.unpinLiveItem() : appState.pinItemToLive(item),
+                  onPressed: item.isClaimed
+                      ? null
+                      : () => isSelected
+                            ? appState.unpinLiveItem()
+                            : appState.pinItemToLive(item),
                   child: Row(
                     children: [
                       ItemThumb(item: item, size: 50),
@@ -241,30 +322,58 @@ class _StudioScreenState extends State<StudioScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: DobhaColors.text)),
+                            Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: DobhaColors.text,
+                              ),
+                            ),
                             const SizedBox(height: 2),
                             Text(
-                                item.isClaimed
-                                    ? 'Sold out'
-                                    : (isSelected
+                              item.isClaimed
+                                  ? 'Sold out'
+                                  : (isSelected
                                         ? 'Pinned for your next live'
-                                        : [item.condition, 'Size ${item.size}', item.stockLabel].where((s) => s.isNotEmpty).join(' · ')),
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: isSelected ? DobhaColors.green : DobhaColors.muted)),
+                                        : [
+                                                item.condition,
+                                                'Size ${item.size}',
+                                                item.stockLabel,
+                                              ]
+                                              .where((s) => s.isNotEmpty)
+                                              .join(' · ')),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? DobhaColors.green
+                                    : DobhaColors.muted,
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      Text(item.formattedPrice, style: TextStyle(fontWeight: FontWeight.w700, color: DobhaColors.green, fontSize: 14)),
+                      Text(
+                        item.formattedPrice,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: DobhaColors.green,
+                          fontSize: 14,
+                        ),
+                      ),
                       if (!item.isClaimed) ...[
                         IconButton(
                           tooltip: 'Edit listing',
-                          icon: Icon(Icons.edit_outlined, size: 19, color: DobhaColors.muted),
-                          onPressed: () => NewListingScreen.open(context, editing: item),
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            size: 19,
+                            color: DobhaColors.muted,
+                          ),
+                          onPressed: () =>
+                              NewListingScreen.open(context, editing: item),
                         ),
                         IconButton(
                           tooltip: 'Paid listing boosts are unavailable',
@@ -277,7 +386,11 @@ class _StudioScreenState extends State<StudioScreen> {
                         ),
                         IconButton(
                           tooltip: 'Remove listing',
-                          icon: Icon(Icons.delete_outline_rounded, size: 19, color: DobhaColors.muted),
+                          icon: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 19,
+                            color: DobhaColors.muted,
+                          ),
                           onPressed: () => _remove(item),
                         ),
                       ],
@@ -288,7 +401,10 @@ class _StudioScreenState extends State<StudioScreen> {
             }),
           const SizedBox(height: 22),
 
-          const Text('Stream Name', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+          const Text(
+            'Stream Name',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+          ),
           const SizedBox(height: 10),
           TextField(
             controller: _streamTitleCtrl,
@@ -310,7 +426,14 @@ class _StudioScreenState extends State<StudioScreen> {
               children: [
                 Icon(Icons.sensors_rounded, size: 20),
                 SizedBox(width: 8),
-                Text('GO LIVE NOW', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, letterSpacing: 0.8)),
+                Text(
+                  'GO LIVE NOW',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    letterSpacing: 0.8,
+                  ),
+                ),
               ],
             ),
           ),
@@ -320,7 +443,7 @@ class _StudioScreenState extends State<StudioScreen> {
   }
 }
 
-/// Bottom sheet: pick duration + tier, deducts from wallet, boosts the listing.
+/// Bottom sheet for a local-only listing boost simulation.
 class BoostListingSheet extends StatefulWidget {
   final ThriftItem item;
   const BoostListingSheet({super.key, required this.item});
@@ -345,31 +468,56 @@ class _BoostListingSheetState extends State<BoostListingSheet> {
   bool _busy = false;
 
   static const _tiers = {
-    'basic':    (label: 'Basic',    price: 'R 50/day',   desc: 'Appear higher in search results'),
-    'standard': (label: 'Standard', price: 'R 150/day',  desc: 'Featured in category feeds'),
-    'premium':  (label: 'Premium',  price: 'R 500/day',  desc: 'Top of home feed + push to followers'),
+    'basic': (
+      label: 'Basic',
+      price: 'R 50/day · demo',
+      desc: 'Appear higher in search results',
+    ),
+    'standard': (
+      label: 'Standard',
+      price: 'R 150/day · demo',
+      desc: 'Featured in category feeds',
+    ),
+    'premium': (
+      label: 'Premium',
+      price: 'R 500/day · demo',
+      desc: 'Top of home feed + push to followers',
+    ),
   };
 
   static const _durations = [1, 3, 7, 14, 30];
 
   double _totalCost() {
-    final pricePerDay = _tier == 'premium' ? 500.0 : _tier == 'standard' ? 150.0 : 50.0;
+    final pricePerDay = _tier == 'premium'
+        ? 500.0
+        : _tier == 'standard'
+        ? 150.0
+        : 50.0;
     return pricePerDay * _days;
   }
 
   Future<void> _boost() async {
     setState(() => _busy = true);
     try {
-      final until = await AppState().promoteItem(widget.item, days: _days, tier: _tier);
+      final until = await AppState().promoteItem(
+        widget.item,
+        days: _days,
+        tier: _tier,
+      );
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-          '"${widget.item.title}" is now boosted until ${until.day}/${until.month}/${until.year}! 🚀',
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Demo boost active for "${widget.item.title}" until ${until.day}/${until.month}/${until.year}. No payment was made.',
+          ),
         ),
-      ));
+      );
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -377,38 +525,59 @@ class _BoostListingSheetState extends State<BoostListingSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final balance = AppState().availableBalance;
     final cost = _totalCost();
-    final canAfford = balance >= cost;
 
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
-          left: 20, right: 20, bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          left: 20,
+          right: 20,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 24,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(children: [
-              Icon(Icons.rocket_launch_rounded, color: DobhaColors.amber, size: 22),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Boost this listing',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17, letterSpacing: -0.3)),
-                  Text(
-                    widget.item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: DobhaColors.muted),
+            Row(
+              children: [
+                Icon(
+                  Icons.rocket_launch_rounded,
+                  color: DobhaColors.amber,
+                  size: 22,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Boost this listing',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      Text(
+                        widget.item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: DobhaColors.muted,
+                        ),
+                      ),
+                    ],
                   ),
-                ]),
-              ),
-            ]),
+                ),
+              ],
+            ),
             const SizedBox(height: 20),
 
-            const Text('Boost tier', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const Text(
+              'Boost tier',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
             const SizedBox(height: 10),
             for (final entry in _tiers.entries) ...[
               GestureDetector(
@@ -420,36 +589,60 @@ class _BoostListingSheetState extends State<BoostListingSheet> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: _tier == entry.key ? DobhaColors.amber : DobhaColors.border,
+                      color: _tier == entry.key
+                          ? DobhaColors.amber
+                          : DobhaColors.border,
                       width: _tier == entry.key ? 2 : 1,
                     ),
-                    color: _tier == entry.key ? DobhaColors.amber.withValues(alpha: 0.08) : DobhaColors.card,
+                    color: _tier == entry.key
+                        ? DobhaColors.amber.withValues(alpha: 0.08)
+                        : DobhaColors.card,
                   ),
-                  child: Row(children: [
-                    Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(entry.value.label,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: _tier == entry.key ? DobhaColors.amber : DobhaColors.text,
-                            )),
-                        Text(entry.value.desc,
-                            style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
-                      ],
-                    )),
-                    Text(entry.value.price,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              entry.value.label,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: _tier == entry.key
+                                    ? DobhaColors.amber
+                                    : DobhaColors.text,
+                              ),
+                            ),
+                            Text(
+                              entry.value.desc,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: DobhaColors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        entry.value.price,
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          color: _tier == entry.key ? DobhaColors.amber : DobhaColors.muted,
-                        )),
-                  ]),
+                          color: _tier == entry.key
+                              ? DobhaColors.amber
+                              : DobhaColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
 
             const SizedBox(height: 16),
-            const Text('Duration', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const Text(
+              'Duration',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
             const SizedBox(height: 10),
             Wrap(
               spacing: 10,
@@ -471,40 +664,47 @@ class _BoostListingSheetState extends State<BoostListingSheet> {
             const SizedBox(height: 20),
             AppWell(
               radius: 14,
-              tint: canAfford ? DobhaColors.green : DobhaColors.red,
-              child: Row(children: [
-                Icon(
-                  canAfford ? Icons.account_balance_wallet_rounded : Icons.warning_amber_rounded,
-                  color: canAfford ? DobhaColors.green : DobhaColors.red,
-                  size: 18,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    canAfford
-                        ? 'Total: R ${cost.toStringAsFixed(0)} · Wallet: R ${balance.toStringAsFixed(0)}'
-                        : 'Not enough funds. Top up in the Orders tab (R ${cost.toStringAsFixed(0)} needed).',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: canAfford ? DobhaColors.green : DobhaColors.red,
+              tint: DobhaColors.amber,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline_rounded,
+                    color: DobhaColors.amber,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Demo boost only · value R ${cost.toStringAsFixed(0)} · no wallet debit, server update, or real promotion.',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: DobhaColors.amber,
+                      ),
                     ),
                   ),
-                ),
-              ]),
+                ],
+              ),
             ),
 
             const SizedBox(height: 16),
             AppButton(
-              color: canAfford ? DobhaColors.amber : null,
-              foreground: canAfford ? Colors.black : null,
-              onPressed: (!canAfford || _busy) ? null : _boost,
+              color: DobhaColors.amber,
+              foreground: Colors.black,
+              onPressed: _busy ? null : _boost,
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: _busy
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.4))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2.4),
+                    )
                   : Text(
-                      'Boost for R ${_totalCost().toStringAsFixed(0)}',
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                      'Simulate boost · no charge',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
             ),
           ],
@@ -520,7 +720,9 @@ class NewListingScreen extends StatefulWidget {
   const NewListingScreen({super.key, this.editing});
 
   static Future<void> open(BuildContext context, {ThriftItem? editing}) =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => NewListingScreen(editing: editing)));
+      Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => NewListingScreen(editing: editing)),
+      );
 
   @override
   State<NewListingScreen> createState() => _NewListingScreenState();
@@ -552,11 +754,15 @@ class _NewListingScreenState extends State<NewListingScreen> {
     final item = widget.editing;
     if (item != null) {
       _title.text = item.title;
-      _price.text = item.priceZar.toStringAsFixed(item.priceZar % 1 == 0 ? 0 : 2);
+      _price.text = item.priceZar.toStringAsFixed(
+        item.priceZar % 1 == 0 ? 0 : 2,
+      );
       _description.text = item.description;
       _caption.text = item.haulCaption;
       _quantity.text = '${item.quantity < 1 ? 1 : item.quantity}';
-      _category = ThriftItem.categories.contains(item.category) ? item.category : ThriftItem.categories.last;
+      _category = ThriftItem.categories.contains(item.category)
+          ? item.category
+          : ThriftItem.categories.last;
       _condition = item.condition;
       _size = item.size;
       _media.addAll(item.media.map(ListingMedia.existing));
@@ -576,7 +782,9 @@ class _NewListingScreenState extends State<NewListingScreen> {
   static String? _typeFor(XFile file, {required bool video}) {
     final name = file.name.toLowerCase();
     final mime = file.mimeType;
-    if (mime != null && (mime.startsWith('image/') || mime.startsWith('video/'))) return mime;
+    if (mime != null &&
+        (mime.startsWith('image/') || mime.startsWith('video/')))
+      return mime;
     if (video) {
       if (name.endsWith('.mp4')) return 'video/mp4';
       if (name.endsWith('.mov')) return 'video/quicktime';
@@ -590,30 +798,58 @@ class _NewListingScreenState extends State<NewListingScreen> {
 
   Future<void> _addPhotos({required bool camera}) async {
     final room = _maxMedia - _media.length;
-    if (room <= 0) return setState(() => _error = 'You can add up to $_maxMedia photos and videos');
+    if (room <= 0)
+      return setState(
+        () => _error = 'You can add up to $_maxMedia photos and videos',
+      );
     try {
       final picker = ImagePicker();
       final files = camera
-          ? [?await picker.pickImage(source: ImageSource.camera, maxWidth: 1600, imageQuality: 82)]
-          : await picker.pickMultiImage(maxWidth: 1600, imageQuality: 82, limit: room > 1 ? room : null);
+          ? [
+              ?await picker.pickImage(
+                source: ImageSource.camera,
+                maxWidth: 1600,
+                imageQuality: 82,
+              ),
+            ]
+          : await picker.pickMultiImage(
+              maxWidth: 1600,
+              imageQuality: 82,
+              limit: room > 1 ? room : null,
+            );
       final added = <ListingMedia>[];
       for (final f in files.take(room)) {
-        added.add(ListingMedia.pending(PendingMedia(await f.readAsBytes(), _typeFor(f, video: false)!)));
+        added.add(
+          ListingMedia.pending(
+            PendingMedia(await f.readAsBytes(), _typeFor(f, video: false)!),
+          ),
+        );
       }
       setState(() {
         _media.addAll(added);
-        _error = files.length > room ? 'Only the first $room were added (max $_maxMedia)' : null;
+        _error = files.length > room
+            ? 'Only the first $room were added (max $_maxMedia)'
+            : null;
       });
     } catch (_) {
-      setState(() => _error = 'Could not open photos. Check the app has permission.');
+      setState(
+        () => _error = 'Could not open photos. Check the app has permission.',
+      );
     }
   }
 
   Future<void> _addVideo(ImageSource source) async {
-    if (_media.length >= _maxMedia) return setState(() => _error = 'You can add up to $_maxMedia photos and videos');
-    if (_videoCount >= _maxVideos) return setState(() => _error = 'You can add up to $_maxVideos videos');
+    if (_media.length >= _maxMedia)
+      return setState(
+        () => _error = 'You can add up to $_maxMedia photos and videos',
+      );
+    if (_videoCount >= _maxVideos)
+      return setState(() => _error = 'You can add up to $_maxVideos videos');
     try {
-      final file = await ImagePicker().pickVideo(source: source, maxDuration: const Duration(seconds: 60));
+      final file = await ImagePicker().pickVideo(
+        source: source,
+        maxDuration: const Duration(seconds: 60),
+      );
       if (file == null) return;
       final type = _typeFor(file, video: true);
       if (type == null || !type.startsWith('video/')) {
@@ -621,14 +857,19 @@ class _NewListingScreenState extends State<NewListingScreen> {
       }
       final bytes = await file.readAsBytes();
       if (bytes.length > _maxVideoBytes) {
-        return setState(() => _error = 'That video is too large (max 60 MB). Try a shorter clip.');
+        return setState(
+          () => _error =
+              'That video is too large (max 60 MB). Try a shorter clip.',
+        );
       }
       setState(() {
         _media.add(ListingMedia.pending(PendingMedia(bytes, type)));
         _error = null;
       });
     } catch (_) {
-      setState(() => _error = 'Could not open videos. Check the app has permission.');
+      setState(
+        () => _error = 'Could not open videos. Check the app has permission.',
+      );
     }
   }
 
@@ -642,21 +883,33 @@ class _NewListingScreenState extends State<NewListingScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('Add a video', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+              const Text(
+                'Add a video',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text('Up to 60 seconds. Show the fit, the fabric and any flaws.',
-                  style: TextStyle(color: DobhaColors.muted, fontSize: 13)),
+              Text(
+                'Up to 60 seconds. Show the fit, the fabric and any flaws.',
+                style: TextStyle(color: DobhaColors.muted, fontSize: 13),
+              ),
               const SizedBox(height: 16),
               AppButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   _addVideo(ImageSource.camera);
                 },
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.videocam_outlined, size: 18),
-                  SizedBox(width: 8),
-                  Text('Record'),
-                ]),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.videocam_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Record'),
+                  ],
+                ),
               ),
               const SizedBox(height: 10),
               AppButton(
@@ -664,11 +917,14 @@ class _NewListingScreenState extends State<NewListingScreen> {
                   Navigator.of(ctx).pop();
                   _addVideo(ImageSource.gallery);
                 },
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.video_library_outlined, size: 18),
-                  SizedBox(width: 8),
-                  Text('Choose from gallery'),
-                ]),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.video_library_outlined, size: 18),
+                    SizedBox(width: 8),
+                    Text('Choose from gallery'),
+                  ],
+                ),
               ),
             ],
           ),
@@ -679,11 +935,17 @@ class _NewListingScreenState extends State<NewListingScreen> {
 
   Future<void> _submit() async {
     final price = double.tryParse(_price.text.trim().replaceAll(',', '.')) ?? 0;
-    if (_title.text.trim().length < 3) return setState(() => _error = 'Give the piece a name (3+ characters)');
+    if (_title.text.trim().length < 3)
+      return setState(() => _error = 'Give the piece a name (3+ characters)');
     if (price <= 0) return setState(() => _error = 'Enter a price in rand');
     final quantity = int.tryParse(_quantity.text.trim()) ?? 0;
-    if (quantity < 1 || quantity > 999) return setState(() => _error = 'How many do you have? Enter 1 to 999');
-    if (!_media.any((m) => !m.isVideo)) return setState(() => _error = 'Add at least one photo; it is the cover shoppers see first');
+    if (quantity < 1 || quantity > 999)
+      return setState(() => _error = 'How many do you have? Enter 1 to 999');
+    if (!_media.any((m) => !m.isVideo))
+      return setState(
+        () => _error =
+            'Add at least one photo; it is the cover shoppers see first',
+      );
 
     setState(() {
       _busy = true;
@@ -691,7 +953,11 @@ class _NewListingScreenState extends State<NewListingScreen> {
     });
     void progress(int done, int total) {
       if (mounted && total > 0) {
-        setState(() => _progress = done < total ? 'Uploading ${done + 1} of $total...' : (_isEdit ? 'Saving...' : 'Publishing...'));
+        setState(
+          () => _progress = done < total
+              ? 'Uploading ${done + 1} of $total...'
+              : (_isEdit ? 'Saving...' : 'Publishing...'),
+        );
       }
     }
 
@@ -725,7 +991,10 @@ class _NewListingScreenState extends State<NewListingScreen> {
         );
       }
       if (!mounted) return;
-      if (_isEdit) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Listing updated')));
+      if (_isEdit)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Listing updated')));
       Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -753,17 +1022,30 @@ class _NewListingScreenState extends State<NewListingScreen> {
             child: m.isVideo
                 ? const ColoredBox(
                     color: Colors.black,
-                    child: Center(child: Icon(Icons.play_circle_outline_rounded, color: Colors.white, size: 36)),
+                    child: Center(
+                      child: Icon(
+                        Icons.play_circle_outline_rounded,
+                        color: Colors.white,
+                        size: 36,
+                      ),
+                    ),
                   )
                 : m.pending != null
-                    ? Image.memory(m.pending!.bytes, fit: BoxFit.cover)
-                    : Image.network(AppState().api.resolve(m.existing!.url), fit: BoxFit.cover),
+                ? Image.memory(m.pending!.bytes, fit: BoxFit.cover)
+                : Image.network(
+                    AppState().api.resolve(m.existing!.url),
+                    fit: BoxFit.cover,
+                  ),
           ),
           if (isCover || m.isVideo)
             Positioned(
               left: 6,
               bottom: 6,
-              child: AppTag(isCover ? 'COVER' : 'VIDEO', color: isCover ? DobhaColors.green : Colors.black, solid: true),
+              child: AppTag(
+                isCover ? 'COVER' : 'VIDEO',
+                color: isCover ? DobhaColors.green : Colors.black,
+                solid: true,
+              ),
             ),
           Positioned(
             top: 4,
@@ -772,7 +1054,9 @@ class _NewListingScreenState extends State<NewListingScreen> {
               icon: Icons.close_rounded,
               size: 16,
               tooltip: 'Remove',
-              onTap: _busy ? null : () => setState(() => _media.removeAt(index)),
+              onTap: _busy
+                  ? null
+                  : () => setState(() => _media.removeAt(index)),
             ),
           ),
         ],
@@ -797,12 +1081,19 @@ class _NewListingScreenState extends State<NewListingScreen> {
     );
   }
 
-  Widget _dropdown(String label, String value, List<String> options, ValueChanged<String> onChanged) {
+  Widget _dropdown(
+    String label,
+    String value,
+    List<String> options,
+    ValueChanged<String> onChanged,
+  ) {
     return DropdownButtonFormField<String>(
       initialValue: value,
       decoration: InputDecoration(labelText: label),
       dropdownColor: DobhaColors.cardElevated,
-      items: options.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+      items: options
+          .map((o) => DropdownMenuItem(value: o, child: Text(o)))
+          .toList(),
       onChanged: (v) {
         if (v != null) setState(() => onChanged(v));
       },
@@ -817,7 +1108,12 @@ class _NewListingScreenState extends State<NewListingScreen> {
         leading: Padding(
           padding: const EdgeInsets.only(left: 12),
           child: Center(
-            child: AppButton.icon(icon: Icons.arrow_back_rounded, size: 20, padding: 9, onPressed: () => Navigator.of(context).pop()),
+            child: AppButton.icon(
+              icon: Icons.arrow_back_rounded,
+              size: 20,
+              padding: 9,
+              onPressed: () => Navigator.of(context).pop(),
+            ),
           ),
         ),
         leadingWidth: 64,
@@ -828,13 +1124,23 @@ class _NewListingScreenState extends State<NewListingScreen> {
         children: [
           Row(
             children: [
-              const Expanded(child: Text('Photos & Videos', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
-              Text('${_media.length}/$_maxMedia', style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+              const Expanded(
+                child: Text(
+                  'Photos & Videos',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                ),
+              ),
+              Text(
+                '${_media.length}/$_maxMedia',
+                style: TextStyle(color: DobhaColors.muted, fontSize: 12),
+              ),
             ],
           ),
           const SizedBox(height: 4),
-          Text('The first photo is the cover. Add up to 3 short videos.',
-              style: TextStyle(color: DobhaColors.muted, fontSize: 12)),
+          Text(
+            'The first photo is the cover. Add up to 3 short videos.',
+            style: TextStyle(color: DobhaColors.muted, fontSize: 12),
+          ),
           const SizedBox(height: 12),
           if (_media.isEmpty)
             AppWell(
@@ -842,9 +1148,19 @@ class _NewListingScreenState extends State<NewListingScreen> {
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.add_photo_alternate_outlined, size: 36, color: DobhaColors.muted),
+                    Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 36,
+                      color: DobhaColors.muted,
+                    ),
                     SizedBox(height: 8),
-                    Text('Show the piece from every angle', style: TextStyle(color: DobhaColors.muted, fontWeight: FontWeight.w600)),
+                    Text(
+                      'Show the piece from every angle',
+                      style: TextStyle(
+                        color: DobhaColors.muted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -862,9 +1178,17 @@ class _NewListingScreenState extends State<NewListingScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _addButton(Icons.photo_library_outlined, 'Photos', () => _addPhotos(camera: false)),
+              _addButton(
+                Icons.photo_library_outlined,
+                'Photos',
+                () => _addPhotos(camera: false),
+              ),
               const SizedBox(width: 10),
-              _addButton(Icons.photo_camera_outlined, 'Camera', () => _addPhotos(camera: true)),
+              _addButton(
+                Icons.photo_camera_outlined,
+                'Camera',
+                () => _addPhotos(camera: true),
+              ),
               const SizedBox(width: 10),
               _addButton(Icons.videocam_outlined, 'Video', _chooseVideoSource),
             ],
@@ -873,7 +1197,10 @@ class _NewListingScreenState extends State<NewListingScreen> {
           TextField(
             controller: _title,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'What are you selling? (e.g. vintage jacket, desk lamp, tablet)'),
+            decoration: const InputDecoration(
+              labelText:
+                  'What are you selling? (e.g. vintage jacket, desk lamp, tablet)',
+            ),
           ),
           const SizedBox(height: 14),
           Row(
@@ -883,8 +1210,13 @@ class _NewListingScreenState extends State<NewListingScreen> {
                 flex: 3,
                 child: TextField(
                   controller: _price,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: const InputDecoration(labelText: 'Price (each)', prefixText: 'R '),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Price (each)',
+                    prefixText: 'R ',
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -893,7 +1225,10 @@ class _NewListingScreenState extends State<NewListingScreen> {
                 child: TextField(
                   controller: _quantity,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'How many?', helperText: 'Identical pieces'),
+                  decoration: const InputDecoration(
+                    labelText: 'How many?',
+                    helperText: 'Identical pieces',
+                  ),
                 ),
               ),
             ],
@@ -901,20 +1236,41 @@ class _NewListingScreenState extends State<NewListingScreen> {
           const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(child: _dropdown('Category', _category, ThriftItem.categories, (v) => _category = v)),
+              Expanded(
+                child: _dropdown(
+                  'Category',
+                  _category,
+                  ThriftItem.categories,
+                  (v) => _category = v,
+                ),
+              ),
               const SizedBox(width: 12),
-              Expanded(child: _dropdown('Size / details', _size, {...ThriftItem.sizes, _size}.toList(), (v) => _size = v)),
+              Expanded(
+                child: _dropdown(
+                  'Size / details',
+                  _size,
+                  {...ThriftItem.sizes, _size}.toList(),
+                  (v) => _size = v,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
           // An older listing may use a condition that is no longer in the list; keep it selectable.
-          _dropdown('Condition', _condition, {...ThriftItem.conditions, _condition}.toList(), (v) => _condition = v),
+          _dropdown(
+            'Condition',
+            _condition,
+            {...ThriftItem.conditions, _condition}.toList(),
+            (v) => _condition = v,
+          ),
           const SizedBox(height: 14),
           TextField(
             controller: _caption,
             maxLength: 200,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Caption for the feed (optional)'),
+            decoration: const InputDecoration(
+              labelText: 'Caption for the feed (optional)',
+            ),
           ),
           const SizedBox(height: 6),
           TextField(
@@ -922,7 +1278,9 @@ class _NewListingScreenState extends State<NewListingScreen> {
             maxLines: 4,
             minLines: 2,
             textCapitalization: TextCapitalization.sentences,
-            decoration: const InputDecoration(labelText: 'Details: features, measurements, flaws (optional)'),
+            decoration: const InputDecoration(
+              labelText: 'Details: features, measurements, flaws (optional)',
+            ),
           ),
           const SizedBox(height: 18),
           if (_error != null)
@@ -930,7 +1288,13 @@ class _NewListingScreenState extends State<NewListingScreen> {
               radius: 14,
               tint: DobhaColors.red,
               margin: const EdgeInsets.only(bottom: 14),
-              child: Text(_error!, style: TextStyle(color: DobhaColors.red, fontWeight: FontWeight.w600)),
+              child: Text(
+                _error!,
+                style: TextStyle(
+                  color: DobhaColors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           AppButton(
             color: DobhaColors.green,
@@ -940,12 +1304,25 @@ class _NewListingScreenState extends State<NewListingScreen> {
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.black)),
+                      const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Colors.black,
+                        ),
+                      ),
                       const SizedBox(width: 10),
-                      Text(_progress ?? (_isEdit ? 'Saving...' : 'Publishing...'), style: const TextStyle(fontSize: 14)),
+                      Text(
+                        _progress ?? (_isEdit ? 'Saving...' : 'Publishing...'),
+                        style: const TextStyle(fontSize: 14),
+                      ),
                     ],
                   )
-                : Text(_isEdit ? 'Save changes' : 'Publish Listing', style: const TextStyle(fontSize: 15)),
+                : Text(
+                    _isEdit ? 'Save changes' : 'Publish Listing',
+                    style: const TextStyle(fontSize: 15),
+                  ),
           ),
         ],
       ),

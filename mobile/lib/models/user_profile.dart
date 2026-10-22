@@ -1,17 +1,8 @@
 import 'json_date.dart';
 
-enum UserRole {
-  shopper,
-  vendor,
-}
+enum UserRole { shopper, vendor }
 
-enum TransactionType {
-  escrowHold,
-  escrowRelease,
-  withdrawal,
-  topup,
-  refund,
-}
+enum TransactionType { escrowHold, escrowRelease, withdrawal, topup, refund }
 
 class WalletTransaction {
   final String id;
@@ -37,14 +28,20 @@ class WalletTransaction {
   });
 
   bool get isCredit =>
-      type == TransactionType.escrowRelease || type == TransactionType.topup || type == TransactionType.refund;
+      type == TransactionType.escrowRelease ||
+      type == TransactionType.topup ||
+      type == TransactionType.refund;
 
-  factory WalletTransaction.fromJson(Map<String, dynamic> json) => WalletTransaction(
+  factory WalletTransaction.fromJson(Map<String, dynamic> json) =>
+      WalletTransaction(
         id: json['id'] as String,
         title: json['title'] as String,
         subtitle: json['subtitle'] as String? ?? '',
         amountZar: (json['amountZar'] as num).toDouble(),
-        type: TransactionType.values.firstWhere((t) => t.name == json['type'], orElse: () => TransactionType.topup),
+        type: TransactionType.values.firstWhere(
+          (t) => t.name == json['type'],
+          orElse: () => TransactionType.topup,
+        ),
         date: parseJsonDateTime(json['date']),
         status: json['status'] as String? ?? '',
         reference: json['reference'] as String? ?? '',
@@ -89,26 +86,33 @@ class UserProfile {
   bool get isVendor => role == UserRole.vendor;
 
   String get initials {
-    final parts = name.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return '?';
-    if (parts.length == 1) return parts.first.substring(0, parts.first.length.clamp(1, 2)).toUpperCase();
+    if (parts.length == 1)
+      return parts.first
+          .substring(0, parts.first.length.clamp(1, 2))
+          .toUpperCase();
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-        id: json['id'] as String,
-        email: json['email'] as String? ?? '',
-        name: json['name'] as String,
-        handle: json['handle'] as String,
-        phone: json['phone'] as String? ?? '',
-        role: json['role'] == 'vendor' ? UserRole.vendor : UserRole.shopper,
-        shopName: json['shopName'] as String? ?? '',
-        stallLocation: json['stallLocation'] as String? ?? '',
-        avatarUrl: json['avatarUrl'] as String?,
-        bio: json['bio'] as String? ?? '',
-        location: json['location'] as String? ?? '',
-        createdAt: parseJsonDateTime(json['createdAt']),
-        salesCount: json['salesCount'] as int? ?? 0,
-        hasPassword: json['hasPassword'] as bool? ?? true,
-      );
+    id: json['id'] as String,
+    email: json['email'] as String? ?? '',
+    name: json['name'] as String,
+    handle: json['handle'] as String,
+    phone: json['phone'] as String? ?? '',
+    role: json['role'] == 'vendor' ? UserRole.vendor : UserRole.shopper,
+    shopName: json['shopName'] as String? ?? '',
+    stallLocation: json['stallLocation'] as String? ?? '',
+    avatarUrl: json['avatarUrl'] as String?,
+    bio: json['bio'] as String? ?? '',
+    location: json['location'] as String? ?? '',
+    createdAt: parseJsonDateTime(json['createdAt']),
+    salesCount: json['salesCount'] as int? ?? 0,
+    hasPassword: json['hasPassword'] as bool? ?? true,
+  );
 }

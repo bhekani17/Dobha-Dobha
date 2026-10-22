@@ -9,12 +9,13 @@ import '../widgets/item_photo.dart';
 import '../widgets/ui.dart';
 import 'feed_screen.dart';
 
-/// Pieces saved for buying together. Checkout makes one order per piece.
+/// Pieces saved for later or a local checkout simulation.
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
-  static Future<void> open(BuildContext context) =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CartScreen()));
+  static Future<void> open(BuildContext context) => Navigator.of(
+    context,
+  ).push(MaterialPageRoute(builder: (_) => const CartScreen()));
 
   @override
   State<CartScreen> createState() => _CartScreenState();
@@ -31,7 +32,10 @@ class _CartScreenState extends State<CartScreen> {
     try {
       await AppState().removeFromCart(item.id);
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted)
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -42,9 +46,14 @@ class _CartScreenState extends State<CartScreen> {
       builder: (context, _) {
         final cart = AppState().cart;
         final available = AppState().cartAvailable;
-        final subtotal = available.fold<double>(0, (sum, i) => sum + i.priceZar);
+        final subtotal = available.fold<double>(
+          0,
+          (sum, i) => sum + i.priceZar,
+        );
         return Scaffold(
-          appBar: AppBar(title: Text(cart.isEmpty ? 'Cart' : 'Cart (${cart.length})')),
+          appBar: AppBar(
+            title: Text(cart.isEmpty ? 'Cart' : 'Cart (${cart.length})'),
+          ),
           body: cart.isEmpty
               ? Center(
                   child: Padding(
@@ -52,12 +61,29 @@ class _CartScreenState extends State<CartScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.shopping_bag_outlined, size: 48, color: DobhaColors.muted),
+                        Icon(
+                          Icons.shopping_bag_outlined,
+                          size: 48,
+                          color: DobhaColors.muted,
+                        ),
                         const SizedBox(height: 12),
-                        const Text('Your cart is empty', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+                        const Text(
+                          'Your cart is empty',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
                         const SizedBox(height: 6),
-                        Text('Tap the bag on any piece to add it here and buy several at once.',
-                            textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted, height: 1.4)),
+                        Text(
+                          'Tap the bag on any piece to add it here and buy several at once.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: DobhaColors.muted,
+                            height: 1.4,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -66,7 +92,8 @@ class _CartScreenState extends State<CartScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: cart.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, i) => _CartRow(item: cart[i], onRemove: () => _remove(cart[i])),
+                  itemBuilder: (context, i) =>
+                      _CartRow(item: cart[i], onRemove: () => _remove(cart[i])),
                 ),
           bottomNavigationBar: available.isEmpty
               ? null
@@ -79,10 +106,21 @@ class _CartScreenState extends State<CartScreen> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('${available.length} piece${available.length == 1 ? '' : 's'}',
-                                style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
-                            Text('R ${subtotal.toStringAsFixed(0)}',
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+                            Text(
+                              '${available.length} piece${available.length == 1 ? '' : 's'}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: DobhaColors.muted,
+                              ),
+                            ),
+                            Text(
+                              'R ${subtotal.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
                           ],
                         ),
                         const SizedBox(width: 16),
@@ -90,7 +128,10 @@ class _CartScreenState extends State<CartScreen> {
                           child: AppButton(
                             color: DobhaColors.green,
                             onPressed: () => CheckoutModal.showCart(context),
-                            child: const Text('Checkout', style: TextStyle(fontSize: 15)),
+                            child: const Text(
+                              'Try checkout simulator',
+                              style: TextStyle(fontSize: 15),
+                            ),
                           ),
                         ),
                       ],
@@ -125,15 +166,31 @@ class _CartRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.title,
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
                   const SizedBox(height: 2),
-                  Text('${item.sellerName} · Size ${item.size}',
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: DobhaColors.muted)),
+                  Text(
+                    '${item.sellerName} · Size ${item.size}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12, color: DobhaColors.muted),
+                  ),
                   const SizedBox(height: 4),
-                  Text(gone ? 'No longer available' : item.formattedPrice,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w700, fontSize: 14, color: gone ? DobhaColors.red : DobhaColors.green)),
+                  Text(
+                    gone ? 'No longer available' : item.formattedPrice,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: gone ? DobhaColors.red : DobhaColors.green,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -162,8 +219,18 @@ class CartButton extends StatelessWidget {
       builder: (context, _) {
         final n = AppState().cartAvailable.length;
         final button = overlay
-            ? OverlayIconButton(icon: Icons.shopping_bag_outlined, size: 22, tooltip: 'Cart', onTap: () => CartScreen.open(context))
-            : AppButton.icon(icon: Icons.shopping_bag_outlined, size: 20, padding: 10, onPressed: () => CartScreen.open(context));
+            ? OverlayIconButton(
+                icon: Icons.shopping_bag_outlined,
+                size: 22,
+                tooltip: 'Cart',
+                onTap: () => CartScreen.open(context),
+              )
+            : AppButton.icon(
+                icon: Icons.shopping_bag_outlined,
+                size: 20,
+                padding: 10,
+                onPressed: () => CartScreen.open(context),
+              );
         return Semantics(
           label: n == 0 ? 'Cart' : 'Cart, $n pieces',
           child: Badge(

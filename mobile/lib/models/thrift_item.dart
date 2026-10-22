@@ -236,9 +236,9 @@ class ItemComment {
   factory ItemComment.fromJson(Map<String, dynamic> json) => ItemComment(
         id: json['id'] as String,
         text: json['text'] as String,
-        userId: json['userId'] as String?,
-        name: json['name'] as String,
-        handle: json['handle'] as String,
-        createdAt: parseJsonDateTime(json['createdAt']),
+        userId: (json['userId'] ?? json['user_id']) as String?,
+        name: (json['name'] ?? json['user_name']) as String? ?? 'Member',
+        handle: (json['handle'] ?? json['user_handle']) as String? ?? '',
+        createdAt: parseJsonDateTime(json['createdAt'] ?? json['created_at']),
       );
 }

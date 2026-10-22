@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -9,7 +8,7 @@ import '../google_auth.dart';
 import '../legal/terms.dart';
 import '../models/app_notification.dart';
 import '../models/escrow_order.dart';
-import '../models/json_date.dart';
+import '../models/demo_activity.dart';
 import '../models/social.dart';
 import '../models/support.dart';
 import '../models/thrift_item.dart';
@@ -36,7 +35,8 @@ class ListingMedia {
   bool get isVideo => existing?.isVideo ?? pending!.isVideo;
 
   /// Storage key of media already on the listing (its URL is `/media/<key>`).
-  String? get existingKey => existing?.url.replaceFirst(RegExp(r'^.*?/media/'), '');
+  String? get existingKey =>
+      existing?.url.replaceFirst(RegExp(r'^.*?/media/'), '');
 }
 
 /// App-wide state backed by the Dobha server. Screens listen to this and call
@@ -63,6 +63,8 @@ class AppState extends ChangeNotifier {
   List<EscrowOrder> _orders = [];
   List<WalletTransaction> _transactions = [];
   final List<WalletTransaction> _demoTransactions = [];
+  final List<DemoOrder> _demoOrders = [];
+  double _demoBalance = 0;
   double _available = 0, _locked = 0, _pending = 0;
   List<ThriftItem> _searchResults = [];
   List<AppNotification> _notifications = [];
@@ -91,9 +93,15 @@ class AppState extends ChangeNotifier {
   List<ThriftItem> get savedItems => List.unmodifiable(_saved);
   List<EscrowOrder> get orders => List.unmodifiable(_orders);
   List<WalletTransaction> get transactions {
-    final all = [..._transactions, ..._demoTransactions]..sort((a, b) => b.date.compareTo(a.date));
-    return List.unmodifiable(all);
+    final transactions = [..._transactions]
+      ..sort((a, b) => b.date.compareTo(a.date));
+    return List.unmodifiable(transactions);
   }
+
+  List<WalletTransaction> get demoTransactions =>
+      List.unmodifiable(_demoTransactions);
+  List<DemoOrder> get demoOrders => List.unmodifiable(_demoOrders);
+  double get demoBalance => _demoBalance;
   double get availableBalance => _available;
   double get lockedEscrowFunds => _locked;
   double get vendorPendingPayouts => _pending;
@@ -105,7 +113,8 @@ class AppState extends ChangeNotifier {
   List<ThriftItem> get cart => List.unmodifiable(_cart);
 
   /// Pieces in the cart that can still be bought.
-  List<ThriftItem> get cartAvailable => _cart.where((i) => !i.isClaimed).toList();
+  List<ThriftItem> get cartAvailable =>
+      _cart.where((i) => !i.isClaimed).toList();
   List<Offer> get offers => List.unmodifiable(_offers);
   int get followerCount => _followers;
   int get followingCount => _following;
@@ -124,7 +133,7 @@ class AppState extends ChangeNotifier {
         _api.token = token;
         // A blip (bad signal, server hiccup) shouldn't look like being logged out: retry before giving up.
         dynamic res;
-        for (var attempt = 1;; attempt++) {
+        for (var attempt = 1; ; attempt++) {
           try {
             res = await _api.get('/api/me');
             break;
@@ -169,13 +178,19 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> login({required String email, required String password}) async {
-    final res = await _api.post('/api/auth/login', {'email': email, 'password': password});
+    final res = await _api.post('/api/auth/login', {
+      'email': email,
+      'password': password,
+    });
     await _startSession(res as Map<String, dynamic>);
   }
 
   /// Exchanges a verified Google ID token for a Dobha session.
   Future<void> loginWithGoogle(String idToken) async {
-    final res = await _api.post('/api/auth/google', {'idToken': idToken, 'termsVersion': termsVersion});
+    final res = await _api.post('/api/auth/google', {
+      'idToken': idToken,
+      'termsVersion': termsVersion,
+    });
     await _startSession(res as Map<String, dynamic>);
   }
 
@@ -192,21 +207,42 @@ class AppState extends ChangeNotifier {
   }
 
   /// Emails a 6-digit code for [resetPassword]. Succeeds whether or not the email has an account.
-  Future<void> forgotPassword(String email) => _api.post('/api/auth/forgot', {'email': email});
+  Future<void> forgotPassword(String email) =>
+      _api.post('/api/auth/forgot', {'email': email});
 
   /// Sets a new password with the emailed code and signs in.
-  Future<void> resetPassword({required String email, required String code, required String password}) async {
-    final res = await _api.post('/api/auth/reset', {'email': email, 'code': code, 'password': password});
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+  }) async {
+    final res = await _api.post('/api/auth/reset', {
+      'email': email,
+      'code': code,
+      'password': password,
+    });
     await _startSession(res as Map<String, dynamic>);
   }
 
   /// Changes the password; other devices are signed out, this one stays in.
-  Future<void> changePassword({required String current, required String password}) =>
-      _call(() => _api.post('/api/me/password', {'current': current, 'password': password}));
+  Future<void> changePassword({
+    required String current,
+    required String password,
+  }) => _call(
+    () => _api.post('/api/me/password', {
+      'current': current,
+      'password': password,
+    }),
+  );
 
   /// Deletes the account for good. Password accounts confirm with [password]; Google-only ones type DELETE.
   Future<void> deleteAccount({String? password}) async {
-    await _call(() => _api.delete('/api/me', password != null ? {'password': password} : {'confirm': 'DELETE'}));
+    await _call(
+      () => _api.delete(
+        '/api/me',
+        password != null ? {'password': password} : {'confirm': 'DELETE'},
+      ),
+    );
     await GoogleAuth.signOut();
     await _clearSession();
     notifyListeners();
@@ -214,8 +250,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> _startSession(Map<String, dynamic> res) async {
     final token = res['token'] as String;
+    final user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
+    _clearDemoActivity();
     _api.token = token;
-    _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
+    _user = user;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     notifyListeners();
@@ -229,7 +267,11 @@ class AppState extends ChangeNotifier {
 
   void _startPush() {
     // Not awaited: the permission prompt shouldn't hold up the app.
-    Push.start(_api, onMessage: pollNotifications, onOpen: (data) => onPushTap?.call(data));
+    Push.start(
+      _api,
+      onMessage: pollNotifications,
+      onOpen: (data) => onPushTap?.call(data),
+    );
   }
 
   Future<void> _clearSession() async {
@@ -242,7 +284,7 @@ class AppState extends ChangeNotifier {
     _saved = [];
     _orders = [];
     _transactions = [];
-    _demoTransactions.clear();
+    _clearDemoActivity();
     _available = _locked = _pending = 0;
     _livePinnedItem = null;
     _searchResults = [];
@@ -257,6 +299,12 @@ class AppState extends ChangeNotifier {
     await prefs.remove(_tokenKey);
   }
 
+  void _clearDemoActivity() {
+    _demoTransactions.clear();
+    _demoOrders.clear();
+    _demoBalance = 0;
+  }
+
   /// Runs a request; an expired session signs the user out.
   Future<T> _call<T>(Future<T> Function() request) async {
     try {
@@ -269,7 +317,6 @@ class AppState extends ChangeNotifier {
       rethrow;
     }
   }
-
 
   // ---- Notifications ----
 
@@ -294,7 +341,13 @@ class AppState extends ChangeNotifier {
       _unreadMessages = messages;
       notifyListeners();
       if (grew) {
-        await Future.wait([loadOrders(), loadWallet(), loadOffers()].map((f) => f.catchError((_) {})));
+        await Future.wait(
+          [
+            loadOrders(),
+            loadWallet(),
+            loadOffers(),
+          ].map((f) => f.catchError((_) {})),
+        );
       }
     } catch (_) {
       // Offline or a server blip; the next poll tries again.
@@ -303,8 +356,9 @@ class AppState extends ChangeNotifier {
 
   Future<void> loadNotifications() async {
     final res = await _call(() => _api.get('/api/notifications'));
-    _notifications =
-        (res['notifications'] as List).map((n) => AppNotification.fromJson(n as Map<String, dynamic>)).toList();
+    _notifications = (res['notifications'] as List)
+        .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))
+        .toList();
     _unread = res['unread'] as int;
     notifyListeners();
   }
@@ -319,18 +373,20 @@ class AppState extends ChangeNotifier {
   // ---- Loading ----
 
   Future<void> refreshAll() async {
-    await Future.wait([
-      loadFeed(),
-      loadOrders(),
-      loadWallet(),
-      loadSaved(),
-      loadCart(),
-      loadOffers(),
-      loadMyFollowCounts(),
-      loadStories(),
-      loadSubscriptions(),
-      if (isVendor) loadMyItems(),
-    ].map((f) => f.catchError((_) {})));
+    await Future.wait(
+      [
+        loadFeed(),
+        loadOrders(),
+        loadWallet(),
+        loadSaved(),
+        loadCart(),
+        loadOffers(),
+        loadMyFollowCounts(),
+        loadStories(),
+        loadSubscriptions(),
+        if (isVendor) loadMyItems(),
+      ].map((f) => f.catchError((_) {})),
+    );
   }
 
   Future<void> loadFeed() async {
@@ -363,7 +419,9 @@ class AppState extends ChangeNotifier {
 
   Future<void> loadOrders() async {
     final res = await _call(() => _api.get('/api/orders'));
-    _orders = (res['orders'] as List).map((o) => EscrowOrder.fromJson(o as Map<String, dynamic>)).toList();
+    _orders = (res['orders'] as List)
+        .map((o) => EscrowOrder.fromJson(o as Map<String, dynamic>))
+        .toList();
     notifyListeners();
   }
 
@@ -372,15 +430,17 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<ThriftItem> _items(dynamic res) =>
-      (res['items'] as List).map((i) => ThriftItem.fromJson(i as Map<String, dynamic>)).toList();
+  List<ThriftItem> _items(dynamic res) => (res['items'] as List)
+      .map((i) => ThriftItem.fromJson(i as Map<String, dynamic>))
+      .toList();
 
   void _applyWallet(dynamic res) {
     _available = (res['availableZar'] as num).toDouble();
     _locked = (res['lockedZar'] as num).toDouble();
     _pending = (res['pendingZar'] as num).toDouble();
-    _transactions =
-        (res['transactions'] as List).map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>)).toList();
+    _transactions = (res['transactions'] as List)
+        .map((t) => WalletTransaction.fromJson(t as Map<String, dynamic>))
+        .toList();
   }
 
   // ---- Profile ----
@@ -394,15 +454,17 @@ class AppState extends ChangeNotifier {
     String? stallLocation,
     UserRole? role,
   }) async {
-    final res = await _call(() => _api.patch('/api/me', {
-          'name': ?name,
-          'phone': ?phone,
-          'bio': ?bio,
-          'location': ?location,
-          'shopName': ?shopName,
-          'stallLocation': ?stallLocation,
-          if (role != null) 'role': role.name,
-        }));
+    final res = await _call(
+      () => _api.patch('/api/me', {
+        'name': ?name,
+        'phone': ?phone,
+        'bio': ?bio,
+        'location': ?location,
+        'shopName': ?shopName,
+        'stallLocation': ?stallLocation,
+        if (role != null) 'role': role.name,
+      }),
+    );
     final wasVendor = isVendor;
     _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
     notifyListeners();
@@ -410,9 +472,15 @@ class AppState extends ChangeNotifier {
   }
 
   /// Replaces the profile picture, or removes it when [bytes] is null.
-  Future<void> setAvatar(Uint8List? bytes, {String contentType = 'image/jpeg'}) async {
-    final res = await _call(() =>
-        bytes == null ? _api.delete('/api/me/avatar') : _api.putBytes('/api/me/avatar', bytes, contentType));
+  Future<void> setAvatar(
+    Uint8List? bytes, {
+    String contentType = 'image/jpeg',
+  }) async {
+    final res = await _call(
+      () => bytes == null
+          ? _api.delete('/api/me/avatar')
+          : _api.putBytes('/api/me/avatar', bytes, contentType),
+    );
     _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
     notifyListeners();
     // Listings embed the seller's picture.
@@ -433,7 +501,9 @@ class AppState extends ChangeNotifier {
   }
 
   void _replaceItem(ThriftItem item) {
-    List<ThriftItem> swap(List<ThriftItem> list) => [for (final i in list) i.id == item.id ? item : i];
+    List<ThriftItem> swap(List<ThriftItem> list) => [
+      for (final i in list) i.id == item.id ? item : i,
+    ];
     _feed = swap(_feed);
     _myItems = swap(_myItems);
     _saved = swap(_saved);
@@ -444,20 +514,28 @@ class AppState extends ChangeNotifier {
 
   /// Marks an item as in or out of the cart everywhere it is shown.
   void _markInCart(String itemId, bool inCart) {
-    List<ThriftItem> mark(List<ThriftItem> list) => [for (final i in list) i.id == itemId ? i.copyWith(inCart: inCart) : i];
+    List<ThriftItem> mark(List<ThriftItem> list) => [
+      for (final i in list) i.id == itemId ? i.copyWith(inCart: inCart) : i,
+    ];
     _feed = mark(_feed);
     _saved = mark(_saved);
     _searchResults = mark(_searchResults);
   }
 
   /// Searches all available pieces on the server. Empty values mean "any".
-  Future<List<ThriftItem>> search({String query = '', String? category, String? location}) async {
-    final res = await _call(() => _api.get('/api/items', {
-          'limit': '50',
-          if (query.isNotEmpty) 'q': query,
-          'category': ?category,
-          'location': ?location,
-        }));
+  Future<List<ThriftItem>> search({
+    String query = '',
+    String? category,
+    String? location,
+  }) async {
+    final res = await _call(
+      () => _api.get('/api/items', {
+        'limit': '50',
+        if (query.isNotEmpty) 'q': query,
+        'category': ?category,
+        'location': ?location,
+      }),
+    );
     _searchResults = _items(res);
     notifyListeners();
     return _searchResults;
@@ -473,7 +551,9 @@ class AppState extends ChangeNotifier {
 
   /// Reports a listing. It disappears for this user straight away; admins review it.
   Future<void> reportItem(String itemId, String reason) async {
-    await _call(() => _api.post('/api/items/$itemId/report', {'reason': reason}));
+    await _call(
+      () => _api.post('/api/items/$itemId/report', {'reason': reason}),
+    );
     bool keep(ThriftItem i) => i.id != itemId;
     _feed = _feed.where(keep).toList();
     _searchResults = _searchResults.where(keep).toList();
@@ -500,17 +580,21 @@ class AppState extends ChangeNotifier {
       keys.add(await _call(() => _api.uploadMedia(m.bytes, m.contentType)));
     }
     onProgress?.call(keys.length, media.length);
-    final res = await _call(() => _api.post('/api/items', {
-          'title': title,
-          'priceZar': priceZar,
-          'condition': condition,
-          'size': size,
-          'category': category,
-          'description': description,
-          'caption': caption,
-          'quantity': quantity,
-          'media': [for (final k in keys) {'key': k}],
-        }));
+    final res = await _call(
+      () => _api.post('/api/items', {
+        'title': title,
+        'priceZar': priceZar,
+        'condition': condition,
+        'size': size,
+        'category': category,
+        'description': description,
+        'caption': caption,
+        'quantity': quantity,
+        'media': [
+          for (final k in keys) {'key': k},
+        ],
+      }),
+    );
     final item = ThriftItem.fromJson(res['item'] as Map<String, dynamic>);
     _myItems = [item, ..._myItems];
     _feed = [item, ..._feed];
@@ -541,21 +625,29 @@ class AppState extends ChangeNotifier {
         continue;
       }
       onProgress?.call(uploaded, toUpload);
-      keys.add(await _call(() => _api.uploadMedia(m.pending!.bytes, m.pending!.contentType)));
+      keys.add(
+        await _call(
+          () => _api.uploadMedia(m.pending!.bytes, m.pending!.contentType),
+        ),
+      );
       uploaded++;
     }
     onProgress?.call(uploaded, toUpload);
-    final res = await _call(() => _api.patch('/api/items/${item.id}', {
-          'title': title,
-          'priceZar': priceZar,
-          'condition': condition,
-          'size': size,
-          'category': category,
-          'description': description,
-          'caption': caption,
-          'quantity': quantity,
-          'media': [for (final k in keys) {'key': k}],
-        }));
+    final res = await _call(
+      () => _api.patch('/api/items/${item.id}', {
+        'title': title,
+        'priceZar': priceZar,
+        'condition': condition,
+        'size': size,
+        'category': category,
+        'description': description,
+        'caption': caption,
+        'quantity': quantity,
+        'media': [
+          for (final k in keys) {'key': k},
+        ],
+      }),
+    );
     final updated = ThriftItem.fromJson(res['item'] as Map<String, dynamic>);
     _replaceItem(updated);
     if (_livePinnedItem?.id == updated.id) _livePinnedItem = updated;
@@ -572,13 +664,24 @@ class AppState extends ChangeNotifier {
 
   Future<List<ItemComment>> comments(String itemId) async {
     final res = await _call(() => _api.get('/api/items/$itemId/comments'));
-    return (res['comments'] as List).map((c) => ItemComment.fromJson(c as Map<String, dynamic>)).toList();
+    return (res['comments'] as List)
+        .map((c) => ItemComment.fromJson(c as Map<String, dynamic>))
+        .toList();
   }
 
   Future<ItemComment> addComment(String itemId, String text) async {
-    final res = await _call(() => _api.post('/api/items/$itemId/comments', {'text': text}));
-    final item = [..._feed, ..._saved].where((i) => i.id == itemId).firstOrNull;
-    if (item != null) _replaceItem(item.copyWith(commentsCount: item.commentsCount + 1));
+    final res = await _call(
+      () => _api.post('/api/items/$itemId/comments', {'text': text}),
+    );
+    final item = [
+      ..._feed,
+      ..._myItems,
+      ..._saved,
+      ..._searchResults,
+      ..._cart,
+    ].where((i) => i.id == itemId).firstOrNull;
+    if (item != null)
+      _replaceItem(item.copyWith(commentsCount: item.commentsCount + 1));
     return ItemComment.fromJson(res['comment'] as Map<String, dynamic>);
   }
 
@@ -592,7 +695,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- Orders & wallet (payments simulated server-side) ----
+  // ---- Orders & wallet (payments are unavailable until provider integration) ----
 
   Future<EscrowOrder> checkout({
     required ThriftItem item,
@@ -601,13 +704,15 @@ class AppState extends ChangeNotifier {
     required String deliveryAddress,
     String? offerId,
   }) async {
-    final res = await _call(() => _api.post('/api/orders', {
-          'itemId': item.id,
-          'deliveryMethod': deliveryMethod,
-          'paymentMethod': paymentMethod,
-          'deliveryAddress': deliveryAddress,
-          'offerId': ?offerId,
-        }));
+    final res = await _call(
+      () => _api.post('/api/orders', {
+        'itemId': item.id,
+        'deliveryMethod': deliveryMethod,
+        'paymentMethod': paymentMethod,
+        'deliveryAddress': deliveryAddress,
+        'offerId': ?offerId,
+      }),
+    );
     final order = EscrowOrder.fromJson(res['order'] as Map<String, dynamic>);
     _orders = [order, ..._orders];
     if (item.quantity <= 1) {
@@ -624,12 +729,22 @@ class AppState extends ChangeNotifier {
 
   /// [trackingNumber] is required unless the order is collected at the Safe Hub.
   Future<void> dispatchOrder(String orderId, {String? trackingNumber}) =>
-      _orderAction(orderId, 'dispatch', trackingNumber == null ? null : {'trackingNumber': trackingNumber});
+      _orderAction(
+        orderId,
+        'dispatch',
+        trackingNumber == null ? null : {'trackingNumber': trackingNumber},
+      );
   Future<void> confirmOrder(String orderId) => _orderAction(orderId, 'confirm');
   Future<void> disputeOrder(String orderId) => _orderAction(orderId, 'dispute');
 
-  Future<void> _orderAction(String orderId, String action, [Object? body]) async {
-    final res = await _call(() => _api.post('/api/orders/$orderId/$action', body));
+  Future<void> _orderAction(
+    String orderId,
+    String action, [
+    Object? body,
+  ]) async {
+    final res = await _call(
+      () => _api.post('/api/orders/$orderId/$action', body),
+    );
     final order = EscrowOrder.fromJson(res['order'] as Map<String, dynamic>);
     _orders = [for (final o in _orders) o.id == orderId ? order : o];
     notifyListeners();
@@ -642,53 +757,140 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> topUpWallet(double amountZar, String method) async {
-    _applyWallet(await _call(() => _api.post('/api/wallet/topup', {'amountZar': amountZar, 'method': method})));
+    _applyWallet(
+      await _call(
+        () => _api.post('/api/wallet/topup', {
+          'amountZar': amountZar,
+          'method': method,
+        }),
+      ),
+    );
     notifyListeners();
   }
 
-  Future<void> withdrawFunds(double amountZar, String bank, String account) async {
-    _applyWallet(await _call(() => _api.post('/api/wallet/withdraw', {'amountZar': amountZar, 'bank': bank, 'account': account})));
+  Future<void> withdrawFunds(
+    double amountZar,
+    String bank,
+    String account,
+  ) async {
+    _applyWallet(
+      await _call(
+        () => _api.post('/api/wallet/withdraw', {
+          'amountZar': amountZar,
+          'bank': bank,
+          'account': account,
+        }),
+      ),
+    );
     notifyListeners();
   }
 
-  void recordDemoWalletActivity({
+  void simulateWalletActivity({
     required double amountZar,
     required TransactionType type,
-    String method = '',
   }) {
     if (!amountZar.isFinite || amountZar <= 0) {
-      throw ArgumentError.value(amountZar, 'amountZar', 'Must be a positive amount');
+      throw ArgumentError.value(
+        amountZar,
+        'amountZar',
+        'Must be a positive amount',
+      );
     }
-    if (!const {
-      TransactionType.topup,
-      TransactionType.withdrawal,
-      TransactionType.escrowHold,
-    }.contains(type)) {
-      throw ArgumentError.value(type, 'type', 'Unsupported demo wallet activity');
+    if (type != TransactionType.topup && type != TransactionType.withdrawal) {
+      throw ArgumentError.value(
+        type,
+        'type',
+        'Only demo deposits and withdrawals are supported',
+      );
+    }
+    if (type == TransactionType.withdrawal && amountZar > _demoBalance) {
+      throw StateError(
+        'The temporary demo balance is too low for that withdrawal.',
+      );
     }
 
-    final id = DateTime.now().microsecondsSinceEpoch.toString();
-    final title = switch (type) {
-      TransactionType.topup => 'Demo deposit',
-      TransactionType.withdrawal => 'Demo withdrawal request',
-      TransactionType.escrowHold => 'Demo payment',
-      _ => throw ArgumentError.value(type, 'type', 'Unsupported demo wallet activity'),
-    };
-    final methodText = method.isEmpty ? '' : ' · $method';
+    _demoBalance += type == TransactionType.topup ? amountZar : -amountZar;
     _demoTransactions.insert(
       0,
       WalletTransaction(
-        id: 'demo-$id',
-        title: title,
-        subtitle: 'Simulation only$methodText. No funds moved.',
+        id: 'demo-${DateTime.now().microsecondsSinceEpoch}',
+        title: type == TransactionType.topup
+            ? 'Simulated deposit'
+            : 'Simulated withdrawal',
+        subtitle: 'Temporary simulator activity. No real funds moved.',
         amountZar: amountZar,
         type: type,
         date: DateTime.now(),
-        status: 'Demo · not processed',
-        reference: 'DEMO-$id',
+        status: 'SIMULATION ONLY',
+        reference: 'LOCAL-ONLY',
         isDemo: true,
       ),
     );
+    notifyListeners();
+  }
+
+  DemoOrder simulateCheckout({
+    required String itemTitle,
+    required double amountZar,
+    required String deliveryMethod,
+    required String paymentMethod,
+    bool useDemoWallet = false,
+  }) {
+    if (!amountZar.isFinite || amountZar <= 0) {
+      throw ArgumentError.value(
+        amountZar,
+        'amountZar',
+        'Must be a positive amount',
+      );
+    }
+    if (useDemoWallet) {
+      if (amountZar > _demoBalance) {
+        throw StateError(
+          'The temporary demo balance is too low; simulate a demo deposit first.',
+        );
+      }
+      _demoBalance -= amountZar;
+    }
+    final order = DemoOrder(
+      id: 'DEMO-${DateTime.now().microsecondsSinceEpoch}',
+      itemTitle: itemTitle,
+      amountZar: amountZar,
+      deliveryMethod: deliveryMethod,
+      paymentMethod: paymentMethod,
+      status: 'Simulated checkout · no order placed',
+      createdAt: DateTime.now(),
+    );
+    _demoOrders.insert(0, order);
+    _demoTransactions.insert(
+      0,
+      WalletTransaction(
+        id: '${order.id}-payment',
+        title: 'Simulated checkout',
+        subtitle: '$itemTitle · $paymentMethod. No real payment or order.',
+        amountZar: amountZar,
+        type: TransactionType.escrowHold,
+        date: order.createdAt,
+        status: 'SIMULATION ONLY',
+        reference: order.id,
+        isDemo: true,
+      ),
+    );
+    notifyListeners();
+    return order;
+  }
+
+  void advanceDemoOrder(String orderId) {
+    final index = _demoOrders.indexWhere((order) => order.id == orderId);
+    if (index < 0) return;
+    final order = _demoOrders[index];
+    final nextStatus = switch (order.status) {
+      'Simulated checkout · no order placed' =>
+        'Simulation · delivery not booked',
+      'Simulation · delivery not booked' =>
+        'Simulation complete · no delivery occurred',
+      _ => order.status,
+    };
+    _demoOrders[index] = order.copyWith(status: nextStatus);
     notifyListeners();
   }
 
@@ -698,7 +900,10 @@ class AppState extends ChangeNotifier {
     _cart = (res['items'] as List).map((i) {
       final json = i as Map<String, dynamic>;
       // Sold or removed pieces stay in the list, shown as no longer available.
-      return ThriftItem.fromJson({...json, 'isClaimed': json['available'] == false || json['isClaimed'] == true});
+      return ThriftItem.fromJson({
+        ...json,
+        'isClaimed': json['available'] == false || json['isClaimed'] == true,
+      });
     }).toList();
   }
 
@@ -727,56 +932,87 @@ class AppState extends ChangeNotifier {
   }) async {
     dynamic res;
     try {
-      res = await _call(() => _api.post('/api/cart/checkout', {
-            'deliveryMethod': deliveryMethod,
-            'paymentMethod': paymentMethod,
-            'deliveryAddress': deliveryAddress,
-          }));
+      res = await _call(
+        () => _api.post('/api/cart/checkout', {
+          'deliveryMethod': deliveryMethod,
+          'paymentMethod': paymentMethod,
+          'deliveryAddress': deliveryAddress,
+        }),
+      );
     } on ApiException {
       // Nothing could be bought; reload so the cart shows which pieces are gone.
       await loadCart().catchError((_) {});
       rethrow;
     }
-    final bought = (res['orders'] as List).map((o) => EscrowOrder.fromJson(o as Map<String, dynamic>)).toList();
+    final bought = (res['orders'] as List)
+        .map((o) => EscrowOrder.fromJson(o as Map<String, dynamic>))
+        .toList();
     _orders = [...bought, ..._orders];
     notifyListeners();
     // Pieces with stock left stay in the feed, so reload it rather than dropping what was bought.
-    await Future.wait([loadCart(), loadWallet(), loadFeed()].map((f) => f.catchError((_) {})));
-    return [for (final f in res['failed'] as List) (f as Map<String, dynamic>)['error'] as String];
+    await Future.wait(
+      [loadCart(), loadWallet(), loadFeed()].map((f) => f.catchError((_) {})),
+    );
+    return [
+      for (final f in res['failed'] as List)
+        (f as Map<String, dynamic>)['error'] as String,
+    ];
   }
 
   // ---- Offers ----
 
   Future<void> loadOffers() async {
     final res = await _call(() => _api.get('/api/offers'));
-    _offers = (res['offers'] as List).map((o) => Offer.fromJson(o as Map<String, dynamic>)).toList();
+    _offers = (res['offers'] as List)
+        .map((o) => Offer.fromJson(o as Map<String, dynamic>))
+        .toList();
     notifyListeners();
   }
 
   Future<void> makeOffer(ThriftItem item, double amountZar) async {
-    await _call(() => _api.post('/api/items/${item.id}/offers', {'amountZar': amountZar}));
+    await _call(
+      () => _api.post('/api/items/${item.id}/offers', {'amountZar': amountZar}),
+    );
     await loadOffers();
   }
 
   /// [action] is accept, decline, counter (with [amountZar]) or cancel.
-  Future<void> respondToOffer(String offerId, String action, {double? amountZar}) async {
-    await _call(() => _api.post('/api/offers/$offerId/$action', amountZar == null ? null : {'amountZar': amountZar}));
+  Future<void> respondToOffer(
+    String offerId,
+    String action, {
+    double? amountZar,
+  }) async {
+    await _call(
+      () => _api.post(
+        '/api/offers/$offerId/$action',
+        amountZar == null ? null : {'amountZar': amountZar},
+      ),
+    );
     await loadOffers();
   }
 
   // ---- Sellers, follows and reviews ----
 
-  Future<(SellerProfile, List<ThriftItem>, List<Review>)> loadProfile(String userId) async {
+  Future<(SellerProfile, List<ThriftItem>, List<Review>)> loadProfile(
+    String userId,
+  ) async {
     final res = await _call(() => _api.get('/api/users/$userId'));
     return (
       SellerProfile.fromJson(res['profile'] as Map<String, dynamic>),
       _items(res),
-      [for (final r in res['reviews'] as List) Review.fromJson(r as Map<String, dynamic>)],
+      [
+        for (final r in res['reviews'] as List)
+          Review.fromJson(r as Map<String, dynamic>),
+      ],
     );
   }
 
   Future<SellerProfile> setFollowing(String userId, bool follow) async {
-    final res = await _call(() => follow ? _api.post('/api/users/$userId/follow') : _api.delete('/api/users/$userId/follow'));
+    final res = await _call(
+      () => follow
+          ? _api.post('/api/users/$userId/follow')
+          : _api.delete('/api/users/$userId/follow'),
+    );
     loadMyFollowCounts().catchError((_) {});
     return SellerProfile.fromJson(res['profile'] as Map<String, dynamic>);
   }
@@ -792,17 +1028,28 @@ class AppState extends ChangeNotifier {
   /// [which] is 'followers' or 'following'.
   Future<List<PersonRow>> loadFollowList(String userId, String which) async {
     final res = await _call(() => _api.get('/api/users/$userId/$which'));
-    return [for (final u in res['users'] as List) PersonRow.fromJson(u as Map<String, dynamic>)];
+    return [
+      for (final u in res['users'] as List)
+        PersonRow.fromJson(u as Map<String, dynamic>),
+    ];
   }
 
   Future<List<PersonRow>> searchPeople(String query) async {
     if (query.trim().length < 2) return const [];
     final res = await _call(() => _api.get('/api/users', {'q': query.trim()}));
-    return [for (final u in res['users'] as List) PersonRow.fromJson(u as Map<String, dynamic>)];
+    return [
+      for (final u in res['users'] as List)
+        PersonRow.fromJson(u as Map<String, dynamic>),
+    ];
   }
 
   Future<void> reviewOrder(String orderId, int rating, String text) async {
-    await _call(() => _api.post('/api/orders/$orderId/review', {'rating': rating, 'text': text}));
+    await _call(
+      () => _api.post('/api/orders/$orderId/review', {
+        'rating': rating,
+        'text': text,
+      }),
+    );
     await loadOrders();
   }
 
@@ -810,24 +1057,43 @@ class AppState extends ChangeNotifier {
 
   Future<List<ChatSummary>> loadChats() async {
     final res = await _call(() => _api.get('/api/chats'));
-    return [for (final c in res['chats'] as List) ChatSummary.fromJson(c as Map<String, dynamic>)];
+    return [
+      for (final c in res['chats'] as List)
+        ChatSummary.fromJson(c as Map<String, dynamic>),
+    ];
   }
 
   /// The conversation with [userId]; opening it marks their messages read.
   Future<List<ChatMessage>> loadChat(String userId) async {
     final res = await _call(() => _api.get('/api/chats/$userId'));
-    final messages = [for (final m in res['messages'] as List) ChatMessage.fromJson(m as Map<String, dynamic>)];
+    final messages = [
+      for (final m in res['messages'] as List)
+        ChatMessage.fromJson(m as Map<String, dynamic>),
+    ];
     pollNotifications();
     return messages;
   }
 
   Future<void> sendMessage(String userId, String text, {String? itemId}) async {
-    await _call(() => _api.post('/api/chats/$userId', {'text': text, 'itemId': ?itemId}));
+    await _call(
+      () => _api.post('/api/chats/$userId', {'text': text, 'itemId': ?itemId}),
+    );
   }
 
   /// Sends a question to Dobha support. Works signed out too (then [email] is needed for the answer).
-  Future<void> contactSupport({required String topic, required String message, String? orderId, String? email}) =>
-      _call(() => _api.post('/api/support', {'topic': topic, 'message': message, 'orderId': ?orderId, 'email': ?email}));
+  Future<void> contactSupport({
+    required String topic,
+    required String message,
+    String? orderId,
+    String? email,
+  }) => _call(
+    () => _api.post('/api/support', {
+      'topic': topic,
+      'message': message,
+      'orderId': ?orderId,
+      'email': ?email,
+    }),
+  );
 
   // ---- Stories ----
 
@@ -842,7 +1108,9 @@ class AppState extends ChangeNotifier {
         // Grouped format: { userId, stories: [...] }
         if (map.containsKey('stories')) {
           final uid = map['userId'] as String? ?? map['user_id'] as String;
-          final list = (map['stories'] as List).map((s) => Story.fromJson(s as Map<String, dynamic>)).toList();
+          final list = (map['stories'] as List)
+              .map((s) => Story.fromJson(s as Map<String, dynamic>))
+              .toList();
           groups[uid] = list;
         } else {
           // Flat format: individual story
@@ -866,11 +1134,21 @@ class AppState extends ChangeNotifier {
   }
 
   /// Uploads story media and posts the story.
-  Future<void> createStory(Uint8List bytes, String contentType, {String caption = ''}) async {
+  Future<void> createStory(
+    Uint8List bytes,
+    String contentType, {
+    String caption = '',
+  }) async {
     final key = await _call(() => _api.uploadMedia(bytes, contentType));
     final mediaUrl = _api.resolve('/media/$key');
     final mediaType = contentType.startsWith('video/') ? 'video' : 'image';
-    await _call(() => _api.postStory(mediaUrl: mediaUrl, mediaType: mediaType, caption: caption));
+    await _call(
+      () => _api.postStory(
+        mediaUrl: mediaUrl,
+        mediaType: mediaType,
+        caption: caption,
+      ),
+    );
     await loadStories().catchError((_) {});
   }
 
@@ -878,7 +1156,8 @@ class AppState extends ChangeNotifier {
 
   Future<void> loadSubscriptions() async {
     try {
-      final res = await _call(() => _api.getSubscriptions()) as Map<String, dynamic>;
+      final res =
+          await _call(() => _api.getSubscriptions()) as Map<String, dynamic>;
       _subscriptions = (res['subscriptions'] as List? ?? [])
           .map((s) => Subscription.fromJson(s as Map<String, dynamic>))
           .toList();
@@ -890,23 +1169,32 @@ class AppState extends ChangeNotifier {
 
   /// Subscribes or unsubscribes to [userId]. Returns true if now subscribed.
   Future<bool> toggleSubscription(String userId) async {
-    final res = await _call(() => _api.toggleSubscription(userId)) as Map<String, dynamic>;
+    final res =
+        await _call(() => _api.toggleSubscription(userId))
+            as Map<String, dynamic>;
     final subscribed = res['subscribed'] as bool? ?? false;
     await loadSubscriptions().catchError((_) {});
     return subscribed;
   }
 
-  bool isSubscribedTo(String userId) => _subscriptions.any((s) => s.sellerId == userId);
+  bool isSubscribedTo(String userId) =>
+      _subscriptions.any((s) => s.sellerId == userId);
 
   // ---- Promotions ----
 
-  /// Boosts [item] for [days] at [tier]. Deducts the cost from the seller's wallet.
-  Future<DateTime> promoteItem(ThriftItem item, {required int days, String tier = 'basic'}) async {
-    final res = await _call(() => _api.promoteItem(item.id, days: days, tier: tier)) as Map<String, dynamic>;
-    final until = parseJsonDateTime(res['promotedUntil']);
-    // Reload the item in the inventory so the promoted badge appears
-    await loadMyItems().catchError((_) {});
-    await loadWallet().catchError((_) {});
+  /// Simulates a temporary listing boost locally; it never charges or calls the API.
+  Future<DateTime> promoteItem(
+    ThriftItem item, {
+    required int days,
+    String tier = 'basic',
+  }) async {
+    if (days <= 0 || days > 30) {
+      throw ArgumentError.value(days, 'days', 'Must be between 1 and 30 days');
+    }
+    final until = DateTime.now().add(Duration(days: days));
+    final promoted = item.copyWith(isPromoted: true, promotedUntil: until);
+    _replaceItem(promoted);
+    if (_livePinnedItem?.id == item.id) _livePinnedItem = promoted;
     return until;
   }
 
@@ -914,6 +1202,9 @@ class AppState extends ChangeNotifier {
 
   Future<List<SupportRequest>> loadSupportRequests() async {
     final res = await _call(() => _api.get('/api/support'));
-    return [for (final r in res['requests'] as List) SupportRequest.fromJson(r as Map<String, dynamic>)];
+    return [
+      for (final r in res['requests'] as List)
+        SupportRequest.fromJson(r as Map<String, dynamic>),
+    ];
   }
 }

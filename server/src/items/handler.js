@@ -66,6 +66,18 @@ function validateListingMedia({ photos, videoUrls }) {
   return null;
 }
 
+function formatComment(comment) {
+  return {
+    id: comment.id,
+    itemId: comment.item_id,
+    userId: comment.user_id,
+    name: comment.user_name || comment.name || 'Member',
+    handle: comment.user_handle || comment.handle || '',
+    text: comment.text || '',
+    createdAt: new Date(comment.created_at).toISOString(),
+  };
+}
+
 function formatItem(item, seller = null, viewerId = null, isLiked = false, isSaved = false) {
   const mediaReferences = formatMediaReferences(item);
   const sellerInfo = seller || {
@@ -113,6 +125,7 @@ function formatItem(item, seller = null, viewerId = null, isLiked = false, isSav
 exports.normalizeListingMedia = normalizeListingMedia;
 exports.formatMediaReferences = formatMediaReferences;
 exports.validateListingMedia = validateListingMedia;
+exports.formatComment = formatComment;
 
 exports.handler = async (event) => {
   const cors = handleCors(event);
@@ -536,33 +549,69 @@ exports.handler = async (event) => {
     if (likeMatch && method === 'POST') {
       const authUser = await requireUser(event);
       const itemId = likeMatch[1];
+      const item = await dynamo.get(itemsTable, { id: itemId });
+      if (!item) return error(404, 'Item not found');
 
       const existing = await dynamo.get(likesTable, { user_id: authUser.id, item_id: itemId });
-      if (existing) {
-        // Unlike
-        await dynamo.delete(likesTable, { user_id: authUser.id, item_id: itemId });
-        await dynamo.update({
-          TableName: itemsTable,
-          Key: { id: itemId },
-          UpdateExpression: 'SET likes_count = if_not_exists(likes_count, :one) - :one',
-          ExpressionAttributeValues: { ':one': 1 },
-        }).catch(() => {});
-        return json(200, { liked: false });
-      } else {
-        // Like
-        await dynamo.put(likesTable, {
-          user_id: authUser.id,
-          item_id: itemId,
-          created_at: now(),
-        });
-        await dynamo.update({
-          TableName: itemsTable,
-          Key: { id: itemId },
-          UpdateExpression: 'SET likes_count = if_not_exists(likes_count, :zero) + :one',
-          ExpressionAttributeValues: { ':one': 1, ':zero': 0 },
-        }).catch(() => {});
-        return json(200, { liked: true });
+      const transactItems = existing
+        ? [
+            {
+              Delete: {
+                TableName: likesTable,
+                Key: { user_id: authUser.id, item_id: itemId },
+                ConditionExpression: 'attribute_exists(user_id)',
+              },
+            },
+            {
+              Update: {
+                TableName: itemsTable,
+                Key: { id: itemId },
+                UpdateExpression: 'ADD likes_count :decrement',
+                ConditionExpression: 'attribute_exists(id) AND likes_count >= :one',
+                ExpressionAttributeValues: { ':decrement': -1, ':one': 1 },
+              },
+            },
+          ]
+        : [
+            {
+              Put: {
+                TableName: likesTable,
+                Item: { user_id: authUser.id, item_id: itemId, created_at: now() },
+                ConditionExpression: 'attribute_not_exists(user_id)',
+              },
+            },
+            {
+              Update: {
+                TableName: itemsTable,
+                Key: { id: itemId },
+                UpdateExpression: 'ADD likes_count :one',
+                ConditionExpression: 'attribute_exists(id)',
+                ExpressionAttributeValues: { ':one': 1 },
+              },
+            },
+          ];
+
+      try {
+        await dynamo.transactWrite(transactItems);
+      } catch (err) {
+        if (err.name !== 'TransactionCanceledException') throw err;
+        const [currentLike, currentItem] = await Promise.all([
+          dynamo.get(likesTable, { user_id: authUser.id, item_id: itemId }),
+          dynamo.get(itemsTable, { id: itemId }),
+        ]);
+        if (!currentItem) return error(404, 'Item not found');
+        if (Boolean(currentLike) === Boolean(existing)) throw err;
       }
+
+      const [updated, saved] = await Promise.all([
+        dynamo.get(itemsTable, { id: itemId }),
+        dynamo.get(savesTable, { user_id: authUser.id, item_id: itemId }),
+      ]);
+      const liked = Boolean(await dynamo.get(likesTable, { user_id: authUser.id, item_id: itemId }));
+      return json(200, {
+        liked,
+        item: formatItem(updated, null, authUser.id, liked, Boolean(saved)),
+      });
     }
 
     // -------------------------------------------------------------
@@ -572,19 +621,28 @@ exports.handler = async (event) => {
     if (saveMatch && method === 'POST') {
       const authUser = await requireUser(event);
       const itemId = saveMatch[1];
+      const item = await dynamo.get(itemsTable, { id: itemId });
+      if (!item) return error(404, 'Item not found');
 
       const existing = await dynamo.get(savesTable, { user_id: authUser.id, item_id: itemId });
       if (existing) {
         await dynamo.delete(savesTable, { user_id: authUser.id, item_id: itemId });
-        return json(200, { saved: false });
       } else {
         await dynamo.put(savesTable, {
           user_id: authUser.id,
           item_id: itemId,
           created_at: now(),
         });
-        return json(200, { saved: true });
       }
+      const [updated, liked, saved] = await Promise.all([
+        dynamo.get(itemsTable, { id: itemId }),
+        dynamo.get(likesTable, { user_id: authUser.id, item_id: itemId }),
+        dynamo.get(savesTable, { user_id: authUser.id, item_id: itemId }),
+      ]);
+      return json(200, {
+        saved: Boolean(saved),
+        item: formatItem(updated, null, authUser.id, Boolean(liked), Boolean(saved)),
+      });
     }
 
     // -------------------------------------------------------------
@@ -666,14 +724,16 @@ exports.handler = async (event) => {
           ScanIndexForward: true,
           Limit: 100,
         });
-        return json(200, { comments: res.items });
+        return json(200, { comments: res.items.map(formatComment) });
       }
 
       if (method === 'POST') {
         const authUser = await requireUser(event);
         const body = parseBody(event);
-        const text = (body.text || '').trim();
+        const text = typeof body.text === 'string' ? body.text.trim() : '';
         if (!text) return error(400, 'Comment text is required');
+        if (text.length > 500) return error(400, 'Comment must be 500 characters or fewer');
+        if (!await dynamo.get(itemsTable, { id: itemId })) return error(404, 'Item not found');
 
         const commentId = id('cmt');
         const newComment = {
@@ -687,7 +747,7 @@ exports.handler = async (event) => {
         };
 
         await dynamo.put(commentsTable, newComment);
-        return json(201, { comment: newComment });
+        return json(201, { comment: formatComment(newComment) });
       }
     }
 

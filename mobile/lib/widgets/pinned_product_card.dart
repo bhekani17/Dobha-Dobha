@@ -34,7 +34,10 @@ class PinnedProductBanner extends StatelessWidget {
             children: [
               Icon(Icons.sell_outlined, color: DobhaColors.green, size: 18),
               SizedBox(width: 8),
-              Text('Pin an item for sale', style: TextStyle(color: DobhaColors.green, fontSize: 13)),
+              Text(
+                'Pin an item for sale',
+                style: TextStyle(color: DobhaColors.green, fontSize: 13),
+              ),
             ],
           ),
         ),
@@ -55,7 +58,11 @@ class PinnedProductBanner extends StatelessWidget {
             circle: true,
             padding: const EdgeInsets.all(9),
             tint: accent,
-            child: Icon(isSold ? Icons.check_circle : Icons.local_offer, color: accent, size: 18),
+            child: Icon(
+              isSold ? Icons.check_circle : Icons.local_offer,
+              color: accent,
+              size: 18,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -70,7 +77,10 @@ class PinnedProductBanner extends StatelessWidget {
                         current.title,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -81,7 +91,9 @@ class PinnedProductBanner extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      current.price.startsWith('R') ? current.price : 'R ${current.price}',
+                      current.price.startsWith('R')
+                          ? current.price
+                          : 'R ${current.price}',
                       style: TextStyle(
                         color: isSold ? DobhaColors.muted : DobhaColors.green,
                         fontWeight: FontWeight.w700,
@@ -96,7 +108,11 @@ class PinnedProductBanner extends StatelessWidget {
                           'Legacy status',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: DobhaColors.amber, fontSize: 12, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: DobhaColors.amber,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -114,30 +130,45 @@ class PinnedProductBanner extends StatelessWidget {
                 if (val == 'unpin') onUnpinTap?.call();
               },
               itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('Pin a different item')),
-                PopupMenuItem(value: 'unpin', child: Text('Unpin item', style: TextStyle(color: DobhaColors.red))),
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Text('Pin a different item'),
+                ),
+                PopupMenuItem(
+                  value: 'unpin',
+                  child: Text(
+                    'Unpin item',
+                    style: TextStyle(color: DobhaColors.red),
+                  ),
+                ),
               ],
             )
           else
-            AppTag(isSold ? 'LEGACY' : 'NO CHECKOUT', color: isSold ? DobhaColors.amber : DobhaColors.muted),
+            AppTag(isSold ? 'LEGACY' : 'DEMO ONLY', color: DobhaColors.amber),
         ],
       ),
     );
   }
 }
 
-
 /// Host picks one of their unsold listings to pin in the stream.
-Future<PinnedItem?> showPinItemModal({required BuildContext context, String? currentId}) {
+Future<PinnedItem?> showPinItemModal({
+  required BuildContext context,
+  String? currentId,
+}) {
   return showModalBottomSheet<PinnedItem>(
     context: context,
     isScrollControlled: true,
     builder: (ctx) {
-      final items = AppState().vendorInventory.where((i) => !i.isClaimed).toList();
+      final items = AppState().vendorInventory
+          .where((i) => !i.isClaimed)
+          .toList();
       return Padding(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.7),
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.7,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -146,17 +177,32 @@ Future<PinnedItem?> showPinItemModal({required BuildContext context, String? cur
                 children: [
                   Icon(Icons.sell_rounded, color: DobhaColors.green, size: 22),
                   const SizedBox(width: 8),
-                  const Text('Pin an item', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.3)),
+                  const Text(
+                    'Pin an item',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
                   const Spacer(),
-                  AppButton.icon(icon: Icons.close, size: 18, padding: 8, onPressed: () => Navigator.of(ctx).pop()),
+                  AppButton.icon(
+                    icon: Icons.close,
+                    size: 18,
+                    padding: 8,
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
               if (items.isEmpty)
                 Padding(
                   padding: EdgeInsets.all(20),
-                  child: Text('You have no unsold listings. Add items from the Go Live tab.',
-                      textAlign: TextAlign.center, style: TextStyle(color: DobhaColors.muted)),
+                  child: Text(
+                    'You have no unsold listings. Add items from the Go Live tab.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: DobhaColors.muted),
+                  ),
                 )
               else
                 Flexible(
@@ -172,19 +218,32 @@ Future<PinnedItem?> showPinItemModal({required BuildContext context, String? cur
                             radius: 16,
                             padding: const EdgeInsets.all(10),
                             onPressed: () => Navigator.of(ctx).pop(
-                              PinnedItem(id: item.id, title: item.title, price: item.formattedPrice, size: item.size),
+                              PinnedItem(
+                                id: item.id,
+                                title: item.title,
+                                price: item.formattedPrice,
+                                size: item.size,
+                              ),
                             ),
                             child: Row(
                               children: [
                                 ItemThumb(item: item, size: 46),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Text(item.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(color: DobhaColors.text, fontSize: 13)),
+                                  child: Text(
+                                    item.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: DobhaColors.text,
+                                      fontSize: 13,
+                                    ),
+                                  ),
                                 ),
-                                Text(item.formattedPrice, style: TextStyle(color: DobhaColors.green)),
+                                Text(
+                                  item.formattedPrice,
+                                  style: TextStyle(color: DobhaColors.green),
+                                ),
                               ],
                             ),
                           ),

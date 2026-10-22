@@ -276,16 +276,19 @@ class ChatSummary {
     required this.updatedAt,
   });
 
-  factory ChatSummary.fromJson(Map<String, dynamic> json) => ChatSummary(
-        userId: json['userId'] as String,
-        name: json['name'] as String,
-        handle: json['handle'] as String,
-        avatarUrl: json['avatarUrl'] as String?,
-        lastMessage: json['lastMessage'] as String? ?? '',
-        lastFromMe: json['lastFromMe'] as bool? ?? false,
-        unread: json['unread'] as int? ?? 0,
-        updatedAt: parseJsonDateTime(json['updatedAt']),
-      );
+  factory ChatSummary.fromJson(Map<String, dynamic> json) {
+    final peer = json['peer'] as Map<String, dynamic>? ?? const {};
+    return ChatSummary(
+      userId: json['userId'] as String? ?? json['id'] as String? ?? peer['id'] as String? ?? '',
+      name: json['name'] as String? ?? peer['name'] as String? ?? 'Dobha User',
+      handle: json['handle'] as String? ?? peer['handle'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String? ?? peer['avatarUrl'] as String?,
+      lastMessage: json['lastMessage'] as String? ?? json['last_message'] as String? ?? '',
+      lastFromMe: json['lastFromMe'] as bool? ?? json['last_from_me'] as bool? ?? false,
+      unread: json['unread'] as int? ?? 0,
+      updatedAt: parseJsonDateTime(json['updatedAt'] ?? json['lastMessageAt'] ?? json['last_message_at'] ?? 0),
+    );
+  }
 }
 
 /// A listing a chat message is about.
@@ -311,8 +314,8 @@ class ChatMessage {
     return ChatMessage(
       id: json['id'] as String,
       text: json['text'] as String,
-      fromMe: json['fromMe'] as bool? ?? false,
-      createdAt: parseJsonDateTime(json['createdAt']),
+      fromMe: json['fromMe'] as bool? ?? json['isMe'] as bool? ?? false,
+      createdAt: parseJsonDateTime(json['createdAt'] ?? json['created_at']),
       item: item == null
           ? null
           : ChatItemRef(
