@@ -62,6 +62,7 @@ class AppState extends ChangeNotifier {
   List<ThriftItem> _saved = [];
   List<EscrowOrder> _orders = [];
   List<WalletTransaction> _transactions = [];
+  final List<WalletTransaction> _demoTransactions = [];
   double _available = 0, _locked = 0, _pending = 0;
   List<ThriftItem> _searchResults = [];
   List<AppNotification> _notifications = [];
@@ -89,7 +90,10 @@ class AppState extends ChangeNotifier {
   List<ThriftItem> get vendorInventory => List.unmodifiable(_myItems);
   List<ThriftItem> get savedItems => List.unmodifiable(_saved);
   List<EscrowOrder> get orders => List.unmodifiable(_orders);
-  List<WalletTransaction> get transactions => List.unmodifiable(_transactions);
+  List<WalletTransaction> get transactions {
+    final all = [..._transactions, ..._demoTransactions]..sort((a, b) => b.date.compareTo(a.date));
+    return List.unmodifiable(all);
+  }
   double get availableBalance => _available;
   double get lockedEscrowFunds => _locked;
   double get vendorPendingPayouts => _pending;
@@ -238,6 +242,7 @@ class AppState extends ChangeNotifier {
     _saved = [];
     _orders = [];
     _transactions = [];
+    _demoTransactions.clear();
     _available = _locked = _pending = 0;
     _livePinnedItem = null;
     _searchResults = [];
@@ -643,6 +648,47 @@ class AppState extends ChangeNotifier {
 
   Future<void> withdrawFunds(double amountZar, String bank, String account) async {
     _applyWallet(await _call(() => _api.post('/api/wallet/withdraw', {'amountZar': amountZar, 'bank': bank, 'account': account})));
+    notifyListeners();
+  }
+
+  void recordDemoWalletActivity({
+    required double amountZar,
+    required TransactionType type,
+    String method = '',
+  }) {
+    if (!amountZar.isFinite || amountZar <= 0) {
+      throw ArgumentError.value(amountZar, 'amountZar', 'Must be a positive amount');
+    }
+    if (!const {
+      TransactionType.topup,
+      TransactionType.withdrawal,
+      TransactionType.escrowHold,
+    }.contains(type)) {
+      throw ArgumentError.value(type, 'type', 'Unsupported demo wallet activity');
+    }
+
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    final title = switch (type) {
+      TransactionType.topup => 'Demo deposit',
+      TransactionType.withdrawal => 'Demo withdrawal request',
+      TransactionType.escrowHold => 'Demo payment',
+      _ => throw ArgumentError.value(type, 'type', 'Unsupported demo wallet activity'),
+    };
+    final methodText = method.isEmpty ? '' : ' · $method';
+    _demoTransactions.insert(
+      0,
+      WalletTransaction(
+        id: 'demo-$id',
+        title: title,
+        subtitle: 'Simulation only$methodText. No funds moved.',
+        amountZar: amountZar,
+        type: type,
+        date: DateTime.now(),
+        status: 'Demo · not processed',
+        reference: 'DEMO-$id',
+        isDemo: true,
+      ),
+    );
     notifyListeners();
   }
 

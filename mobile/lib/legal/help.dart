@@ -81,7 +81,7 @@ const helpTopics = [
   HelpTopic('Wallet and payouts', [
     HelpQuestion(
       'How do I withdraw my money?',
-      'Withdrawals are unavailable. Do not enter bank details. Wallet balances shown may include demo or historical activity and are not spendable funds held by Dobha.',
+      'Real withdrawals are unavailable. The wallet can record a simulated withdrawal for demo purposes only; it does not send money or ask for bank details. Wallet balances are not spendable funds held by Dobha.',
     ),
     HelpQuestion(
       'What do the displayed balances mean?',

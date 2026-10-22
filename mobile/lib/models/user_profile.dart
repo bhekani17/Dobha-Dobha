@@ -22,6 +22,7 @@ class WalletTransaction {
   final DateTime date;
   final String status;
   final String reference;
+  final bool isDemo;
 
   const WalletTransaction({
     required this.id,
@@ -32,6 +33,7 @@ class WalletTransaction {
     required this.date,
     required this.status,
     required this.reference,
+    this.isDemo = false,
   });
 
   bool get isCredit =>

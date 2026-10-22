@@ -11,6 +11,105 @@ import '../widgets/ui.dart';
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
 
+  Future<void> _showDemoActivity(BuildContext context, TransactionType type) async {
+    final amountController = TextEditingController();
+    String? amountError;
+    var method = switch (type) {
+      TransactionType.topup => 'Card simulation',
+      TransactionType.withdrawal => 'Bank payout simulation',
+      TransactionType.escrowHold => 'Card payment simulation',
+      _ => '',
+    };
+    try {
+      final amount = await showDialog<double>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(switch (type) {
+              TransactionType.topup => 'Demo deposit',
+              TransactionType.withdrawal => 'Demo withdrawal',
+              TransactionType.escrowHold => 'Demo payment',
+              _ => 'Demo activity',
+            }),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Simulation only. No payment is taken, no funds move, and this does not change your displayed balance.',
+                  style: TextStyle(fontSize: 13, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  onChanged: (_) {
+                    if (amountError != null) {
+                      setDialogState(() => amountError = null);
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Demo amount (R)',
+                    prefixText: 'R ',
+                    errorText: amountError,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: method,
+                  decoration: const InputDecoration(labelText: 'Demo method'),
+                  items: [
+                    if (type == TransactionType.topup) ...[
+                      'Card simulation',
+                      'Instant EFT simulation',
+                      'Voucher simulation',
+                    ],
+                    if (type == TransactionType.withdrawal) ...[
+                      'Bank payout simulation',
+                      'Mobile money simulation',
+                    ],
+                    if (type == TransactionType.escrowHold) ...[
+                      'Card payment simulation',
+                      'Wallet payment simulation',
+                    ],
+                  ].map((option) => DropdownMenuItem(value: option, child: Text(option))).toList(),
+                  onChanged: (value) {
+                    if (value != null) setDialogState(() => method = value);
+                  },
+                ),
+                if (type == TransactionType.withdrawal) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'For your safety, this demo does not ask for bank or account details.',
+                    style: TextStyle(fontSize: 12, color: DobhaColors.muted),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+              FilledButton(
+                onPressed: () {
+                  final amount = double.tryParse(amountController.text.trim());
+                  if (amount == null || !amount.isFinite || amount <= 0) {
+                    setDialogState(() => amountError = 'Enter an amount greater than R 0');
+                    return;
+                  }
+                  Navigator.pop(dialogContext, amount);
+                },
+                child: const Text('Add demo activity'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (amount == null) return;
+      AppState().recordDemoWalletActivity(amountZar: amount, type: type, method: method);
+    } finally {
+      amountController.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -26,7 +125,7 @@ class WalletScreen extends StatelessWidget {
         return Scaffold(
           appBar: AppBar(
             toolbarHeight: 68,
-            title: const Text('Orders'),
+            title: const Text('Wallet & Orders'),
           ),
           body: RefreshIndicator(
             color: DobhaColors.green,
@@ -98,9 +197,31 @@ class WalletScreen extends StatelessWidget {
                       radius: 14,
                       tint: DobhaColors.amber,
                       child: const Text(
-                        'Payments, wallet deposits, withdrawals, and escrow are unavailable. This balance is not spendable and does not represent funds held by Dobha.',
+                        'Demo only: try deposits, payments, and withdrawals below. No real payment or payout is processed, and demo activity never changes this balance.',
                         style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.4),
                       ),
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _DemoActionButton(
+                          icon: Icons.add_card_rounded,
+                          label: 'Deposit demo',
+                          onPressed: () => _showDemoActivity(context, TransactionType.topup),
+                        ),
+                        _DemoActionButton(
+                          icon: Icons.payments_outlined,
+                          label: 'Payment demo',
+                          onPressed: () => _showDemoActivity(context, TransactionType.escrowHold),
+                        ),
+                        _DemoActionButton(
+                          icon: Icons.account_balance_outlined,
+                          label: 'Withdraw demo',
+                          onPressed: () => _showDemoActivity(context, TransactionType.withdrawal),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -170,6 +291,21 @@ class WalletScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DemoActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onPressed;
+
+  const _DemoActionButton({required this.icon, required this.label, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 17),
+        label: Text(label),
+      );
 }
 
 class _BalanceWell extends StatelessWidget {
