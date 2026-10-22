@@ -33,6 +33,11 @@ class CheckoutModal extends StatelessWidget {
     );
   }
 
+  Offer? _acceptedOfferFor(ThriftItem item) {
+    if (offer?.item.id != item.id || offer?.status != 'accepted') return null;
+    return offer;
+  }
+
   Future<void> _contactSeller(BuildContext context, ThriftItem item) async {
     final appState = AppState();
     if (!appState.isLoggedIn) {
@@ -43,10 +48,8 @@ class CheckoutModal extends StatelessWidget {
     }
     if (item.sellerId == appState.user.id) return;
 
-    final acceptedOffer = offer?.item.id == item.id && offer?.status == 'accepted'
-        ? offer
-        : null;
-    final amount = acceptedOffer?.formattedAmount ?? item.formattedPrice;
+    final itemOffer = _acceptedOfferFor(item);
+    final amount = itemOffer?.formattedAmount ?? item.formattedPrice;
     final draft =
         'Hi, I am interested in buying "${item.title}" for $amount. Is it still available? I understand payment is not handled by Dobha.';
 
@@ -126,9 +129,7 @@ class CheckoutModal extends StatelessWidget {
                       final appState = AppState();
                       final isOwnItem = appState.isLoggedIn &&
                           item.sellerId == appState.user.id;
-                      final itemOffer = acceptedOffer?.item.id == item.id
-                          ? acceptedOffer
-                          : null;
+                      final itemOffer = _acceptedOfferFor(item);
                       final amount =
                           itemOffer?.formattedAmount ?? item.formattedPrice;
                       return AppWell(
