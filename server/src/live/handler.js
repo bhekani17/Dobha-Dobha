@@ -244,18 +244,41 @@ exports.handler = withCors(async (event) => {
       const body = parseBody(event);
       const room = (body.room || '').trim();
 
-      if (!room) {
-        return error(400, 'Room name is required');
+      if (!ROOM_NAME_REGEX.test(room)) {
+        return error(400, 'A valid room name is required');
       }
 
       const cfg = getLiveKitConfig();
-      if (cfg) {
+      if (!cfg) {
+        return error(503, 'Live streaming is unavailable until LiveKit is configured');
+      }
+
+      const service = new RoomServiceClient(cfg.url.replace(/^ws/, 'http'), cfg.key, cfg.secret);
+      let participants;
+      try {
+        participants = await service.listParticipants(room);
+      } catch (e) {
+        console.warn('Could not verify LiveKit room host:', e.message);
+        return error(502, 'Could not verify the live stream host');
+      }
+
+      const isHost = participants.some((participant) => {
         try {
-          const service = new RoomServiceClient(cfg.url.replace(/^ws/, 'http'), cfg.key, cfg.secret);
-          await service.deleteRoom(room);
-        } catch (e) {
-          console.warn('Could not delete LiveKit room:', e.message);
+          const metadata = JSON.parse(participant.metadata || '{}');
+          return metadata.role === 'host' && metadata.userId === user.id;
+        } catch {
+          return false;
         }
+      });
+      if (!isHost) {
+        return error(403, 'Only the stream host can end this live stream');
+      }
+
+      try {
+        await service.deleteRoom(room);
+      } catch (e) {
+        console.warn('Could not delete LiveKit room:', e.message);
+        return error(502, 'Could not end the live stream');
       }
 
       return json(200, { message: `Live stream ${room} ended successfully` });

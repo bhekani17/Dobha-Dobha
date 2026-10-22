@@ -27,6 +27,11 @@ Parameters:
     Default: '787923055628-acjg6j5smm778vt2b3mtcss6so61niaj.apps.googleusercontent.com'
     Description: Google OAuth client ID
 
+  PasswordResetSender:
+    Type: String
+    Default: ''
+    Description: Verified SES sender email address for password reset messages.
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -1314,6 +1319,7 @@ Resources:
           USER_POOL_ID: !Ref UserPool
           USER_POOL_CLIENT_ID: !Ref UserPoolClient
           PHOTOS_BUCKET: !Ref PhotosBucket
+          PASSWORD_RESET_SENDER: !Ref PasswordResetSender
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref UsersTable
@@ -1325,6 +1331,14 @@ Resources:
             TableName: !Ref WalletsTable
         - S3CrudPolicy:
             BucketName: !Ref PhotosBucket
+        - Statement:
+            Effect: Allow
+            Action:
+              - ses:SendEmail
+            Resource: '*'
+            Condition:
+              StringEquals:
+                ses:FromAddress: !Ref PasswordResetSender
       Events:
         RegisterApi:
           Type: Api

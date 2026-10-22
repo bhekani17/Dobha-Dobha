@@ -2,6 +2,7 @@
 
 const crypto = require('crypto');
 const { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } = require('@aws-sdk/client-s3');
+const { SendEmailCommand, SESClient } = require('@aws-sdk/client-ses');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { OAuth2Client } = require('google-auth-library');
 const dynamo = require('../utils/dynamo');
@@ -10,6 +11,7 @@ const { id, now, zar } = require('../utils/id');
 const { hashToken, getUser, requireUser, extractBearer } = require('../utils/auth');
 
 const s3 = new S3Client({});
+const ses = new SESClient({});
 const googleOAuthClient = new OAuth2Client();
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 const MEDIA_MAX_BYTES = 60 * 1024 * 1024;
@@ -42,6 +44,10 @@ function hashPassword(password, salt) {
 function verifyPassword(password, hash, salt) {
   const check = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(check, 'hex'));
+}
+
+function hashResetCode(email, code) {
+  return crypto.createHash('sha256').update(`${email}:${code}`).digest('hex');
 }
 
 async function createSession(userId, sessionsTable) {
@@ -587,6 +593,9 @@ exports.handler = withCors(async (event) => {
     // POST /api/auth/forgot  — send a 6-digit reset code via email
     // -------------------------------------------------------------
     if (path.endsWith('/api/auth/forgot') && method === 'POST') {
+      const sender = process.env.PASSWORD_RESET_SENDER;
+      if (!sender) return error(503, 'Password reset email is not configured');
+
       const body = parseBody(event);
       const email = (body.email || '').trim().toLowerCase();
       if (!email) return error(400, 'Email is required');
@@ -602,19 +611,42 @@ exports.handler = withCors(async (event) => {
 
       if (res.items.length > 0) {
         const user = res.items[0];
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const code = crypto.randomInt(100000, 1000000).toString();
         const expires = Math.floor(Date.now() / 1000) + 15 * 60; // 15 minutes
 
-        // Store the reset code on the user record
         await dynamo.update({
           TableName: usersTable,
           Key: { id: user.id },
-          UpdateExpression: 'SET reset_code = :code, reset_expires = :exp',
-          ExpressionAttributeValues: { ':code': code, ':exp': expires },
+          UpdateExpression: 'SET reset_code_hash = :hash, reset_expires = :exp',
+          ExpressionAttributeValues: { ':hash': hashResetCode(email, code), ':exp': expires },
         });
 
-        // TODO: Send email via SES. For now, log the code (dev only).
-        console.log(`[DEV] Password reset code for ${email}: ${code}`);
+        try {
+          await ses.send(new SendEmailCommand({
+            Source: sender,
+            Destination: { ToAddresses: [email] },
+            Message: {
+              Subject: { Data: 'Dobha password reset code', Charset: 'UTF-8' },
+              Body: {
+                Text: {
+                  Data: `Your Dobha password reset code is ${code}. It expires in 15 minutes.`,
+                  Charset: 'UTF-8',
+                },
+              },
+            },
+          }));
+        } catch (sendError) {
+          console.error('Password reset email delivery failed:', sendError.message);
+          try {
+            await dynamo.update({
+              TableName: usersTable,
+              Key: { id: user.id },
+              UpdateExpression: 'REMOVE reset_code_hash, reset_expires',
+            });
+          } catch (cleanupError) {
+            console.error('Could not clear an undelivered password reset code:', cleanupError.message);
+          }
+        }
       }
 
       return json(200, { message: 'If the account exists, a reset code has been sent to its email address.' });
@@ -645,23 +677,34 @@ exports.handler = withCors(async (event) => {
       const user = res.items[0];
       const nowTs = Math.floor(Date.now() / 1000);
 
-      if (!user.reset_code || user.reset_code !== code || !user.reset_expires || user.reset_expires < nowTs) {
+      if (!user.reset_code_hash || user.reset_code_hash !== hashResetCode(email, code) ||
+          !user.reset_expires || user.reset_expires < nowTs) {
         return error(400, 'Invalid or expired reset code');
       }
 
       const salt = crypto.randomBytes(16).toString('hex');
       const passwordHash = hashPassword(password, salt);
 
-      await dynamo.update({
-        TableName: usersTable,
-        Key: { id: user.id },
-        UpdateExpression: 'SET password_hash = :hash, password_salt = :salt, updated_at = :ts REMOVE reset_code, reset_expires',
-        ExpressionAttributeValues: {
-          ':hash': passwordHash,
-          ':salt': salt,
-          ':ts': now(),
-        },
-      });
+      try {
+        await dynamo.update({
+          TableName: usersTable,
+          Key: { id: user.id },
+          UpdateExpression: 'SET password_hash = :hash, password_salt = :salt, updated_at = :ts REMOVE reset_code_hash, reset_expires',
+          ConditionExpression: 'reset_code_hash = :resetHash AND reset_expires > :nowTs',
+          ExpressionAttributeValues: {
+            ':hash': passwordHash,
+            ':salt': salt,
+            ':ts': now(),
+            ':resetHash': hashResetCode(email, code),
+            ':nowTs': nowTs,
+          },
+        });
+      } catch (updateError) {
+        if (updateError.name === 'ConditionalCheckFailedException') {
+          return error(400, 'Invalid or expired reset code');
+        }
+        throw updateError;
+      }
 
       const token = await createSession(user.id, sessionsTable);
       let wallet = null;

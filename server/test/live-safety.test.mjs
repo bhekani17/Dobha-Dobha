@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url);
 const corsOrigin = process.env.ALLOWED_WEB_ORIGINS;
 process.env.ALLOWED_WEB_ORIGINS = '*';
 const { handler } = require('../src/live/handler.js');
+const { RoomServiceClient } = require('livekit-server-sdk');
 if (corsOrigin === undefined) delete process.env.ALLOWED_WEB_ORIGINS;
 else process.env.ALLOWED_WEB_ORIGINS = corsOrigin;
 const liveKitEnvironment = ['LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET']
@@ -77,5 +78,51 @@ describe('live hosting authorization', () => {
     });
 
     assert.equal(response.statusCode, 401);
+  });
+});
+
+describe('live stream ending authorization', () => {
+  async function runEndRequest({ callerId, hostId }) {
+    process.env.LIVEKIT_URL = 'wss://live.example.test';
+    process.env.LIVEKIT_API_KEY = 'test-key';
+    process.env.LIVEKIT_API_SECRET = 'test-secret';
+    const originalListParticipants = RoomServiceClient.prototype.listParticipants;
+    const originalDeleteRoom = RoomServiceClient.prototype.deleteRoom;
+    let deleted = false;
+    RoomServiceClient.prototype.listParticipants = async () => [
+      { metadata: JSON.stringify({ role: 'host', userId: hostId }) },
+    ];
+    RoomServiceClient.prototype.deleteRoom = async () => {
+      deleted = true;
+    };
+
+    try {
+      const response = await handler({
+        path: '/api/rooms/end',
+        httpMethod: 'POST',
+        body: JSON.stringify({ room: 'community-stream' }),
+        requestContext: {
+          authorizer: { claims: { sub: callerId, email: `${callerId}@example.test` } },
+        },
+      });
+      return { response, deleted };
+    } finally {
+      RoomServiceClient.prototype.listParticipants = originalListParticipants;
+      RoomServiceClient.prototype.deleteRoom = originalDeleteRoom;
+    }
+  }
+
+  it('does not let another signed-in user end the host stream', async () => {
+    const { response, deleted } = await runEndRequest({ callerId: 'buyer-123', hostId: 'host-456' });
+
+    assert.equal(response.statusCode, 403);
+    assert.equal(deleted, false);
+  });
+
+  it('allows the active host to end their own stream', async () => {
+    const { response, deleted } = await runEndRequest({ callerId: 'host-456', hostId: 'host-456' });
+
+    assert.equal(response.statusCode, 200);
+    assert.equal(deleted, true);
   });
 });

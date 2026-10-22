@@ -60,6 +60,12 @@ npm ci
 npm test
 ```
 
+Password reset email delivery uses Amazon SES. Set the SAM `PasswordResetSender`
+parameter to an email identity verified in the deployment region and keep the
+SES account out of sandbox before expecting delivery to unverified recipients.
+Without a sender configured, the reset endpoint returns HTTP 503. Reset codes
+are short-lived, stored as digests, and are consumed atomically.
+
 No demo seed script is included. Keep shared development data free of sample
 accounts, listings, and balances; use isolated test fixtures instead.
 
