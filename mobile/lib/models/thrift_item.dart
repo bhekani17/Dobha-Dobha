@@ -116,28 +116,58 @@ class ThriftItem {
   String get stockLabel => !isClaimed && quantity > 1 ? '$quantity left' : '';
   String get formattedOriginalPrice => originalPriceZar != null ? 'R ${originalPriceZar!.toStringAsFixed(0)}' : '';
 
-  factory ThriftItem.fromJson(Map<String, dynamic> json) => ThriftItem(
+  factory ThriftItem.fromJson(Map<String, dynamic> json) {
+    final seller = json['seller'] is Map<String, dynamic> ? json['seller'] as Map<String, dynamic> : const {};
+    final rawMedia = json['media'] as List? ??
+        [
+          for (final photo in json['photos'] as List? ?? const [])
+            {'kind': 'image', 'url': photo},
+          if (json['videoUrl'] is String) {'kind': 'video', 'url': json['videoUrl']},
+        ];
+    final media = [
+      for (final entry in rawMedia)
+        if (entry is Map<String, dynamic>) ItemMedia.fromJson(entry),
+    ];
+    final photos = json['photos'] as List? ?? const [];
+    final firstPhoto = media.where((entry) => !entry.isVideo).firstOrNull?.url ??
+        (photos.isNotEmpty && photos.first is String ? photos.first as String : null);
+    final status = json['status'] as String? ?? 'available';
+    final sellerId = json['sellerId'] as String? ?? json['seller_id'] as String? ?? seller['id'] as String?;
+    final sellerName = json['sellerName'] as String? ??
+        json['seller_name'] as String? ??
+        seller['name'] as String? ??
+        seller['shopName'] as String? ??
+        'Vendor';
+    final sellerHandle = json['sellerHandle'] as String? ?? json['seller_handle'] as String? ?? seller['handle'] as String?;
+    final sellerLocation =
+        json['sellerLocation'] as String? ?? json['seller_location'] as String? ?? seller['stallLocation'] as String? ?? '';
+
+    if (sellerId == null || sellerHandle == null) {
+      throw const FormatException('Listing is missing its seller details');
+    }
+
+    return ThriftItem(
         id: json['id'] as String,
         title: json['title'] as String,
         description: json['description'] as String? ?? '',
         haulCaption: json['haulCaption'] as String? ?? '',
-        priceZar: (json['priceZar'] as num).toDouble(),
+        priceZar: _parsePrice(json),
         originalPriceZar: (json['originalPriceZar'] as num?)?.toDouble(),
-        condition: json['condition'] as String,
-        size: json['size'] as String,
-        category: json['category'] as String,
-        photoUrl: json['photoUrl'] as String?,
-        media: [for (final m in json['media'] as List? ?? const []) ItemMedia.fromJson(m as Map<String, dynamic>)],
-        sellerId: json['sellerId'] as String,
-        sellerName: json['sellerName'] as String,
-        sellerHandle: json['sellerHandle'] as String,
-        sellerLocation: json['sellerLocation'] as String? ?? '',
-        sellerAvatarUrl: json['sellerAvatarUrl'] as String?,
+        condition: json['condition'] as String? ?? 'Pre-loved',
+        size: json['size'] as String? ?? 'One Size',
+        category: json['category'] as String? ?? 'General',
+        photoUrl: json['photoUrl'] as String? ?? firstPhoto,
+        media: media,
+        sellerId: sellerId,
+        sellerName: sellerName,
+        sellerHandle: sellerHandle,
+        sellerLocation: sellerLocation,
+        sellerAvatarUrl: json['sellerAvatarUrl'] as String? ?? seller['avatarUrl'] as String?,
         likesCount: json['likesCount'] as int? ?? 0,
         commentsCount: json['commentsCount'] as int? ?? 0,
         isLiked: json['isLiked'] as bool? ?? false,
         isSaved: json['isSaved'] as bool? ?? false,
-        isClaimed: json['isClaimed'] as bool? ?? false,
+        isClaimed: json['isClaimed'] as bool? ?? status != 'available',
         quantity: json['quantity'] as int? ?? 1,
         inCart: json['inCart'] as bool? ?? false,
         sellerRating: (json['sellerRating'] as num?)?.toDouble(),
@@ -146,6 +176,19 @@ class ThriftItem {
         isPromoted: json['isPromoted'] as bool? ?? false,
         promotedUntil: parseNullableJsonDateTime(json['promotedUntil']),
       );
+  }
+
+  static double _parsePrice(Map<String, dynamic> json) {
+    final price = json['priceZar'];
+    if (price is num) return price.toDouble();
+    if (price is String) {
+      final amount = double.tryParse(price.replaceAll(RegExp(r'[^0-9,.-]'), '').replaceAll(',', ''));
+      if (amount != null) return amount;
+    }
+    final cents = json['priceCents'];
+    if (cents is num) return cents / 100;
+    throw const FormatException('Listing is missing a valid price');
+  }
 
   /// The same item with some fields changed.
   ThriftItem copyWith({int? commentsCount, bool? inCart, bool? isPromoted, DateTime? promotedUntil}) => ThriftItem(

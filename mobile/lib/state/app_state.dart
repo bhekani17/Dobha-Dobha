@@ -337,6 +337,9 @@ class AppState extends ChangeNotifier {
       _feed = _items(res);
     } on ApiException catch (e) {
       _feedError = e.message;
+    } on FormatException catch (e) {
+      debugPrint('Listing feed response was invalid: $e');
+      _feedError = 'Could not read the listings. Please refresh and try again.';
     } finally {
       _feedLoading = false;
       notifyListeners();
