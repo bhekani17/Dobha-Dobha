@@ -51,10 +51,6 @@ const state = {
   savedItems: [],
   offers: [],
   orders: [],
-  demoBalance: 0,
-  demoTransactions: [],
-  demoOrders: [],
-  demoActivityId: 0,
   notifications: [],
   storyQueue: [],
   storyPosition: 0,
@@ -239,7 +235,6 @@ function apiPrivate(path, options = {}) {
   return api(`/api${path}`, { ...options, auth: true });
 }
 function setSignedIn(user, token) {
-  clearDemoActivity();
   state.user = user;
   state.token = token;
   localStorage.setItem('dobha-token', token);
@@ -256,7 +251,6 @@ function signOut() {
   if (state.hostRoom) stopLiveHost().catch((error) => console.error('Unable to end the live stream:', error));
   state.user = null;
   state.token = '';
-  clearDemoActivity();
   state.unreadNotificationCount = null;
   localStorage.removeItem('dobha-token');
   localStorage.removeItem('dobha-user');
@@ -1331,84 +1325,9 @@ async function removeFromCart(itemId) {
     const items = state.cart.filter((item) => item.available !== false && !item.isClaimed);
     const total = items.reduce((sum, item) => sum + (Number(item.priceZar) || 0), 0);
     byId('checkout-total').textContent = items.length
-      ? `Demo subtotal for ${items.length} available ${items.length === 1 ? 'item' : 'items'}: ${money(total)}`
-      : 'There are no available items to simulate.';
+      ? `Subtotal for ${items.length} available ${items.length === 1 ? 'item' : 'items'}: ${money(total)}`
+      : 'There are no available items to checkout.';
     byId('checkout-submit').disabled = items.length === 0 || !Number.isFinite(total) || total <= 0;
-  }
-  function clearDemoActivity() {
-    state.demoBalance = 0;
-    state.demoTransactions = [];
-    state.demoOrders = [];
-    renderDemoWallet();
-    renderDemoOrders();
-  }
-  function addDemoTransaction(title, amountZar, type) {
-    state.demoTransactions.unshift({
-      id: `demo-${++state.demoActivityId}`,
-      title,
-      amountZar,
-      type,
-      date: new Date(),
-    });
-  }
-  function simulateWalletActivity(amountZar, type) {
-    if (!Number.isFinite(amountZar) || amountZar <= 0) throw new Error('Enter an amount greater than R 0.');
-    if (!['topup', 'withdrawal'].includes(type)) throw new Error('Choose a valid demo wallet action.');
-    if (type === 'withdrawal' && amountZar > state.demoBalance) {
-      throw new Error('The temporary demo balance is too low for that withdrawal.');
-    }
-    state.demoBalance += type === 'topup' ? amountZar : -amountZar;
-    addDemoTransaction(type === 'topup' ? 'Simulated deposit' : 'Simulated withdrawal', amountZar, type);
-    renderDemoWallet();
-  }
-  function renderDemoWallet() {
-    const balance = byId('demo-wallet-balance');
-    const activity = byId('demo-wallet-activity');
-    if (!balance || !activity) return;
-    balance.textContent = money(state.demoBalance);
-    activity.innerHTML = state.demoTransactions.length
-      ? state.demoTransactions.slice(0, 8).map((transaction) => `<article class="order-card"><div><strong>${escapeHtml(transaction.title)}</strong><span>${escapeHtml(transaction.date.toLocaleString())}</span></div><strong>${transaction.type === 'topup' ? '+' : '−'}${money(transaction.amountZar)}</strong></article>`).join('')
-      : '<p class="muted">No temporary demo activity yet.</p>';
-  }
-  function simulateCheckout() {
-    const items = state.cart.filter((item) => item.available !== false && !item.isClaimed);
-    const amountZar = items.reduce((sum, item) => sum + (Number(item.priceZar) || 0), 0);
-    if (!items.length || !Number.isFinite(amountZar) || amountZar <= 0) {
-      throw new Error('There are no available cart items to simulate.');
-    }
-    const form = byId('checkout-form');
-    const paymentMethod = form.elements.payment.value;
-    if (paymentMethod === 'Temporary demo wallet') {
-      if (amountZar > state.demoBalance) throw new Error('The temporary demo balance is too low; simulate a deposit first.');
-      state.demoBalance -= amountZar;
-    }
-    const order = {
-      id: `demo-order-${++state.demoActivityId}`,
-      itemTitle: items.length === 1 ? items[0].title : `${items.length} cart items`,
-      amountZar,
-      deliveryMethod: form.elements.delivery.value,
-      paymentMethod,
-      status: 'Simulation only · no order placed',
-    };
-    state.demoOrders.unshift(order);
-    addDemoTransaction('Simulated checkout', amountZar, 'withdrawal');
-    renderDemoWallet();
-    renderDemoOrders();
-  }
-  function renderDemoOrders() {
-    const target = byId('demo-orders');
-    if (!target) return;
-    target.innerHTML = state.demoOrders.length
-      ? state.demoOrders.map((order) => `<article class="order-card"><div><strong>${escapeHtml(order.itemTitle)}</strong><span>${money(order.amountZar)} · ${escapeHtml(order.paymentMethod)} · ${escapeHtml(order.deliveryMethod)}</span><span class="order-status">${escapeHtml(order.status)}</span></div><button class="button button-outline" data-demo-order="${escapeHtml(order.id)}" ${order.status.includes('complete') ? 'disabled' : ''}>Advance simulation</button></article>`).join('')
-      : '<p class="muted">No temporary demo orders yet.</p>';
-    target.querySelectorAll('[data-demo-order]').forEach((button) => button.addEventListener('click', () => {
-      const order = state.demoOrders.find((entry) => entry.id === button.dataset.demoOrder);
-      if (!order) return;
-      order.status = order.status === 'Simulation only · no order placed'
-        ? 'Simulation · delivery not booked'
-        : 'Simulation complete · no delivery occurred';
-      renderDemoOrders();
-    }));
   }
 }
 async function loadSaved() {
@@ -1435,7 +1354,7 @@ async function loadOffers() {
       ${offer.isSeller && offer.status === 'pending' ? `<button data-offer-action="accept" data-offer="${escapeHtml(offer.id)}" class="button button-dark">Accept</button><button data-offer-action="decline" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Decline</button><button data-offer-action="counter" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Counter</button>` : ''}
       ${!offer.isSeller && offer.status === 'pending' ? `<button data-offer-action="cancel" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Cancel</button>` : ''}
       ${!offer.isSeller && offer.status === 'countered' ? `<button data-offer-action="accept" data-offer="${escapeHtml(offer.id)}" class="button button-dark">Accept counter</button><button data-offer-action="decline" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Decline</button>` : ''}
-      ${offer.status === 'accepted' && !offer.isSeller ? `<p class="field-hint">Accepted price: ${money(offer.amountZar)}. This does not complete a sale; the cart simulator is not connected to offers and never places an order.</p>` : ''}
+      ${offer.status === 'accepted' && !offer.isSeller ? `<p class="field-hint">Accepted price: ${money(offer.amountZar)}. Complete the purchase through checkout.</p>` : ''}
       </div></article>`).join('') : '<p class="muted">No offers yet.</p>';
     target.querySelectorAll('[data-offer-action]').forEach((button) => button.addEventListener('click', () => offerAction(button.dataset.offer, button.dataset.offerAction)));
   } catch (error) {
@@ -1458,11 +1377,9 @@ async function offerAction(offerId, action) {
 }
 async function loadWallet() {
   if (!requireSignIn()) return;
-  renderDemoWallet();
-  renderDemoOrders();
   try {
     const wallet = await api('/api/wallet');
-    byId('wallet-summary').innerHTML = `<div class="wallet-balance"><article><span>Historical available</span><strong>${money(wallet.availableZar)}</strong></article><article><span>Historical on hold</span><strong>${money(wallet.lockedZar)}</strong></article><article><span>Historical pending</span><strong>${money(wallet.pendingZar)}</strong></article></div><p class="field-hint">Historical account records only; these are not spendable funds held by Dobha.</p>`;
+    byId('wallet-summary').innerHTML = `<div class="wallet-balance"><article><span>Available</span><strong>${money(wallet.availableZar)}</strong></article><article><span>On hold</span><strong>${money(wallet.lockedZar)}</strong></article><article><span>Pending</span><strong>${money(wallet.pendingZar)}</strong></article></div>`;
     byId('wallet-transactions').innerHTML = wallet.transactions.length ? wallet.transactions.map((transaction) => `<article class="order-card"><div><strong>${escapeHtml(transaction.title)}</strong><span>${escapeHtml(transaction.subtitle || '')} · ${escapeHtml(transaction.date ? new Date(transaction.date).toLocaleDateString() : '')}</span></div><div><strong>${money(transaction.amountZar)}</strong><span class="order-status">${escapeHtml(transaction.status)}</span></div></article>`).join('') : '<p class="muted">No wallet transactions.</p>';
   } catch (error) {
     byId('wallet-summary').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
@@ -1814,22 +1731,22 @@ function init() {
   byId('auth-button').addEventListener('click', () => state.user ? location.hash = 'account' : showAuth());
   byId('account-nav').addEventListener('click', () => { if (!state.token) showAuth(); });
   byId('cart-nav').addEventListener('click', () => { location.hash = 'cart'; });
-  byId('checkout-form').addEventListener('submit', (event) => {
-    event.preventDefault();
-    try {
-      simulateCheckout();
-      notify('Simulation complete. No order, delivery booking, or payment was created.');
-    } catch (error) {
-      notify(error.message, true);
-    }
-  });
-  byId('demo-wallet-form').addEventListener('submit', (event) => {
+  byId('checkout-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     try {
-      simulateWalletActivity(Number(form.elements.amount.value), form.elements.type.value);
-      form.reset();
-      notify('Demo wallet simulation complete. No real money moved.');
+      const { order } = await api('/api/orders', {
+        method: 'POST',
+        body: {
+          items: state.cart.map((item) => ({ id: item.id, quantity: 1 })),
+          paymentMethod: form.elements.payment.value,
+          deliveryMethod: form.elements.delivery.value,
+          deliveryAddress: form.elements.address?.value || '',
+        },
+      });
+      state.cart = [];
+      location.hash = 'orders';
+      notify('Order placed successfully!');
     } catch (error) {
       notify(error.message, true);
     }

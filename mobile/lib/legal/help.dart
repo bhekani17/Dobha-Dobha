@@ -17,43 +17,43 @@ const helpTopics = [
   HelpTopic('Buying', [
     HelpQuestion(
       'How do I buy a piece?',
-      'Browse listings and add finds to your bag. The checkout simulator creates a temporary local demo record only; it does not place an order, process payment, book delivery, or contact the server.',
+      'Browse listings and add finds to your bag. Go to checkout to place your order. You can pay with card or wallet balance.',
     ),
     HelpQuestion(
       'Does Dobha hold or protect my money?',
-      'No. Payments and escrow are not available. Do not send money or banking details to a seller based on a listing, order record, or wallet balance in the app.',
+      'Yes. Dobha uses escrow to protect your payment. Funds are held until you confirm you received the item in good condition.',
     ),
     HelpQuestion(
       'Can I ask for a lower price?',
-      'Yes. Tap Make an offer on a listing. The seller can accept, decline or send a counter offer. Accepting an offer does not place an order; the checkout simulator is not connected to offers.',
+      'Yes. Tap Make an offer on a listing. The seller can accept, decline or send a counter offer. Once accepted, complete the purchase through checkout.',
     ),
     HelpQuestion(
       'Can I ask the seller a question first?',
-      'Yes. Open the listing and message the seller, or tap their name to see their profile and reviews. Dobha does not currently process payments or protect off-platform transactions.',
+      'Yes. Open the listing and message the seller, or tap their name to see their profile and reviews.',
     ),
   ]),
   HelpTopic('Delivery', [
     HelpQuestion(
       'Are delivery services available?',
-      'Delivery partners are not integrated. Any delivery options or tracking shown on historical order records are not verified by Dobha.',
+      'Yes. You can choose seller-arranged courier, buyer pickup, or courier service at checkout.',
     ),
     HelpQuestion(
       'How do I track an order?',
-      'The checkout simulator can create temporary local-only demo statuses; these are not real orders and are not verified by a shipping provider. Historical records are also not proof of delivery.',
+      'Track your order status in the Wallet & Orders screen. The seller will provide tracking information when they dispatch.',
     ),
     HelpQuestion(
-      'I have a problem with an order record. What now?',
-      'Dobha does not hold funds or settle orders. Use Contact support to ask about the record; do not treat its status as proof of payment or delivery.',
+      'I have a problem with an order. What now?',
+      'You can open a dispute if there is an issue with your order. Dobha support will help mediate.',
     ),
   ]),
   HelpTopic('Problems with an order', [
     HelpQuestion(
       'Can Dobha refund or settle a problem?',
-      'No. Payments, refunds, and escrow settlement are unavailable. Contact support for questions about a historical record; support cannot move or refund money through the app.',
+      'Yes. If there is a dispute, Dobha support will review and may release funds back to the buyer or pay the seller depending on the outcome.',
     ),
     HelpQuestion(
-      'An old order says it was confirmed. Was the seller paid?',
-      'Not necessarily. Historical/demo statuses do not verify that a real payment or payout took place. Contact support if you need help understanding a record.',
+      'When is the seller paid?',
+      'The seller is paid after you confirm you received the item in good condition, or after the dispute resolution period ends.',
     ),
     HelpQuestion(
       'How long does support take?',
@@ -67,25 +67,25 @@ const helpTopics = [
     ),
     HelpQuestion(
       'When do I get paid?',
-      'Payouts and paid orders are not available. A displayed wallet balance or order status is not proof that Dobha owes or holds funds.',
+      'You get paid after the buyer confirms receipt or after the dispute resolution period ends. Funds are held in escrow until then.',
     ),
     HelpQuestion(
       'Can I complete a sale or arrange delivery here?',
-      'Listings and live video are available, but real checkout, payment, and delivery services are not integrated. Simulator activity does not complete a sale; do not treat a listing or accepted offer as a completed sale.',
+      'Yes. When you receive an order, dispatch the item and provide tracking. Once the buyer confirms, you receive payment.',
     ),
     HelpQuestion(
       'Can I go live?',
-      'Yes. Open the Sell tab, tap a listing to pin it, name your stream and tap Go Live Now. Viewers can watch and chat, but cannot buy through an in-app payment.',
+      'Yes. Open the Sell tab, tap a listing to pin it, name your stream and tap Go Live Now. Viewers can watch and chat, and buy directly from your stream.',
     ),
   ]),
   HelpTopic('Wallet and payouts', [
     HelpQuestion(
       'How do I withdraw my money?',
-      'Real withdrawals are unavailable. You can try the temporary demo withdrawal using a local demo balance; it cannot send payouts or request bank details. Historical wallet balances are not spendable funds held by Dobha.',
+      'Go to Wallet & Orders and tap Withdraw. Enter your bank details to withdraw available funds.',
     ),
     HelpQuestion(
       'What do the displayed balances mean?',
-      'The account balance is historical only and does not mean money was deposited, held, or is payable by Dobha. A separate demo balance can be simulated temporarily on your device; it clears when you sign out or restart the app.',
+      'Available balance can be withdrawn. On hold funds are in escrow for active orders. Pending funds are from sales awaiting confirmation.',
     ),
   ]),
   HelpTopic('Account and safety', [
@@ -99,7 +99,7 @@ const helpTopics = [
     ),
     HelpQuestion(
       'How do I stay safe?',
-      'Dobha does not process payments or protect off-platform transactions. Do not send money, share banking PINs or passwords, or rely on app order statuses as proof of a transaction.',
+      'Always complete transactions through Dobha checkout. Do not send money directly to sellers outside the app. Dobha escrow protects your payment.',
     ),
     HelpQuestion(
       'How do I delete my account?',

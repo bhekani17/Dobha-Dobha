@@ -38,44 +38,42 @@ class CheckoutModal extends StatefulWidget {
 }
 
 class _CheckoutModalState extends State<CheckoutModal> {
-  String _delivery = 'Seller-arranged courier (simulation)';
-  String _payment = 'Card simulation';
+  String _delivery = 'Seller-arranged courier';
+  String _payment = 'Card';
+  final _addressController = TextEditingController();
   bool _busy = false;
 
-  Future<void> _simulateCheckout() async {
+  Future<void> _checkout() async {
     if (widget.items.isEmpty) return;
     setState(() => _busy = true);
-    final total =
-        widget.offer?.amountZar ??
-        widget.items.fold<double>(0, (sum, item) => sum + item.priceZar);
     try {
-      AppState().simulateCheckout(
-        itemTitle: widget.items.length == 1
-            ? widget.items.first.title
-            : '${widget.items.length} cart items',
-        amountZar: total,
+      await AppState().checkoutCart(
         deliveryMethod: _delivery,
         paymentMethod: _payment,
-        useDemoWallet: _payment == 'Temporary demo wallet',
+        deliveryAddress: _addressController.text.trim(),
       );
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-            'Simulation complete. No order, delivery booking, or payment was created.',
-          ),
+          content: Text('Order placed successfully!'),
         ),
       );
-    } on StateError catch (error) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text(error.message)));
+        ).showSnackBar(SnackBar(content: Text(error.toString())));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  @override
+  void dispose() {
+    _addressController.dispose();
+    super.dispose();
   }
 
   @override
@@ -106,20 +104,9 @@ class _CheckoutModalState extends State<CheckoutModal> {
             ),
             Row(
               children: [
-                AppWell(
-                  circle: true,
-                  padding: const EdgeInsets.all(10),
-                  tint: DobhaColors.amber,
-                  child: Icon(
-                    Icons.info_outline_rounded,
-                    color: DobhaColors.amber,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Checkout simulator',
+                    'Checkout',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -134,19 +121,6 @@ class _CheckoutModalState extends State<CheckoutModal> {
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
-            ),
-            const SizedBox(height: 16),
-            AppWell(
-              radius: 14,
-              tint: DobhaColors.amber,
-              child: const Text(
-                'Simulation only: no real payment, order, delivery booking, balance change, or server write will happen.',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  height: 1.4,
-                ),
-              ),
             ),
             if (items.isNotEmpty) ...[
               const SizedBox(height: 14),
@@ -196,13 +170,13 @@ class _CheckoutModalState extends State<CheckoutModal> {
             DropdownButtonFormField<String>(
               initialValue: _delivery,
               decoration: const InputDecoration(
-                labelText: 'Delivery option · simulation',
+                labelText: 'Delivery option',
               ),
               items:
                   const [
-                        'Seller-arranged courier (simulation)',
-                        'Buyer pickup (simulation)',
-                        'Courier service (simulation)',
+                        'Seller-arranged courier',
+                        'Buyer pickup',
+                        'Courier service',
                       ]
                       .map(
                         (option) => DropdownMenuItem(
@@ -218,9 +192,9 @@ class _CheckoutModalState extends State<CheckoutModal> {
             DropdownButtonFormField<String>(
               initialValue: _payment,
               decoration: const InputDecoration(
-                labelText: 'Payment option · simulation',
+                labelText: 'Payment option',
               ),
-              items: const ['Card simulation', 'Temporary demo wallet']
+              items: const ['Card', 'Wallet']
                   .map(
                     (option) =>
                         DropdownMenuItem(value: option, child: Text(option)),
@@ -229,12 +203,21 @@ class _CheckoutModalState extends State<CheckoutModal> {
               onChanged: (value) =>
                   setState(() => _payment = value ?? _payment),
             ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _addressController,
+              decoration: const InputDecoration(
+                labelText: 'Delivery address',
+                hintText: 'Enter your delivery address',
+              ),
+              maxLines: 2,
+            ),
             const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Demo subtotal: R ${subtotal.toStringAsFixed(2)}',
+                    'Subtotal: R ${subtotal.toStringAsFixed(2)}',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -243,8 +226,8 @@ class _CheckoutModalState extends State<CheckoutModal> {
             const SizedBox(height: 12),
             AppButton(
               color: DobhaColors.green,
-              onPressed: _busy || items.isEmpty ? null : _simulateCheckout,
-              child: Text(_busy ? 'Simulating…' : 'Run checkout simulation'),
+              onPressed: _busy || items.isEmpty ? null : _checkout,
+              child: Text(_busy ? 'Placing order…' : 'Place order'),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),

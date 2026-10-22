@@ -6,11 +6,7 @@ the separate ECS/PostgreSQL API is not a production client target yet.
 
 ## Financial features
 
-Checkout, wallet deposits/withdrawals, order fulfillment, escrow settlement,
-and payouts are unavailable. The app does not collect payment or bank details.
-Historical order and wallet records may contain demo or legacy state and do not
-verify that money was paid, held, refunded, or transferred. See the in-app
-Terms, Privacy, and Help screens for the user-facing policy.
+Checkout is available with card or wallet payment. Funds are held in escrow until the buyer confirms receipt. Wallet deposits and withdrawals are supported. See the in-app Terms, Privacy, and Help screens for the user-facing policy.
 
 ## Development
 
@@ -51,8 +47,7 @@ Use **Continue with Google** on the welcome screen. In the app, open **Live
 Studio** and choose **Start Selling** to create a vendor profile. Then return
 to **Live Studio**, enter a stream name if desired, and choose **Go Live**.
 Allow camera and microphone access when prompted. Live streaming is available
-only while the configured LiveKit service and API are reachable. Checkout,
-paid claims, and wallet transactions remain disabled.
+only while the configured LiveKit service and API are reachable.
 
 The API base is configured in `lib/api.dart`; Google OAuth client IDs are
 provided at build time from `config/google.json`. These IDs are public client

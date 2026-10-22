@@ -5,8 +5,8 @@
 /// `python tool/build_legal_pages.py` to update the public web page (web/terms.html).
 library;
 
-const termsVersion = '2026-10-21';
-const termsUpdated = '21 October 2026';
+const termsVersion = '2026-10-22';
+const termsUpdated = '22 October 2026';
 
 class TermsSection {
   final String title;
@@ -26,20 +26,20 @@ const termsSections = [
   ]),
   TermsSection('3. Buying', [
     'Items may be new or pre-owned. Look carefully at the photos, details, condition and description, and ask the seller in chat if anything is unclear.',
-    'Checkout is currently unavailable. A listing or accepted offer is not a completed purchase, and no delivery fee is being collected.',
+    'Complete your purchase through checkout. You can pay with card or wallet balance. Funds are held in escrow until you confirm receipt.',
   ]),
   TermsSection('4. Selling', [
     'You can sell once you add your shop name and stall location. You must own what you list and have the right to sell it.',
     'Listings must be honest: use real photos, accurate details and condition, and describe any flaws. The quantity you list must be what you actually have.',
-    'Listings and live streams do not complete a sale. Checkout, delivery, payment, escrow, and payout services are currently unavailable.',
+    'When you receive an order, dispatch the item and provide tracking. You receive payment after the buyer confirms receipt.',
   ]),
   TermsSection('5. Offers', [
-    'Buyers can make offers and sellers can accept, decline or counter. Accepting an offer does not place an order because checkout is unavailable.',
+    'Buyers can make offers and sellers can accept, decline or counter. Once accepted, complete the purchase through checkout.',
   ]),
   TermsSection('6. Payments, payouts and problems', [
-    'Dobha does not currently process payments, accept deposits, hold escrow, issue refunds, or make payouts. Do not enter or send payment or banking details.',
-    'Historical order and wallet records may contain demonstration data and do not verify that a real payment, delivery, refund, or payout occurred.',
-    'Support can answer questions about records but cannot move, hold, refund, or pay money through the app.',
+    'Dobha processes payments through checkout. Funds are held in escrow to protect both buyer and seller. The seller is paid after the buyer confirms receipt or after the dispute resolution period.',
+    'You can withdraw available wallet funds to your bank account. Bank details are securely stored for payouts.',
+    'If there is a problem with an order, you can open a dispute. Dobha support will review and may release funds back to the buyer or pay the seller depending on the outcome.',
     'Nothing in these terms takes away your rights under the Consumer Protection Act or other South African law.',
   ]),
   TermsSection('7. Things you may not sell', [

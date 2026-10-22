@@ -4,7 +4,7 @@ library;
 
 import 'terms.dart';
 
-const privacyUpdated = '21 October 2026';
+const privacyUpdated = '22 October 2026';
 
 const privacySections = [
   TermsSection('1. Who we are', [
@@ -14,7 +14,7 @@ const privacySections = [
     'Account details: your name, username, email address, phone number if you give it, password (stored only in a scrambled form we cannot read), and your Google account id if you use Continue with Google.',
     'Profile and shop details: your picture, bio, area, shop name and stall location.',
     'Marketplace activity: listings and their photos and videos, likes, saves, comments, offers, carts, follows, reviews, chats, live streams you host or watch, and reports you make.',
-    'Historical records: stored order details, delivery addresses, wallet activity, and limited bank details from previous demo withdrawal forms. New payment and withdrawal details are not requested.',
+    'Payment and order details: delivery addresses, payment information, bank details for withdrawals, and transaction history.',
     'Support: questions you send us and our answers.',
     'Technical information: your IP address, basic device and app information, and a push notification token for your phone if you allow notifications, used to keep the service secure and working and to send you alerts.',
   ]),
@@ -26,8 +26,8 @@ const privacySections = [
   ]),
   TermsSection('4. Who can see it', [
     'Other users see your public profile: name, username, picture, bio, area, shop details, listings, reviews and follower counts.',
-    'Historical order records may contain a name and delivery address previously supplied for fulfillment.',
-    'We use service providers to run Dobha Dobha, such as Cloudflare (API, database and file storage), AWS (website hosting when deployed there), LiveKit (live streaming), Google (Continue with Google), Firebase (mobile push notifications), and our email provider (password reset codes and support answers). They only get what they need to do that job. Dobha does not currently integrate real payment processing or delivery partners.',
+    'Order records contain delivery addresses needed for fulfillment.',
+    'We use service providers to run Dobha Dobha, such as Cloudflare (API, database and file storage), AWS (website hosting when deployed there), LiveKit (live streaming), Google (Continue with Google), Firebase (mobile push notifications), payment processors for checkout, and our email provider (password reset codes and support answers). They only get what they need to do that job.',
     'We may share information when the law requires it, or to protect people from fraud or harm.',
   ]),
   TermsSection('5. How long we keep it', [

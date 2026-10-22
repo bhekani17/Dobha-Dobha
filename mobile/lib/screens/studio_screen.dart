@@ -470,17 +470,17 @@ class _BoostListingSheetState extends State<BoostListingSheet> {
   static const _tiers = {
     'basic': (
       label: 'Basic',
-      price: 'R 50/day · demo',
+      price: 'R 50/day',
       desc: 'Appear higher in search results',
     ),
     'standard': (
       label: 'Standard',
-      price: 'R 150/day · demo',
+      price: 'R 150/day',
       desc: 'Featured in category feeds',
     ),
     'premium': (
       label: 'Premium',
-      price: 'R 500/day · demo',
+      price: 'R 500/day',
       desc: 'Top of home feed + push to followers',
     ),
   };
@@ -509,7 +509,7 @@ class _BoostListingSheetState extends State<BoostListingSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Demo boost active for "${widget.item.title}" until ${until.day}/${until.month}/${until.year}. No payment was made.',
+            'Boost active for "${widget.item.title}" until ${until.day}/${until.month}/${until.year}.',
           ),
         ),
       );

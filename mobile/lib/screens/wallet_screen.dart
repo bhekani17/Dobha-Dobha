@@ -11,77 +11,6 @@ import '../widgets/ui.dart';
 class WalletScreen extends StatelessWidget {
   const WalletScreen({super.key});
 
-  Future<void> _simulateWalletActivity(
-    BuildContext context,
-    TransactionType type,
-  ) async {
-    final amountController = TextEditingController();
-    String? errorText;
-    try {
-      final amount = await showDialog<double>(
-        context: context,
-        builder: (dialogContext) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: Text(
-              type == TransactionType.topup
-                  ? 'Simulate demo deposit'
-                  : 'Simulate demo withdrawal',
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Temporary local simulation only. No real payment or payout is made.',
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: amountController,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Amount (R)',
-                    errorText: errorText,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  final value = double.tryParse(amountController.text.trim());
-                  if (value == null || !value.isFinite || value <= 0) {
-                    setDialogState(
-                      () => errorText = 'Enter an amount greater than R 0',
-                    );
-                    return;
-                  }
-                  Navigator.pop(dialogContext, value);
-                },
-                child: const Text('Simulate'),
-              ),
-            ],
-          ),
-        ),
-      );
-      if (amount == null || !context.mounted) return;
-      try {
-        AppState().simulateWalletActivity(amountZar: amount, type: type);
-      } on StateError catch (error) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.message)));
-      }
-    } finally {
-      amountController.dispose();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -137,51 +66,6 @@ class WalletScreen extends StatelessWidget {
                   )
                 else
                   ...activeOrders.map((ord) => EscrowTrackerCard(order: ord)),
-                if (appState.demoOrders.isNotEmpty) ...[
-                  const SizedBox(height: 20),
-                  const SectionTitle('Temporary demo orders'),
-                  for (final order in appState.demoOrders)
-                    AppCard(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      radius: 16,
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            order.itemTitle,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'R ${order.amountZar.toStringAsFixed(2)} · ${order.paymentMethod} · ${order.deliveryMethod}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: DobhaColors.muted,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            order.status,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: DobhaColors.amber,
-                            ),
-                          ),
-                          if (!order.status.contains('complete'))
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: TextButton(
-                                onPressed: () =>
-                                    appState.advanceDemoOrder(order.id),
-                                child: const Text('Advance simulation'),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
                 const SizedBox(height: 28),
                 const SectionTitle('Wallet'),
                 // Main balance
@@ -192,7 +76,7 @@ class WalletScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Historical balance',
+                        'Balance',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -233,93 +117,6 @@ class WalletScreen extends StatelessWidget {
                           ],
                         ],
                       ),
-                      const SizedBox(height: 18),
-                      AppWell(
-                        radius: 14,
-                        tint: DobhaColors.amber,
-                        child: const Text(
-                          'This is historical account data only. Use the separate temporary simulator below to explore wallet actions; it never changes this balance or moves real money.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                AppCard(
-                  radius: 20,
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Temporary demo wallet',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'R ${appState.demoBalance.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Local-only test balance. It is not real money, is not sent to the server, and clears when you sign out.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: DobhaColors.muted,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () => _simulateWalletActivity(
-                              context,
-                              TransactionType.topup,
-                            ),
-                            icon: const Icon(Icons.add_card_rounded, size: 17),
-                            label: const Text('Demo deposit'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () => _simulateWalletActivity(
-                              context,
-                              TransactionType.withdrawal,
-                            ),
-                            icon: const Icon(
-                              Icons.account_balance_outlined,
-                              size: 17,
-                            ),
-                            label: const Text('Demo withdrawal'),
-                          ),
-                        ],
-                      ),
-                      if (appState.demoTransactions.isNotEmpty) ...[
-                        const Divider(height: 24),
-                        for (final transaction
-                            in appState.demoTransactions.take(5))
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              '${transaction.title} · R ${transaction.amountZar.toStringAsFixed(2)} · ${transaction.status}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: DobhaColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                      ],
                     ],
                   ),
                 ),

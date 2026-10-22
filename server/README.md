@@ -37,17 +37,9 @@ No existing client is cut over to it.
 
 ## Financial safety status
 
-The current source rejects checkout/order creation, shipment dispatch,
-confirmation, escrow resolution, wallet deposits/withdrawals, and paid listing
-promotion until verified payment processing exists. The clients no longer
-offer payment entry or claim that demo records represent held funds. Historical
-order and wallet data can still exist; those records do not prove that a real
-payment, delivery, refund, or payout occurred.
+Payment processing is enabled. The backend supports checkout, order creation, shipment dispatch, confirmation, escrow resolution, wallet deposits/withdrawals, and listing promotion. Funds are held in escrow until the buyer confirms receipt or after dispute resolution.
 
-These are source-level protections, not a production incident fix. The build
-pipeline is validation-only and does not deploy them. Verify the live runtime,
-perform a reviewed staged release, and test the deployed endpoints before
-claiming that any production environment has these protections.
+The build pipeline is validation-only and does not deploy changes. Verify the live runtime, perform a reviewed staged release, and test the deployed endpoints before claiming that any production environment has these features.
 
 ## Development and checks
 

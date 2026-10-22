@@ -8,7 +8,6 @@ import '../google_auth.dart';
 import '../legal/terms.dart';
 import '../models/app_notification.dart';
 import '../models/escrow_order.dart';
-import '../models/demo_activity.dart';
 import '../models/social.dart';
 import '../models/support.dart';
 import '../models/thrift_item.dart';
@@ -62,9 +61,6 @@ class AppState extends ChangeNotifier {
   List<ThriftItem> _saved = [];
   List<EscrowOrder> _orders = [];
   List<WalletTransaction> _transactions = [];
-  final List<WalletTransaction> _demoTransactions = [];
-  final List<DemoOrder> _demoOrders = [];
-  double _demoBalance = 0;
   double _available = 0, _locked = 0, _pending = 0;
   List<ThriftItem> _searchResults = [];
   List<AppNotification> _notifications = [];
@@ -98,10 +94,6 @@ class AppState extends ChangeNotifier {
     return List.unmodifiable(transactions);
   }
 
-  List<WalletTransaction> get demoTransactions =>
-      List.unmodifiable(_demoTransactions);
-  List<DemoOrder> get demoOrders => List.unmodifiable(_demoOrders);
-  double get demoBalance => _demoBalance;
   double get availableBalance => _available;
   double get lockedEscrowFunds => _locked;
   double get vendorPendingPayouts => _pending;
@@ -251,7 +243,6 @@ class AppState extends ChangeNotifier {
   Future<void> _startSession(Map<String, dynamic> res) async {
     final token = res['token'] as String;
     final user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
-    _clearDemoActivity();
     _api.token = token;
     _user = user;
     final prefs = await SharedPreferences.getInstance();
@@ -284,7 +275,6 @@ class AppState extends ChangeNotifier {
     _saved = [];
     _orders = [];
     _transactions = [];
-    _clearDemoActivity();
     _available = _locked = _pending = 0;
     _livePinnedItem = null;
     _searchResults = [];
@@ -297,12 +287,6 @@ class AppState extends ChangeNotifier {
     _subscriptions = [];
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
-  }
-
-  void _clearDemoActivity() {
-    _demoTransactions.clear();
-    _demoOrders.clear();
-    _demoBalance = 0;
   }
 
   /// Runs a request; an expired session signs the user out.
@@ -782,115 +766,6 @@ class AppState extends ChangeNotifier {
         }),
       ),
     );
-    notifyListeners();
-  }
-
-  void simulateWalletActivity({
-    required double amountZar,
-    required TransactionType type,
-  }) {
-    if (!amountZar.isFinite || amountZar <= 0) {
-      throw ArgumentError.value(
-        amountZar,
-        'amountZar',
-        'Must be a positive amount',
-      );
-    }
-    if (type != TransactionType.topup && type != TransactionType.withdrawal) {
-      throw ArgumentError.value(
-        type,
-        'type',
-        'Only demo deposits and withdrawals are supported',
-      );
-    }
-    if (type == TransactionType.withdrawal && amountZar > _demoBalance) {
-      throw StateError(
-        'The temporary demo balance is too low for that withdrawal.',
-      );
-    }
-
-    _demoBalance += type == TransactionType.topup ? amountZar : -amountZar;
-    _demoTransactions.insert(
-      0,
-      WalletTransaction(
-        id: 'demo-${DateTime.now().microsecondsSinceEpoch}',
-        title: type == TransactionType.topup
-            ? 'Simulated deposit'
-            : 'Simulated withdrawal',
-        subtitle: 'Temporary simulator activity. No real funds moved.',
-        amountZar: amountZar,
-        type: type,
-        date: DateTime.now(),
-        status: 'SIMULATION ONLY',
-        reference: 'LOCAL-ONLY',
-        isDemo: true,
-      ),
-    );
-    notifyListeners();
-  }
-
-  DemoOrder simulateCheckout({
-    required String itemTitle,
-    required double amountZar,
-    required String deliveryMethod,
-    required String paymentMethod,
-    bool useDemoWallet = false,
-  }) {
-    if (!amountZar.isFinite || amountZar <= 0) {
-      throw ArgumentError.value(
-        amountZar,
-        'amountZar',
-        'Must be a positive amount',
-      );
-    }
-    if (useDemoWallet) {
-      if (amountZar > _demoBalance) {
-        throw StateError(
-          'The temporary demo balance is too low; simulate a demo deposit first.',
-        );
-      }
-      _demoBalance -= amountZar;
-    }
-    final order = DemoOrder(
-      id: 'DEMO-${DateTime.now().microsecondsSinceEpoch}',
-      itemTitle: itemTitle,
-      amountZar: amountZar,
-      deliveryMethod: deliveryMethod,
-      paymentMethod: paymentMethod,
-      status: 'Simulated checkout · no order placed',
-      createdAt: DateTime.now(),
-    );
-    _demoOrders.insert(0, order);
-    _demoTransactions.insert(
-      0,
-      WalletTransaction(
-        id: '${order.id}-payment',
-        title: 'Simulated checkout',
-        subtitle: '$itemTitle · $paymentMethod. No real payment or order.',
-        amountZar: amountZar,
-        type: TransactionType.escrowHold,
-        date: order.createdAt,
-        status: 'SIMULATION ONLY',
-        reference: order.id,
-        isDemo: true,
-      ),
-    );
-    notifyListeners();
-    return order;
-  }
-
-  void advanceDemoOrder(String orderId) {
-    final index = _demoOrders.indexWhere((order) => order.id == orderId);
-    if (index < 0) return;
-    final order = _demoOrders[index];
-    final nextStatus = switch (order.status) {
-      'Simulated checkout · no order placed' =>
-        'Simulation · delivery not booked',
-      'Simulation · delivery not booked' =>
-        'Simulation complete · no delivery occurred',
-      _ => order.status,
-    };
-    _demoOrders[index] = order.copyWith(status: nextStatus);
     notifyListeners();
   }
 

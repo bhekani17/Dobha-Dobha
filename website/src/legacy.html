@@ -88,7 +88,7 @@
       </section>
       <section class="feature-section live-host-entry">
         <div class="section-heading"><div><p class="eyebrow">YOUR TURN</p><h2>Host a live stream</h2></div></div>
-        <p class="field-hint">Buyers and sellers can host. Keep this page open while live; viewers can watch and chat. Live shopping is not connected to checkout; use the cart simulator for local-only demos.</p>
+        <p class="field-hint">Buyers and sellers can host. Keep this page open while live; viewers can watch and chat.</p>
         <div id="live-host-auth"><button class="button button-dark" id="live-host-signin" type="button">Sign in to go live</button></div>
         <section id="web-live-studio" class="form-stack hidden">
           <form id="live-host-form" class="form-stack">
@@ -166,12 +166,12 @@
       <section class="page-intro"><p class="eyebrow">YOUR FINDS</p><h1>Your <span>shopping bag.</span></h1><p>Review and manage the items you have saved in your bag.</p></section>
       <section class="feature-section"><div id="cart-list" class="orders-list"></div>
         <form id="checkout-form" class="form-stack checkout-form">
-          <h2>Checkout simulator</h2>
-          <p class="field-hint">Temporary local demo only. This does not place an order, book delivery, charge money, or contact the server.</p>
-          <label class="field">Delivery option<select name="delivery"><option>Seller-arranged courier (simulation)</option><option>Buyer pickup (simulation)</option><option>Courier service (simulation)</option></select></label>
-          <label class="field">Payment option<select name="payment"><option>Card simulation</option><option>Temporary demo wallet</option></select></label>
-          <p id="checkout-total" class="field-hint">Add available items to see a demo subtotal.</p>
-          <button id="checkout-submit" class="button button-dark" disabled>Run checkout simulation</button>
+          <h2>Checkout</h2>
+          <label class="field">Delivery option<select name="delivery"><option>Seller-arranged courier</option><option>Buyer pickup</option><option>Courier service</option></select></label>
+          <label class="field">Payment option<select name="payment"><option>Card</option><option>Wallet</option></select></label>
+          <label class="field">Delivery address<input name="address" type="text" placeholder="Enter your delivery address"></label>
+          <p id="checkout-total" class="field-hint">Add available items to see subtotal.</p>
+          <button id="checkout-submit" class="button button-dark" disabled>Place order</button>
         </form>
       </section>
     </section>
@@ -187,22 +187,9 @@
     </section>
 
     <section class="page hidden" id="page-wallet" data-page="wallet">
-      <section class="page-intro"><p class="eyebrow">DOBHA WALLET</p><h1>Your <span>balance.</span></h1><p>Historical account records below are not spendable funds. Use the separate temporary simulator to explore wallet actions; it never moves real money or changes your account balance.</p></section>
+      <section class="page-intro"><p class="eyebrow">DOBHA WALLET</p><h1>Your <span>balance.</span></h1><p>View your available funds, funds on hold in escrow, and pending payouts.</p></section>
       <section class="feature-section">
-        <section class="checkout-form demo-wallet">
-          <h2>Temporary demo wallet</h2>
-          <p class="field-hint">Local-only simulation. The balance and activity disappear when this page session ends or you sign out.</p>
-          <p id="demo-wallet-balance" class="demo-wallet-balance">R 0.00</p>
-          <form id="demo-wallet-form" class="form-stack">
-            <label class="field">Action<select name="type"><option value="topup">Simulate deposit</option><option value="withdrawal">Simulate withdrawal</option></select></label>
-            <label class="field">Amount (R)<input name="amount" type="number" min="0.01" step="0.01" required></label>
-            <button class="button button-outline">Run wallet simulation</button>
-          </form>
-          <div id="demo-wallet-activity" class="orders-list"></div>
-        </section>
-        <h2>Temporary demo orders</h2>
-        <div id="demo-orders" class="orders-list"></div>
-        <h2>Historical account wallet</h2>
+        <h2>Your wallet</h2>
         <div id="wallet-summary"></div><div id="wallet-transactions" class="orders-list"></div>
       </section>
     </section>
@@ -252,7 +239,7 @@
 
     <section class="page hidden" id="page-about" data-page="about">
       <section class="page-intro"><p class="eyebrow">ABOUT DOBHA-DOBHA</p><h1>A marketplace<br>with <span>room for all.</span></h1><p>Dobha-Dobha brings buyers and sellers together to pass along good things, discover local shops, and meet sellers live.</p></section>
-      <section class="about-grid"><article><span>01</span><h2>Find it</h2><p>Browse many kinds of listings and discover something useful, interesting, or simply yours.</p></article><article><span>02</span><h2>Pass it on</h2><p>Give things a next chapter by sharing a listing with the Dobha-Dobha community.</p></article><article><span>03</span><h2>Meet the seller</h2><p>Watch and host live streams from the website or mobile app. Checkout and wallet simulators are temporary local demos only; no real payment, order, or delivery is created.</p></article></section>
+      <section class="about-grid"><article><span>01</span><h2>Find it</h2><p>Browse many kinds of listings and discover something useful, interesting, or simply yours.</p></article><article><span>02</span><h2>Pass it on</h2><p>Give things a next chapter by sharing a listing with the Dobha-Dobha community.</p></article><article><span>03</span><h2>Meet the seller</h2><p>Watch and host live streams from the website or mobile app. Checkout securely with escrow protection.</p></article></section>
     </section>
   </main>
 

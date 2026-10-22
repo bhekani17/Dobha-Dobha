@@ -144,7 +144,7 @@ class PinnedProductBanner extends StatelessWidget {
               ],
             )
           else
-            AppTag(isSold ? 'LEGACY' : 'DEMO ONLY', color: DobhaColors.amber),
+            AppTag(isSold ? 'SOLD' : '', color: DobhaColors.amber),
         ],
       ),
     );
