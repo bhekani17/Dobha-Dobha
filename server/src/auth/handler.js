@@ -5,7 +5,7 @@ const { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } = re
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { OAuth2Client } = require('google-auth-library');
 const dynamo = require('../utils/dynamo');
-const { CORS_HEADERS, json, error, handleCors, parseBody } = require('../utils/response');
+const { CORS_HEADERS, json, error, handleCors, withCors, parseBody } = require('../utils/response');
 const { id, now, zar } = require('../utils/id');
 const { hashToken, getUser, requireUser, extractBearer } = require('../utils/auth');
 
@@ -86,7 +86,7 @@ function sanitizeUser(user, wallet = null) {
   return result;
 }
 
-exports.handler = async (event) => {
+exports.handler = withCors(async (event) => {
   const cors = handleCors(event);
   if (cors) return cors;
 
@@ -708,4 +708,4 @@ exports.handler = async (event) => {
     console.error('Auth handler error:', err);
     return error(err.statusCode || 500, err.message || 'Internal Server Error');
   }
-};
+});

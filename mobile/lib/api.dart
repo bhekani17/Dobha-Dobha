@@ -4,15 +4,34 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
-/// The live Dobha server (AWS API Gateway, af-south-1).
-const liveServerUrl = 'https://4mvo7623gl.execute-api.af-south-1.amazonaws.com/dev';
 const deploymentApiBaseUrl = String.fromEnvironment('API_BASE_URL');
+const deploymentStage = String.fromEnvironment('DEPLOYMENT_STAGE');
 
-/// Use the deployed API when configured; otherwise preserve the current live setup.
-/// Web deployments normally use their own origin for same-origin API routing.
 String defaultServerUrl() {
   if (deploymentApiBaseUrl.isNotEmpty) return deploymentApiBaseUrl;
-  return kIsWeb ? Uri.base.origin : liveServerUrl;
+  if (kIsWeb) return Uri.base.origin;
+  throw StateError(
+    'Set API_BASE_URL and DEPLOYMENT_STAGE when building or running the mobile app.',
+  );
+}
+
+void validateDeploymentApi() {
+  if (deploymentApiBaseUrl.isEmpty) return;
+  if (!['dev', 'prod'].contains(deploymentStage)) {
+    throw StateError('DEPLOYMENT_STAGE must be "dev" or "prod".');
+  }
+  final apiUrl = Uri.tryParse(deploymentApiBaseUrl);
+  if (apiUrl == null ||
+      !apiUrl.hasAuthority ||
+      !['http', 'https'].contains(apiUrl.scheme)) {
+    throw StateError('API_BASE_URL must be an absolute HTTP or HTTPS URL.');
+  }
+  if (deploymentStage == 'prod' &&
+      (apiUrl.scheme != 'https' || apiUrl.pathSegments.contains('dev'))) {
+    throw StateError(
+      'Production builds require an HTTPS API URL that is not the dev stage.',
+    );
+  }
 }
 
 /// A failed request, with the server's message ready to show to the user.

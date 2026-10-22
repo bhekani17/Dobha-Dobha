@@ -44,6 +44,7 @@ before(() => {
     if (table === tables.USERS_TABLE) return users.get(key.id) || null;
     if (table === tables.LIKES_TABLE) return likes.get(`${key.user_id}:${key.item_id}`) || null;
     if (table === tables.SAVES_TABLE) return saves.get(`${key.user_id}:${key.item_id}`) || null;
+    if (table === tables.MESSAGES_TABLE) return messages.find((message) => message.id === key.id) || null;
     return null;
   };
   dynamo.put = async (table, value) => {
@@ -54,14 +55,30 @@ before(() => {
   dynamo.delete = async (table, key) => {
     if (table === tables.SAVES_TABLE) saves.delete(`${key.user_id}:${key.item_id}`);
   };
-  dynamo.update = async ({ TableName, Key, ExpressionAttributeValues }) => {
+  dynamo.update = async ({ TableName, Key, ExpressionAttributeValues, UpdateExpression, ConditionExpression }) => {
     if (TableName === tables.ITEMS_TABLE) {
       const item = items.get(Key.id);
-      item.likes_count = (item.likes_count || 0) + (ExpressionAttributeValues[':decrement'] || ExpressionAttributeValues[':one']);
+      if (UpdateExpression.includes('likes_count')) {
+        item.likes_count = (item.likes_count || 0) + (ExpressionAttributeValues[':decrement'] || ExpressionAttributeValues[':one']);
+      } else {
+        if (ConditionExpression && item.status !== ExpressionAttributeValues[':available']) {
+          throw conditionFailed();
+        }
+        item.status = ExpressionAttributeValues[':sold'];
+        item.off_app_sale_reported_at = ExpressionAttributeValues[':time'];
+        item.off_app_sale_buyer_id = ExpressionAttributeValues[':buyer'];
+      }
     }
     if (TableName === tables.MESSAGES_TABLE) {
       const message = messages.find((entry) => entry.id === Key.id);
-      message.read_at = ExpressionAttributeValues[':time'];
+      const confirmationField = UpdateExpression.match(/SET (buyer_confirmed_at|seller_confirmed_at)/)?.[1];
+      if (confirmationField) {
+        if (ConditionExpression && message[confirmationField]) throw conditionFailed();
+        message[confirmationField] = ExpressionAttributeValues[':time'];
+      } else {
+        message.read_at = ExpressionAttributeValues[':time'];
+      }
+      return { Attributes: { ...message } };
     }
   };
   dynamo.query = async ({ TableName, IndexName, ExpressionAttributeValues, KeyConditionExpression }) => {
@@ -226,5 +243,72 @@ describe('social interactions', () => {
     assert.equal(message.text, 'Can I see another photo?');
     assert.equal(message.fromMe, true);
     assert.equal(message.item.id, 'item-1');
+  });
+
+  it('records a direct purchase only after both parties confirm, without verifying payment', async () => {
+    const requestResponse = await socialHandler({
+      path: '/api/chats/usr-seller',
+      httpMethod: 'POST',
+      body: JSON.stringify({
+        text: 'I would like to buy this directly.',
+        itemId: 'item-1',
+        purchaseRequest: true,
+      }),
+    });
+    const request = JSON.parse(requestResponse.body).message;
+    assert.equal(requestResponse.statusCode, 201);
+    assert.equal(request.purchaseRequest.status, 'requested');
+    assert.equal(request.purchaseRequest.paymentVerified, false);
+
+    const originalUser = { ...user };
+    try {
+      Object.assign(user, { id: 'usr-other', name: 'Other User', role: 'buyer' });
+      const unauthorizedConfirmation = await socialHandler({
+        path: `/api/chats/usr-current/purchases/${request.id}/confirm`,
+        httpMethod: 'POST',
+      });
+      assert.equal(unauthorizedConfirmation.statusCode, 403);
+    } finally {
+      Object.assign(user, originalUser);
+    }
+
+    const buyerConfirmation = await socialHandler({
+      path: `/api/chats/usr-seller/purchases/${request.id}/confirm`,
+      httpMethod: 'POST',
+    });
+    assert.equal(buyerConfirmation.statusCode, 200);
+    assert.equal(JSON.parse(buyerConfirmation.body).purchaseRequest.status, 'buyer_confirmed');
+    assert.equal(items.get('item-1').status, 'available');
+
+    try {
+      Object.assign(user, users.get('usr-seller'));
+      const sellerConfirmation = await socialHandler({
+        path: `/api/chats/usr-current/purchases/${request.id}/confirm`,
+        httpMethod: 'POST',
+      });
+      const result = JSON.parse(sellerConfirmation.body);
+      assert.equal(sellerConfirmation.statusCode, 200);
+      assert.equal(result.purchaseRequest.status, 'reported_complete');
+      assert.equal(result.purchaseRequest.paymentVerified, false);
+      assert.equal(items.get('item-1').status, 'sold');
+      assert.equal(items.get('item-1').off_app_sale_buyer_id, 'usr-current');
+    } finally {
+      Object.assign(user, originalUser);
+    }
+  });
+
+  it('rejects a purchase request sent to someone other than the listing seller', async () => {
+    users.set('usr-other', { id: 'usr-other', name: 'Other User' });
+    const response = await socialHandler({
+      path: '/api/chats/usr-other',
+      httpMethod: 'POST',
+      body: JSON.stringify({
+        text: 'I would like to buy this directly.',
+        itemId: 'item-1',
+        purchaseRequest: true,
+      }),
+    });
+    assert.equal(response.statusCode, 400);
+    assert.equal(messages.some((message) => message.purchase_request), false);
   });
 });

@@ -140,7 +140,7 @@ class _StudioScreenState extends State<StudioScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'List pieces from your stall and go live to shoppers across SA. Payments and payouts are not available; checkout is simulator-only.',
+              'List pieces from your stall and go live to shoppers across SA. Checkout, payments and payouts are unavailable.',
               textAlign: TextAlign.center,
               style: TextStyle(color: DobhaColors.textSecondary, height: 1.4),
             ),
@@ -465,7 +465,6 @@ class BoostListingSheet extends StatefulWidget {
 class _BoostListingSheetState extends State<BoostListingSheet> {
   String _tier = 'basic';
   int _days = 7;
-  bool _busy = false;
 
   static const _tiers = {
     'basic': (
@@ -494,33 +493,6 @@ class _BoostListingSheetState extends State<BoostListingSheet> {
         ? 150.0
         : 50.0;
     return pricePerDay * _days;
-  }
-
-  Future<void> _boost() async {
-    setState(() => _busy = true);
-    try {
-      final until = await AppState().promoteItem(
-        widget.item,
-        days: _days,
-        tier: _tier,
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Boost active for "${widget.item.title}" until ${until.day}/${until.month}/${until.year}.',
-          ),
-        ),
-      );
-    } on ApiException catch (e) {
-      if (mounted)
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   @override
@@ -691,21 +663,9 @@ class _BoostListingSheetState extends State<BoostListingSheet> {
             AppButton(
               color: DobhaColors.amber,
               foreground: Colors.black,
-              onPressed: _busy ? null : _boost,
+              onPressed: null,
               padding: const EdgeInsets.symmetric(vertical: 16),
-              child: _busy
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2.4),
-                    )
-                  : Text(
-                      'Simulate boost · no charge',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
+              child: const Text('Paid promotion unavailable'),
             ),
           ],
         ),

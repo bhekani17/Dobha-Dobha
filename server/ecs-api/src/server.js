@@ -6,7 +6,7 @@ const { createDatabase } = require('./db/prisma');
 
 async function start() {
   const config = loadConfig();
-  const { pool, prisma } = createDatabase(config);
+  const { pool, prisma } = await createDatabase(config);
   const app = buildApp({ database: prisma });
   let stopping = false;
 

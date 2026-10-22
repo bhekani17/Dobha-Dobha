@@ -5,7 +5,7 @@
 /// `python tool/build_legal_pages.py` to update the public web page (web/terms.html).
 library;
 
-const termsVersion = '2026-10-22';
+const termsVersion = '2026-10-22.1';
 const termsUpdated = '22 October 2026';
 
 class TermsSection {
@@ -26,20 +26,19 @@ const termsSections = [
   ]),
   TermsSection('3. Buying', [
     'Items may be new or pre-owned. Look carefully at the photos, details, condition and description, and ask the seller in chat if anything is unclear.',
-    'Complete your purchase through checkout. You can pay with card or wallet balance. Funds are held in escrow until you confirm receipt.',
+    'A purchase request opens a message draft to the seller. It does not place an order, reserve an item, or process payment through Dobha. Agree on payment and collection directly with the seller and use care. After the direct handoff, both parties may report completion in chat; Dobha does not verify payment or the transaction.',
   ]),
   TermsSection('4. Selling', [
     'You can sell once you add your shop name and stall location. You must own what you list and have the right to sell it.',
     'Listings must be honest: use real photos, accurate details and condition, and describe any flaws. The quantity you list must be what you actually have.',
-    'When you receive an order, dispatch the item and provide tracking. You receive payment after the buyer confirms receipt.',
+    'Dobha does not process orders or seller payouts. Both parties can report a direct sale as complete in chat, which marks the listing sold; this report is not verified by Dobha.',
   ]),
   TermsSection('5. Offers', [
-    'Buyers can make offers and sellers can accept, decline or counter. Once accepted, complete the purchase through checkout.',
+    'Buyers can make offers and sellers can accept, decline or counter where these features are available. An accepted offer is not payment or a completed order; contact the seller to discuss next steps.',
   ]),
   TermsSection('6. Payments, payouts and problems', [
-    'Dobha processes payments through checkout. Funds are held in escrow to protect both buyer and seller. The seller is paid after the buyer confirms receipt or after the dispute resolution period.',
-    'You can withdraw available wallet funds to your bank account. Bank details are securely stored for payouts.',
-    'If there is a problem with an order, you can open a dispute. Dobha support will review and may release funds back to the buyer or pay the seller depending on the outcome.',
+    'Dobha does not currently process payments, hold escrow funds, accept wallet deposits, make withdrawals or pay sellers. Historical order, wallet and transaction records may be test or legacy data and are not proof that money was paid, held, refunded or is owed.',
+    'Do not provide card or bank details or send money based on an in-app balance, order, offer or message. Contact support if you need help understanding a historical record.',
     'Nothing in these terms takes away your rights under the Consumer Protection Act or other South African law.',
   ]),
   TermsSection('7. Things you may not sell', [

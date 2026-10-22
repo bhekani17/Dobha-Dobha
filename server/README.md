@@ -37,7 +37,16 @@ No existing client is cut over to it.
 
 ## Financial safety status
 
-Payment processing is enabled. The backend supports checkout, order creation, shipment dispatch, confirmation, escrow resolution, wallet deposits/withdrawals, and listing promotion. Funds are held in escrow until the buyer confirms receipt or after dispute resolution.
+Online payments are not enabled. Buyers can send a direct purchase request to a
+seller and arrange the transaction outside Dobha. After the handoff, both
+parties can report completion in chat, which marks the listing sold; these
+reports do not verify payment and are not orders or escrow records. The existing
+Lambda handlers reject order creation,
+dispatch, confirmation, escrow resolution, wallet deposits and withdrawals,
+and paid listing promotion with HTTP 503 responses before accessing
+persistence. The ECS API has no payment-provider integration. Do not treat
+historical order, wallet, or transaction records as evidence of real payment,
+delivery, refund, or payout.
 
 The build pipeline is validation-only and does not deploy changes. Verify the live runtime, perform a reviewed staged release, and test the deployed endpoints before claiming that any production environment has these features.
 
@@ -56,23 +65,32 @@ accounts, listings, and balances; use isolated test fixtures instead.
 
 The ECS API foundation and its escrow service tests are documented in
 [ecs-api/README.md](./ecs-api/README.md). It needs Node.js 22 and a generated
-Prisma client. Both backend projects now have committed npm lockfiles and the
-CI build uses `npm ci`; resolve the Prisma advisory documented in the ECS API
-guide before production use.
+Prisma client. Both backend projects use committed npm lockfiles and CI uses
+`npm ci`. The ECS API now uses Prisma 7.10.1 to resolve the reported dependency
+advisory; its generation and regression tests remain required before production
+use.
 
 The root `buildspec.yml` runs tests, JavaScript syntax checks, the website
 production bundle, SAM validation, and SAM build only. It does not create
 buckets, delete stacks, or deploy AWS resources. Treat both SAM templates as
 legacy artifacts and do not promote them as the target service. The
 `deploy:aws` package script was removed so it cannot accidentally deploy the
-legacy Lambda/DynamoDB template. There is no approved API deployment command
-until the ECS target and its reviewed infrastructure are production-ready.
+legacy Lambda/DynamoDB template. General API feature deployments remain gated
+on the ECS target and its reviewed infrastructure; the CORS-only update for the
+approved `Stage` API was a narrowly scoped exception and does not represent an
+API migration or enable payment features.
 
 ## Infrastructure
 
 `infrastructure/website.yaml` provisions a private encrypted S3 bucket and
 CloudFront Origin Access Control. It hosts static website assets only; it does
 not migrate or deploy an API.
+
+The API `AllowedOrigin` parameter accepts comma-separated trusted website
+origins. Lambda responses echo only a request origin from this allowlist;
+static API Gateway preflight and gateway-error responses use wildcard CORS
+headers because those responses cannot dynamically echo the request origin.
+Do not treat CORS as API authorization.
 
 Before implementing ECS infrastructure or a client cutover, define and review:
 

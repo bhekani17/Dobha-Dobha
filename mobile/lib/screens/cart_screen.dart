@@ -9,7 +9,7 @@ import '../widgets/item_photo.dart';
 import '../widgets/ui.dart';
 import 'feed_screen.dart';
 
-/// Pieces saved for later or a local checkout simulation.
+/// Listings saved to the cart for contacting their sellers.
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
 
@@ -77,7 +77,7 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Tap the bag on any piece to add it here and buy several at once.',
+                          'Tap the bag on a listing to save it here, then message its seller about buying.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: DobhaColors.muted,
@@ -107,7 +107,7 @@ class _CartScreenState extends State<CartScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${available.length} piece${available.length == 1 ? '' : 's'}',
+                              '${available.length} piece${available.length == 1 ? '' : 's'} · listed total',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: DobhaColors.muted,
@@ -129,7 +129,7 @@ class _CartScreenState extends State<CartScreen> {
                             color: DobhaColors.green,
                             onPressed: () => CheckoutModal.showCart(context),
                             child: const Text(
-                              'Try checkout simulator',
+                              'Contact sellers',
                               style: TextStyle(fontSize: 15),
                             ),
                           ),

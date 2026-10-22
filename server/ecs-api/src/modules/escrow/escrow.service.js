@@ -1,7 +1,5 @@
 'use strict';
 
-const { Prisma } = require('@prisma/client');
-
 const ALLOWED_TRANSITIONS = Object.freeze({
   PENDING: new Set(['HELD']),
   HELD: new Set(['DISPUTED', 'RELEASED', 'REFUNDED']),
@@ -81,7 +79,7 @@ async function serializableTransaction(prisma, operation, idempotencyKey, expect
   for (let attempt = 0; ; attempt += 1) {
     try {
       return await prisma.$transaction(operation, {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        isolationLevel: 'Serializable',
       });
     } catch (error) {
       if (error?.code !== 'P2034' || attempt >= SERIALIZATION_RETRIES) throw error;

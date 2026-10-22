@@ -14,7 +14,7 @@ const privacySections = [
     'Account details: your name, username, email address, phone number if you give it, password (stored only in a scrambled form we cannot read), and your Google account id if you use Continue with Google.',
     'Profile and shop details: your picture, bio, area, shop name and stall location.',
     'Marketplace activity: listings and their photos and videos, likes, saves, comments, offers, carts, follows, reviews, chats, live streams you host or watch, and reports you make.',
-    'Payment and order details: delivery addresses, payment information, bank details for withdrawals, and transaction history.',
+    'Historical marketplace records: any retained order, wallet or transaction data, which may be legacy or test data. The current app does not request card or bank details for checkout, deposits or payouts.',
     'Support: questions you send us and our answers.',
     'Technical information: your IP address, basic device and app information, and a push notification token for your phone if you allow notifications, used to keep the service secure and working and to send you alerts.',
   ]),
@@ -26,13 +26,13 @@ const privacySections = [
   ]),
   TermsSection('4. Who can see it', [
     'Other users see your public profile: name, username, picture, bio, area, shop details, listings, reviews and follower counts.',
-    'Order records contain delivery addresses needed for fulfillment.',
-    'We use service providers to run Dobha Dobha, such as Cloudflare (API, database and file storage), AWS (website hosting when deployed there), LiveKit (live streaming), Google (Continue with Google), Firebase (mobile push notifications), payment processors for checkout, and our email provider (password reset codes and support answers). They only get what they need to do that job.',
+    'Historical order records may contain delivery addresses previously entered in the app.',
+    'We use service providers to run Dobha Dobha, including AWS (API and website hosting), LiveKit (live streaming), Google (Continue with Google), and Firebase (mobile push notifications). They only get information needed to provide their service. Dobha currently has no payment processor for checkout.',
     'We may share information when the law requires it, or to protect people from fraud or harm.',
   ]),
   TermsSection('5. How long we keep it', [
     'We keep your information while your account is open. When you delete your account, we remove your profile, picture, listings that never sold, likes, saves, comments, carts, follows and notifications straight away.',
-    'Records of orders and payments are kept, without your profile, for as long as South African law requires, so the other person in each order still has a record of it.',
+    'Some historical order, wallet or transaction records may remain after account deletion. Their presence does not mean a payment, delivery, refund or payout occurred.',
   ]),
   TermsSection('6. Your rights', [
     'You can see and correct most of your information yourself under Me, then Edit profile.',

@@ -191,7 +191,14 @@ class ThriftItem {
   }
 
   /// The same item with some fields changed.
-  ThriftItem copyWith({int? commentsCount, bool? inCart, bool? isPromoted, DateTime? promotedUntil}) => ThriftItem(
+  ThriftItem copyWith({
+    int? commentsCount,
+    bool? inCart,
+    bool? isClaimed,
+    int? quantity,
+    bool? isPromoted,
+    DateTime? promotedUntil,
+  }) => ThriftItem(
         id: id,
         title: title,
         description: description,
@@ -212,8 +219,8 @@ class ThriftItem {
         commentsCount: commentsCount ?? this.commentsCount,
         isLiked: isLiked,
         isSaved: isSaved,
-        isClaimed: isClaimed,
-        quantity: quantity,
+        isClaimed: isClaimed ?? this.isClaimed,
+        quantity: quantity ?? this.quantity,
         inCart: inCart ?? this.inCart,
         sellerRating: sellerRating,
         sellerReviewCount: sellerReviewCount,

@@ -119,11 +119,36 @@ class ChatScreen extends StatefulWidget {
 
   /// Shown above the box until the first message is sent, and attached to it.
   final ThriftItem? about;
+  final String? initialMessage;
+  final bool initialPurchaseRequest;
 
-  const ChatScreen({super.key, required this.userId, required this.name, this.about});
+  const ChatScreen({
+    super.key,
+    required this.userId,
+    required this.name,
+    this.about,
+    this.initialMessage,
+    this.initialPurchaseRequest = false,
+  });
 
-  static Future<void> open(BuildContext context, {required String userId, required String name, ThriftItem? about}) =>
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatScreen(userId: userId, name: name, about: about)));
+  static Future<void> open(
+    BuildContext context, {
+    required String userId,
+    required String name,
+    ThriftItem? about,
+    String? initialMessage,
+    bool initialPurchaseRequest = false,
+  }) => Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => ChatScreen(
+        userId: userId,
+        name: name,
+        about: about,
+        initialMessage: initialMessage,
+        initialPurchaseRequest: initialPurchaseRequest,
+      ),
+    ),
+  );
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -135,12 +160,16 @@ class _ChatScreenState extends State<ChatScreen> {
   List<ChatMessage>? _messages;
   ThriftItem? _about;
   bool _sending = false;
+  bool _purchaseRequestDraft = false;
+  String? _confirmingPurchaseId;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _about = widget.about;
+    _text.text = widget.initialMessage ?? '';
+    _purchaseRequestDraft = widget.initialPurchaseRequest;
     _load();
     // New replies show up while the conversation is open.
     _timer = Timer.periodic(const Duration(seconds: 5), (_) => _load());
@@ -180,7 +209,12 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty || _sending) return;
     setState(() => _sending = true);
     try {
-      await AppState().sendMessage(widget.userId, text, itemId: _about?.id);
+      if (_purchaseRequestDraft && _about != null) {
+        await AppState().sendPurchaseRequest(widget.userId, _about!, text);
+        _purchaseRequestDraft = false;
+      } else {
+        await AppState().sendMessage(widget.userId, text, itemId: _about?.id);
+      }
       _text.clear();
       _about = null;
       await _load();
@@ -188,6 +222,31 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _confirmPurchase(ChatMessage message) async {
+    setState(() => _confirmingPurchaseId = message.id);
+    try {
+      final itemId = message.item?.id;
+      if (itemId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This purchase request has no linked listing.')),
+        );
+        return;
+      }
+      await AppState().confirmOffAppPurchase(
+        widget.userId,
+        message.id,
+        itemId: itemId,
+      );
+      await _load();
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _confirmingPurchaseId = null);
     }
   }
 
@@ -226,7 +285,15 @@ class _ChatScreenState extends State<ChatScreen> {
                         controller: _scroll,
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                         itemCount: messages.length,
-                        itemBuilder: (context, i) => _Bubble(messages[i]),
+                        itemBuilder: (context, i) => _Bubble(
+                          messages[i],
+                          confirming: _confirmingPurchaseId == messages[i].id,
+                          onConfirm: messages[i].purchaseRequest == null ||
+                                  messages[i].purchaseRequest!.confirmedByMe ||
+                                  messages[i].purchaseRequest!.status == 'reported_complete'
+                              ? null
+                              : () => _confirmPurchase(messages[i]),
+                        ),
                       ),
           ),
           if (_about != null)
@@ -288,7 +355,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
 class _Bubble extends StatelessWidget {
   final ChatMessage m;
-  const _Bubble(this.m);
+  final bool confirming;
+  final VoidCallback? onConfirm;
+  const _Bubble(this.m, {required this.confirming, required this.onConfirm});
 
   @override
   Widget build(BuildContext context) {
@@ -312,6 +381,13 @@ class _Bubble extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (m.purchaseRequest case final purchase?)
+                _PurchaseRequestCard(
+                  purchase: purchase,
+                  isBuyer: m.fromMe,
+                  confirming: confirming,
+                  onConfirm: onConfirm,
+                ),
               if (m.item != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
@@ -331,6 +407,77 @@ class _Bubble extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _PurchaseRequestCard extends StatelessWidget {
+  final ChatPurchaseRequest purchase;
+  final bool isBuyer;
+  final bool confirming;
+  final VoidCallback? onConfirm;
+
+  const _PurchaseRequestCard({
+    required this.purchase,
+    required this.isBuyer,
+    required this.confirming,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final statusText = switch (purchase.status) {
+      'reported_complete' =>
+        'Both parties report this purchase was completed off-app. Dobha has not verified payment.',
+      'buyer_confirmed' =>
+        'Buyer reports payment and collection are complete. Waiting for seller confirmation.',
+      'seller_confirmed' =>
+        'Seller reports receiving payment and handing over the item. Waiting for buyer confirmation.',
+      _ =>
+        'Arrange payment and handoff directly. This request is not an order or reservation.',
+    };
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: DobhaColors.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Direct purchase request',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            statusText,
+            style: TextStyle(color: DobhaColors.textSecondary, fontSize: 12, height: 1.3),
+          ),
+          if (purchase.confirmedByMe && purchase.status != 'reported_complete')
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text('Your confirmation is recorded.'),
+            )
+          else if (onConfirm != null) ...[
+            const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: confirming ? null : onConfirm,
+              child: confirming
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(isBuyer
+                      ? 'I paid and received the item'
+                      : 'I received payment and handed over the item'),
+            ),
+          ],
+        ],
       ),
     );
   }

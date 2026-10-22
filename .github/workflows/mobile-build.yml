@@ -40,9 +40,24 @@ jobs:
         working-directory: ./mobile
         run: flutter pub get
 
+      - name: Analyze Dart code
+        working-directory: ./mobile
+        run: flutter analyze
+
+      - name: Run Flutter tests
+        working-directory: ./mobile
+        run: flutter test
+
       - name: Build APK
         working-directory: ./mobile
-        run: flutter build apk --release --dart-define-from-file=config/google.json
+        env:
+          DEPLOYMENT_STAGE: dev
+          API_BASE_URL: https://4mvo7623gl.execute-api.af-south-1.amazonaws.com/dev
+        run: >-
+          flutter build apk --release
+          --dart-define-from-file=config/google.json
+          --dart-define=DEPLOYMENT_STAGE=dev
+          --dart-define=API_BASE_URL=https://4mvo7623gl.execute-api.af-south-1.amazonaws.com/dev
 
       - name: Install Firebase CLI
         run: npm install --global firebase-tools

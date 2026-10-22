@@ -43,7 +43,9 @@ class ListingMedia {
 class AppState extends ChangeNotifier {
   static final AppState _instance = AppState._internal();
   factory AppState() => _instance;
-  AppState._internal();
+  AppState._internal() {
+    validateDeploymentApi();
+  }
 
   static const _tokenKey = 'auth_token';
   static const _pollEvery = Duration(seconds: 30);
@@ -953,6 +955,46 @@ class AppState extends ChangeNotifier {
     await _call(
       () => _api.post('/api/chats/$userId', {'text': text, 'itemId': ?itemId}),
     );
+  }
+
+  Future<void> sendPurchaseRequest(
+    String sellerId,
+    ThriftItem item,
+    String text,
+  ) async {
+    await _call(
+      () => _api.post('/api/chats/$sellerId', {
+        'text': text,
+        'itemId': item.id,
+        'purchaseRequest': true,
+      }),
+    );
+  }
+
+  Future<void> confirmOffAppPurchase(
+    String peerId,
+    String messageId, {
+    required String itemId,
+  }) async {
+    final response = await _call(
+      () => _api.post('/api/chats/$peerId/purchases/$messageId/confirm'),
+    );
+    final purchaseRequest =
+        (response as Map<String, dynamic>)['purchaseRequest'] as Map<String, dynamic>;
+    if (purchaseRequest['status'] == 'reported_complete') {
+      final item = [
+        ..._feed,
+        ..._myItems,
+        ..._saved,
+        ..._searchResults,
+        ..._cart,
+      ].where((listing) => listing.id == itemId).firstOrNull;
+      if (item != null) {
+        final soldItem = item.copyWith(isClaimed: true, quantity: 0);
+        if (_livePinnedItem?.id == itemId) _livePinnedItem = soldItem;
+        _replaceItem(soldItem);
+      }
+    }
   }
 
   /// Sends a question to Dobha support. Works signed out too (then [email] is needed for the answer).

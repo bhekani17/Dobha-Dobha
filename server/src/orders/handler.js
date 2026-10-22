@@ -1,7 +1,7 @@
 'use strict';
 
 const dynamo = require('../utils/dynamo');
-const { json, error, handleCors } = require('../utils/response');
+const { json, error, handleCors, withCors } = require('../utils/response');
 const { requireUser } = require('../utils/auth');
 const { id, now, zar } = require('../utils/id');
 
@@ -65,7 +65,7 @@ function formatOrder(order, viewerId, item = null) {
   };
 }
 
-exports.handler = async (event) => {
+exports.handler = withCors(async (event) => {
   const cors = handleCors(event);
   if (cors) return cors;
 
@@ -75,6 +75,28 @@ exports.handler = async (event) => {
   const notificationsTable = process.env.NOTIFICATIONS_TABLE;
   const path = event.path || (event.requestContext && event.requestContext.http && event.requestContext.http.path) || '';
   const method = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || '').toUpperCase();
+
+  if (method === 'POST') {
+    if (path === '/api/orders') return error(503, 'Payments are disabled until verified payment processing is integrated');
+    if (/^\/api\/orders\/[^/]+\/dispatch$/.test(path)) {
+      return error(503, 'Order fulfillment is disabled until verified payment processing is integrated');
+    }
+    if (/^\/api\/orders\/[^/]+\/dispute$/.test(path)) {
+      return error(503, 'Order disputes are unavailable until verified payment processing is integrated');
+    }
+    if (/^\/api\/orders\/[^/]+\/confirm$/.test(path)) {
+      return error(503, 'Escrow settlement is disabled until verified payment processing is integrated');
+    }
+    if (/^\/api\/orders\/[^/]+\/resolve$/.test(path)) {
+      return error(503, 'Escrow resolution is disabled until verified payment processing is integrated');
+    }
+    if (path === '/api/wallet/topup') {
+      return error(503, 'Wallet deposits are disabled until verified payment processing is integrated');
+    }
+    if (path === '/api/wallet/withdraw') {
+      return error(503, 'Wallet withdrawals are disabled until verified payment processing is integrated');
+    }
+  }
 
   try {
     // -------------------------------------------------------------
@@ -598,4 +620,4 @@ exports.handler = async (event) => {
     console.error('Orders handler error:', err);
     return error(err.statusCode || 500, err.message || 'Internal Server Error');
   }
-};
+});

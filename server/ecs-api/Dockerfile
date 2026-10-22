@@ -2,10 +2,10 @@ FROM node:22-bookworm-slim AS dependencies
 
 WORKDIR /app
 
-COPY package.json ./
+COPY package.json package-lock.json prisma.config.ts ./
 COPY prisma ./prisma
-RUN npm install --no-audit --no-fund \
-    && npm run prisma:generate
+RUN npm ci --no-audit --no-fund \
+    && DATABASE_URL=postgresql://localhost:5432/dobha npm run prisma:generate
 
 FROM dependencies AS migration
 
@@ -28,8 +28,9 @@ WORKDIR /app
 COPY --from=production-dependencies --chown=node:node /app/node_modules ./node_modules
 COPY --chown=node:node package.json ./
 COPY --chown=node:node src ./src
+COPY --from=dependencies --chown=node:node /app/src/generated/prisma ./src/generated/prisma
 COPY --chown=node:node prisma ./prisma
 
 USER node
 EXPOSE 3000
-CMD ["node", "src/server.js"]
+CMD ["npm", "start"]

@@ -6,7 +6,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/ui.dart';
 
-/// Sales, dispatches, payouts, disputes and comments, newest first. Opening it marks everything read.
+/// Marketplace activity, newest first. Opening it marks everything read.
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -59,7 +59,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           if (items.isEmpty) {
             return const _Empty(
               icon: Icons.notifications_none_rounded,
-              text: 'Nothing yet. Sales, deliveries and payouts will show up here.',
+              text: 'Nothing yet. Messages, follows and other marketplace activity will show up here.',
             );
           }
           return RefreshIndicator(

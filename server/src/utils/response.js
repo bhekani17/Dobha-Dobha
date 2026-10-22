@@ -1,11 +1,15 @@
 'use strict';
 
-const allowedWebOrigin = (process.env.ALLOWED_WEB_ORIGINS || '').trim();
+const allowedWebOrigins = (process.env.ALLOWED_WEB_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const defaultWebOrigin = allowedWebOrigins.length === 1 ? allowedWebOrigins[0] : '';
 const CORS_HEADERS = {
-  ...(allowedWebOrigin
+  ...(defaultWebOrigin
     ? {
-        'Access-Control-Allow-Origin': allowedWebOrigin,
-        ...(allowedWebOrigin === '*' ? {} : { Vary: 'Origin' }),
+        'Access-Control-Allow-Origin': defaultWebOrigin,
+        ...(defaultWebOrigin === '*' ? {} : { Vary: 'Origin' }),
       }
     : {}),
   'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token',
@@ -40,6 +44,28 @@ function handleCors(event) {
   return null;
 }
 
+function applyCors(event, response) {
+  const origin = event?.headers?.origin || event?.headers?.Origin;
+  const headers = { ...response.headers };
+
+  if (allowedWebOrigins.includes('*')) {
+    headers['Access-Control-Allow-Origin'] = '*';
+    delete headers.Vary;
+  } else if (origin && allowedWebOrigins.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers.Vary = headers.Vary ? `${headers.Vary}, Origin` : 'Origin';
+  } else {
+    delete headers['Access-Control-Allow-Origin'];
+    delete headers.Vary;
+  }
+
+  return { ...response, headers };
+}
+
+function withCors(handler) {
+  return async (event) => applyCors(event, await handler(event));
+}
+
 function parseBody(event) {
   if (!event.body) return {};
   if (typeof event.body === 'object') return event.body;
@@ -56,5 +82,7 @@ module.exports = {
   json,
   error,
   handleCors,
+  applyCors,
+  withCors,
   parseBody,
 };

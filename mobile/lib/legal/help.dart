@@ -17,15 +17,15 @@ const helpTopics = [
   HelpTopic('Buying', [
     HelpQuestion(
       'How do I buy a piece?',
-      'Browse listings and add finds to your bag. Go to checkout to place your order. You can pay with card or wallet balance.',
+      'Tap Message seller on a listing to send a purchase request. Arrange payment and collection directly with the seller. After the handoff, both of you can confirm completion in chat; this is not proof of payment and Dobha cannot verify off-app transactions.',
     ),
     HelpQuestion(
       'Does Dobha hold or protect my money?',
-      'Yes. Dobha uses escrow to protect your payment. Funds are held until you confirm you received the item in good condition.',
+      'No. Dobha does not process payments or hold escrow funds. Do not treat a listing, offer or chat message as proof of payment.',
     ),
     HelpQuestion(
       'Can I ask for a lower price?',
-      'Yes. Tap Make an offer on a listing. The seller can accept, decline or send a counter offer. Once accepted, complete the purchase through checkout.',
+      'Where available, tap Make an offer on a listing. If an offer is accepted, message the seller to discuss next steps; acceptance is not an order or payment.',
     ),
     HelpQuestion(
       'Can I ask the seller a question first?',
@@ -35,25 +35,25 @@ const helpTopics = [
   HelpTopic('Delivery', [
     HelpQuestion(
       'Are delivery services available?',
-      'Yes. You can choose seller-arranged courier, buyer pickup, or courier service at checkout.',
+      'Delivery is not arranged through Dobha. Agree on collection or delivery details directly with the seller.',
     ),
     HelpQuestion(
       'How do I track an order?',
-      'Track your order status in the Wallet & Orders screen. The seller will provide tracking information when they dispatch.',
+      'Historical order records may appear in Wallet & Orders. They are not proof of payment, dispatch or delivery.',
     ),
     HelpQuestion(
       'I have a problem with an order. What now?',
-      'You can open a dispute if there is an issue with your order. Dobha support will help mediate.',
+      'Contact support about a historical order record. Dobha cannot settle or refund payments through the app.',
     ),
   ]),
   HelpTopic('Problems with an order', [
     HelpQuestion(
       'Can Dobha refund or settle a problem?',
-      'Yes. If there is a dispute, Dobha support will review and may release funds back to the buyer or pay the seller depending on the outcome.',
+      'Dobha does not currently process payments, hold escrow funds or issue refunds or payouts. Contact support if you need help understanding a historical record.',
     ),
     HelpQuestion(
       'When is the seller paid?',
-      'The seller is paid after you confirm you received the item in good condition, or after the dispute resolution period ends.',
+      'Dobha does not currently process seller payments or payouts.',
     ),
     HelpQuestion(
       'How long does support take?',
@@ -67,25 +67,25 @@ const helpTopics = [
     ),
     HelpQuestion(
       'When do I get paid?',
-      'You get paid after the buyer confirms receipt or after the dispute resolution period ends. Funds are held in escrow until then.',
+      'Dobha does not currently process seller payments or payouts.',
     ),
     HelpQuestion(
       'Can I complete a sale or arrange delivery here?',
-      'Yes. When you receive an order, dispatch the item and provide tracking. Once the buyer confirms, you receive payment.',
+      'You can message the seller about buying, but Dobha does not place orders, arrange dispatch or process payment.',
     ),
     HelpQuestion(
       'Can I go live?',
-      'Yes. Open the Sell tab, tap a listing to pin it, name your stream and tap Go Live Now. Viewers can watch and chat, and buy directly from your stream.',
+      'Yes. Open the Sell tab, tap a listing to pin it, name your stream and tap Go Live Now. Viewers can watch and chat, but cannot buy through Dobha checkout.',
     ),
   ]),
   HelpTopic('Wallet and payouts', [
     HelpQuestion(
       'How do I withdraw my money?',
-      'Go to Wallet & Orders and tap Withdraw. Enter your bank details to withdraw available funds.',
+      'Wallet withdrawals are unavailable. Do not treat displayed balances as money held by Dobha or as proof of funds owed.',
     ),
     HelpQuestion(
       'What do the displayed balances mean?',
-      'Available balance can be withdrawn. On hold funds are in escrow for active orders. Pending funds are from sales awaiting confirmation.',
+      'Displayed wallet balances and transactions may be historical or test records. Dobha does not hold funds; these values are not proof of money owed or paid.',
     ),
   ]),
   HelpTopic('Account and safety', [
@@ -99,7 +99,7 @@ const helpTopics = [
     ),
     HelpQuestion(
       'How do I stay safe?',
-      'Always complete transactions through Dobha checkout. Do not send money directly to sellers outside the app. Dobha escrow protects your payment.',
+      'Dobha checkout and payments are unavailable, and the app does not protect off-app transactions. Do not send money based on in-app balances, orders, offers or messages.',
     ),
     HelpQuestion(
       'How do I delete my account?',

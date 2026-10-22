@@ -559,7 +559,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                         ? () => NewListingScreen.open(context, editing: item)
                         : () => CheckoutModal.show(context, item),
                     child: Text(
-                      isMine ? 'Edit listing' : 'Try checkout simulator',
+                      isMine ? 'Edit listing' : 'Message seller',
                     ),
                   ),
                 ),
@@ -797,7 +797,7 @@ class ItemInfoSheet extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Checkout is unavailable. Dobha does not currently process payments or hold funds.',
+                        'Message the seller to ask about buying. Payment and orders are not handled by Dobha.',
                         style: TextStyle(
                           fontSize: 13,
                           color: DobhaColors.textSecondary,
@@ -812,14 +812,8 @@ class ItemInfoSheet extends StatelessWidget {
                 const SizedBox(height: 16),
                 AppButton(
                   color: DobhaColors.green,
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    CheckoutModal.show(context, item);
-                  },
-                  child: const Text(
-                    'Try checkout simulator',
-                    style: TextStyle(fontSize: 15),
-                  ),
+                  onPressed: () => CheckoutModal.show(context, item),
+                  child: const Text('Message seller'),
                 ),
                 const SizedBox(height: 10),
                 Row(

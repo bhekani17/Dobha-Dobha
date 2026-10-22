@@ -3,4 +3,4 @@ node_modules
 .wrangler
 .aws-sam
 node-runtime
-
+ecs-api/src/generated/prisma/

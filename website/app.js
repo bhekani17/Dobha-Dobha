@@ -30,7 +30,8 @@ const categoryCards = [
   ['Other', 'Something different? It belongs here too'],
 ];
 const savedTheme = localStorage.getItem('dobha-theme');
-const apiBase = String(window.DOBHA_CONFIG?.apiBase || 'https://dobha-live.ndlovubhekani17.workers.dev').replace(/\/+$/, '');
+const apiBase = String(import.meta.env.VITE_API_BASE_URL || window.DOBHA_CONFIG?.apiBase || '').replace(/\/+$/, '');
+if (!apiBase) throw new Error('The Dobha API base URL is not configured.');
 const termsVersion = window.DOBHA_CONFIG?.termsVersion || '2026-10-21';
 const state = {
   token: localStorage.getItem('dobha-token') || '',
@@ -1200,16 +1201,17 @@ function categoryPlaceholder(category) {
 
 function listingCard(item) {
   const conditionClass = item.condition === 'New' || item.condition === 'new' ? 'condition-new' : item.condition ? 'condition-preloved' : '';
-  // API returns item.photos[] array and item.seller.name — normalise here
-  const photoSrc = (item.photos && item.photos[0]) || item.photoUrl || null;
-  const sellerName = (item.seller && item.seller.name) || item.sellerName || 'Dobha seller';
+  const photoSrc = listingMediaEntries(item).find((entry) => entry.kind === 'image')?.url || null;
+  const seller = item.seller || {};
+  const sellerName = seller.name || seller.shopName || item.sellerName || item.seller_name || 'Dobha seller';
+  const sellerHandle = String(seller.handle || item.sellerHandle || '').replace(/^@/, '');
   const media = photoSrc
     ? `<img src="${escapeHtml(resolveMedia(photoSrc))}" alt="${escapeHtml(item.title)}" loading="lazy">`
     : categoryPlaceholder(item.category);
   const hasVideo = listingMediaEntries(item).some((entry) => entry.kind === 'video');
   return `<article class="item-card ${conditionClass}" tabindex="0" role="button" aria-label="View ${escapeHtml(item.title)}" data-item="${escapeHtml(item.id)}">
     <div class="item-image">${media}<span class="item-category">${escapeHtml(item.category)}</span>${hasVideo ? '<span class="item-video-label">Video</span>' : ''}</div>
-    <div class="item-meta"><div><h3>${escapeHtml(item.title)}</h3><p class="seller-line">${escapeHtml(sellerName)}</p></div><strong>${money(item.priceZar)}</strong></div>
+    <div class="item-meta"><div><h3>${escapeHtml(item.title)}</h3><p class="seller-line">Listed by ${escapeHtml(sellerName)}${sellerHandle ? ` · @${escapeHtml(sellerHandle)}` : ''}</p></div><strong>${money(item.priceZar)}</strong></div>
   </article>`;
 }
 function bindListingCards(target) {
@@ -1314,20 +1316,16 @@ async function refreshCart() {
   updateCartBadge();
   return items;
 }
+function renderCheckout() {
+  byId('checkout-total').textContent = 'Dobha does not process payments or hold funds. Do not send money based on an in-app balance or order record.';
+  byId('checkout-submit').disabled = true;
+}
 async function removeFromCart(itemId) {
   try {
     await api(`/api/cart/${itemId}`, { method: 'DELETE' });
     await loadCart();
   } catch (error) {
     notify(error.message, true);
-  }
-  function renderCheckout() {
-    const items = state.cart.filter((item) => item.available !== false && !item.isClaimed);
-    const total = items.reduce((sum, item) => sum + (Number(item.priceZar) || 0), 0);
-    byId('checkout-total').textContent = items.length
-      ? `Subtotal for ${items.length} available ${items.length === 1 ? 'item' : 'items'}: ${money(total)}`
-      : 'There are no available items to checkout.';
-    byId('checkout-submit').disabled = items.length === 0 || !Number.isFinite(total) || total <= 0;
   }
 }
 async function loadSaved() {
@@ -1354,7 +1352,7 @@ async function loadOffers() {
       ${offer.isSeller && offer.status === 'pending' ? `<button data-offer-action="accept" data-offer="${escapeHtml(offer.id)}" class="button button-dark">Accept</button><button data-offer-action="decline" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Decline</button><button data-offer-action="counter" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Counter</button>` : ''}
       ${!offer.isSeller && offer.status === 'pending' ? `<button data-offer-action="cancel" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Cancel</button>` : ''}
       ${!offer.isSeller && offer.status === 'countered' ? `<button data-offer-action="accept" data-offer="${escapeHtml(offer.id)}" class="button button-dark">Accept counter</button><button data-offer-action="decline" data-offer="${escapeHtml(offer.id)}" class="button button-outline">Decline</button>` : ''}
-      ${offer.status === 'accepted' && !offer.isSeller ? `<p class="field-hint">Accepted price: ${money(offer.amountZar)}. Complete the purchase through checkout.</p>` : ''}
+      ${offer.status === 'accepted' && !offer.isSeller ? `<p class="field-hint">Accepted price: ${money(offer.amountZar)}. Checkout and payment are unavailable.</p>` : ''}
       </div></article>`).join('') : '<p class="muted">No offers yet.</p>';
     target.querySelectorAll('[data-offer-action]').forEach((button) => button.addEventListener('click', () => offerAction(button.dataset.offer, button.dataset.offerAction)));
   } catch (error) {
@@ -1731,26 +1729,6 @@ function init() {
   byId('auth-button').addEventListener('click', () => state.user ? location.hash = 'account' : showAuth());
   byId('account-nav').addEventListener('click', () => { if (!state.token) showAuth(); });
   byId('cart-nav').addEventListener('click', () => { location.hash = 'cart'; });
-  byId('checkout-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    try {
-      const { order } = await api('/api/orders', {
-        method: 'POST',
-        body: {
-          items: state.cart.map((item) => ({ id: item.id, quantity: 1 })),
-          paymentMethod: form.elements.payment.value,
-          deliveryMethod: form.elements.delivery.value,
-          deliveryAddress: form.elements.address?.value || '',
-        },
-      });
-      state.cart = [];
-      location.hash = 'orders';
-      notify('Order placed successfully!');
-    } catch (error) {
-      notify(error.message, true);
-    }
-  });
   byId('auth-form').addEventListener('submit', submitAuth);
   byId('auth-switch').addEventListener('click', () => showAuth(state.authMode === 'register' ? 'login' : 'register'));
   byId('forgot-link').addEventListener('click', () => showAuth('forgot'));

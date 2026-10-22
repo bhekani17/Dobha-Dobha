@@ -25,15 +25,31 @@ The Discover page displays listing photos and videos. Community members can
 follow one another, and signed-in members have a live studio with camera and
 microphone selection, mute controls, viewer count, and live chat.
 
-Install dependencies and build the deployable site with:
+Install dependencies and build the site with an explicit API base URL:
 
 ```sh
 cd website
 npm ci
+VITE_DEPLOYMENT_STAGE=dev VITE_API_BASE_URL=https://4mvo7623gl.execute-api.af-south-1.amazonaws.com/dev npm run build
+```
+
+`VITE_API_BASE_URL` is required for production builds. For a production
+deployment, also set `VITE_DEPLOYMENT_STAGE=prod`; the build rejects a missing,
+non-HTTPS, or `/dev` API URL. The approved production website API target is the
+API Gateway `Stage` endpoint:
+
+```sh
+VITE_DEPLOYMENT_STAGE=prod \
+VITE_API_BASE_URL=https://4mvo7623gl.execute-api.af-south-1.amazonaws.com/Stage \
 npm run build
 ```
 
-Upload the contents of `dist/` to the private website bucket. The public runtime settings are in `public/config.js`; do not place secrets or private credentials there. Static AWS hosting is configured separately from the marketplace API. Until the AWS marketplace backend implements and passes parity testing, this website continues to call the current API configured there.
+The `Stage` API is part of the existing Lambda/DynamoDB deployment. Keep its
+CORS allowlist synchronized with both the dev and production CloudFront origins.
+The ECS/PostgreSQL API is not ready for client cutover. Never place secrets or
+private credentials in public website config. Static AWS hosting is configured
+separately from the marketplace API. Upload `dist/` to the private production
+website bucket only after verifying the build target and API CORS configuration.
 
 Anyone can browse listings and watch live streams without signing in. Any signed-in Dobha member, including buyers and sellers, can host a live stream after granting browser camera and microphone access. Sellers retain seller-only product pinning and listing controls.
 

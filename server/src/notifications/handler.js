@@ -1,11 +1,11 @@
 'use strict';
 
 const dynamo = require('../utils/dynamo');
-const { json, error, handleCors, parseBody } = require('../utils/response');
+const { json, error, handleCors, withCors, parseBody } = require('../utils/response');
 const { requireUser } = require('../utils/auth');
 const { now } = require('../utils/id');
 
-exports.handler = async (event) => {
+exports.handler = withCors(async (event) => {
   const cors = handleCors(event);
   if (cors) return cors;
 
@@ -106,4 +106,4 @@ exports.handler = async (event) => {
     console.error('Notifications handler error:', err);
     return error(err.statusCode || 500, err.message || 'Internal Server Error');
   }
-};
+});

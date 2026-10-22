@@ -49,4 +49,25 @@ void main() {
     expect(message.fromMe, isTrue);
     expect(message.text, 'Can I see another photo?');
   });
+
+  test('parses an off-app purchase report without treating it as verified payment', () {
+    final message = ChatMessage.fromJson({
+      'id': 'purchase-1',
+      'text': 'I am interested in buying this item.',
+      'fromMe': true,
+      'createdAt': '2026-10-20T10:30:00.000Z',
+      'purchaseRequest': {
+        'status': 'reported_complete',
+        'buyerConfirmed': true,
+        'sellerConfirmed': true,
+        'confirmedByMe': true,
+        'paymentVerified': false,
+      },
+    });
+
+    expect(message.purchaseRequest?.status, 'reported_complete');
+    expect(message.purchaseRequest?.buyerConfirmed, isTrue);
+    expect(message.purchaseRequest?.sellerConfirmed, isTrue);
+    expect(message.purchaseRequest?.paymentVerified, isFalse);
+  });
 }

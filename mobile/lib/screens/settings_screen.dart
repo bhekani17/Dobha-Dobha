@@ -97,8 +97,9 @@ class SettingsScreen extends StatelessWidget {
         title: const Text('Delete your account?'),
         content: const Text(
           'This cannot be undone. Your profile, picture, listings that never sold, likes, saves, follows and '
-          'notifications are removed. Records of past orders are kept, without your profile, as the law requires.\n\n'
-          'Finish any orders in progress and withdraw your wallet first.',
+          'notifications are removed. Some historical order or wallet records may remain without your profile; '
+          'they are not proof of payment or funds owed.\n\n'
+          'If old order records prevent deletion, contact support for help. Wallet withdrawals are unavailable.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),

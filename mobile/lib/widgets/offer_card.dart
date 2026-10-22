@@ -75,8 +75,7 @@ Future<void> makeOfferFlow(BuildContext context, ThriftItem item) async {
   final amount = await askAmount(
     context,
     title: 'Make an offer',
-    hint:
-        '${item.title} is listed at ${item.formattedPrice}. If the seller accepts, you have 48 hours to buy it at your price.',
+    hint: '${item.title} is listed at ${item.formattedPrice}. An accepted offer is not a completed order or payment; message the seller to discuss next steps.',
     action: 'Send offer',
   );
   if (amount == null) return;
@@ -122,7 +121,7 @@ class OfferCard extends StatelessWidget {
         'countered' =>
           'You countered with ${o.formattedAmount}. Waiting for ${o.buyerName}.',
         'accepted' =>
-          'Agreed at ${o.formattedAmount}. Waiting for ${o.buyerName} to pay.',
+          'Offer accepted at ${o.formattedAmount}. Checkout is unavailable.',
         _ => o.formattedAmount,
       };
     }
@@ -130,15 +129,9 @@ class OfferCard extends StatelessWidget {
       'pending' => 'You offered ${o.formattedAmount}. Waiting for the seller.',
       'countered' => 'The seller asks ${o.formattedAmount} instead',
       'accepted' =>
-        'Accepted at ${o.formattedAmount}. Buy it before ${_deadline()}.',
+        'Offer accepted at ${o.formattedAmount}. Checkout is unavailable.',
       _ => o.formattedAmount,
     };
-  }
-
-  String _deadline() {
-    final t = offer.expiresAt?.toLocal();
-    if (t == null) return 'it expires';
-    return '${t.day}/${t.month} ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -254,8 +247,11 @@ class OfferCard extends StatelessWidget {
           ),
           AppButton(
             color: DobhaColors.green,
-            onPressed: () =>
-                _act(context, 'accept', 'Accepted. Buy it within 48 hours.'),
+            onPressed: () => _act(
+              context,
+              'accept',
+              'Offer accepted. Checkout and payment are unavailable.',
+            ),
             child: Text('Accept ${o.formattedAmount}'),
           ),
         ]),
@@ -266,7 +262,7 @@ class OfferCard extends StatelessWidget {
         AppButton(
           color: DobhaColors.green,
           onPressed: () => CheckoutModal.show(context, o.item, offer: o),
-          child: const Text('Try checkout simulator'),
+          child: const Text('Message seller'),
         ),
       ];
     }

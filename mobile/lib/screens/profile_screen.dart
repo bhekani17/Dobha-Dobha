@@ -189,11 +189,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                               ),
                             ),
                             _Stat(
-                              label: 'Purchases',
+                              label: 'Purchase records',
                               value:
                                   '${orders.where((o) => !o.isSeller).length}',
                             ),
-                            _Stat(label: 'Sales', value: '${user.salesCount}'),
+                            _Stat(
+                              label: 'Sales records',
+                              value: '${user.salesCount}',
+                            ),
                           ],
                         ),
                       ),
@@ -287,17 +290,30 @@ class _ProfileScreenState extends State<ProfileScreen>
     if (orders.isEmpty) {
       return const _Empty(
         icon: Icons.receipt_long_outlined,
-        text: 'No orders yet. Buy a piece from Home and it shows up here.',
+        text:
+            'Checkout is unavailable. Historical order records may appear here, but do not prove payment or delivery.',
       );
     }
     return RefreshIndicator(
       color: DobhaColors.green,
       backgroundColor: DobhaColors.cardElevated,
       onRefresh: AppState().loadOrders,
-      child: ListView.builder(
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-        itemCount: orders.length,
-        itemBuilder: (context, idx) => EscrowTrackerCard(order: orders[idx]),
+        children: [
+          AppWell(
+            radius: 14,
+            child: Text(
+              'Historical order records may be test or legacy data. They do not verify payment, delivery, refund or payout.',
+              style: TextStyle(
+                color: DobhaColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...orders.map((order) => EscrowTrackerCard(order: order)),
+        ],
       ),
     );
   }
@@ -393,7 +409,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                         ),
                         onPressed: () => CheckoutModal.show(context, item),
                         child: const Text(
-                          'Try checkout simulator',
+                          'Message seller',
                           style: TextStyle(fontSize: 13),
                         ),
                       ),

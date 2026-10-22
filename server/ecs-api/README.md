@@ -71,12 +71,13 @@ deliberately only part of the target layout above; no placeholder handlers are
 added.
 
 The ECS API test suite covers configuration validation, liveness/readiness
-responses, and escrow idempotency and transaction boundaries. Run it after
-installing dependencies and generating the Prisma client:
+responses, Prisma client initialization, and escrow idempotency and transaction
+boundaries. Run it after installing dependencies and generating the Prisma
+client:
 
 ```sh
 npm ci
-npm run prisma:generate
+DATABASE_URL=postgresql://localhost:5432/dobha npm run prisma:generate
 npm test
 ```
 
@@ -144,10 +145,10 @@ deployment proceeds. It deliberately refuses to run when no Prisma migration
 has been committed. Committed npm lockfiles are used for repeatable dependency
 installation.
 
-The current Prisma 6 dependency tree reports a high-severity `deepmerge-ts`
-advisory through the Prisma configuration tooling; npm reports that its
-available fix requires a Prisma major upgrade. Treat resolution and regression
-testing of that upgrade as a release gate before exposing this target service.
+Prisma 7.10.1 is used to avoid the high-severity `deepmerge-ts` advisory in the
+Prisma 6 toolchain. The client is generated as TypeScript and loaded through
+`tsx`; keep the Prisma packages aligned and run client generation and API tests
+after any Prisma upgrade.
 
 Deploy an immutable runtime image to an ECS Fargate service in private subnets
 behind an internet-facing ALB. Terminate public TLS at the ALB, restrict task

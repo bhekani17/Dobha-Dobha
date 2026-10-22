@@ -44,6 +44,17 @@ class WalletScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
+                AppWell(
+                  radius: 14,
+                  child: Text(
+                    'Order, wallet and transaction records may be historical or test data. Dobha does not hold funds or process payments; these records do not prove payment, delivery, refund or payout.',
+                    style: TextStyle(
+                      color: DobhaColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 if (openOffers.isNotEmpty) ...[
                   const SectionTitle('Offers'),
                   ...openOffers.map((o) => OfferCard(offer: o)),
@@ -55,7 +66,7 @@ class WalletScreen extends StatelessWidget {
                     radius: 18,
                     padding: const EdgeInsets.all(20),
                     child: Text(
-                      'No orders in progress. When you buy or sell a piece, you follow it here.',
+                      'No order records. Checkout and order fulfillment are currently unavailable.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: DobhaColors.muted,

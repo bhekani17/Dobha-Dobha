@@ -3,7 +3,7 @@
 const { AccessToken, RoomServiceClient } = require('livekit-server-sdk');
 const crypto = require('crypto');
 const dynamo = require('../utils/dynamo');
-const { json, error, handleCors, parseBody } = require('../utils/response');
+const { json, error, handleCors, withCors, parseBody } = require('../utils/response');
 const { getUser, requireUser } = require('../utils/auth');
 const { now, zar } = require('../utils/id');
 
@@ -69,7 +69,7 @@ async function fetchLiveRooms(cfg) {
   }
 }
 
-exports.handler = async (event) => {
+exports.handler = withCors(async (event) => {
   const cors = handleCors(event);
   if (cors) return cors;
 
@@ -266,4 +266,4 @@ exports.handler = async (event) => {
     console.error('Live handler error:', err);
     return error(err.statusCode || 500, err.message || 'Internal Server Error');
   }
-};
+});

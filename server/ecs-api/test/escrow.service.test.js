@@ -2,7 +2,6 @@
 
 const assert = require('node:assert/strict');
 const { describe, it } = require('node:test');
-const { Prisma } = require('@prisma/client');
 const { createEscrowService, EscrowServiceError } = require('../src/modules/escrow/escrow.service');
 
 describe('escrow idempotency and transaction boundaries', () => {
@@ -70,7 +69,7 @@ describe('escrow idempotency and transaction boundaries', () => {
     );
     assert.equal(
       transactionOptions.isolationLevel,
-      Prisma.TransactionIsolationLevel.Serializable,
+      'Serializable',
     );
   });
 

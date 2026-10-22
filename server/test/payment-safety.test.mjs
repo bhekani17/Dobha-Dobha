@@ -33,17 +33,19 @@ describe('financial operations without a payment provider', () => {
   const blockedOperations = [
     ['/api/orders', 'Payments are disabled'],
     ['/api/orders/order-1/dispatch', 'Order fulfillment is disabled'],
+    ['/api/orders/order-1/dispute', 'Order disputes are unavailable'],
     ['/api/orders/order-1/confirm', 'Escrow settlement is disabled'],
     ['/api/orders/order-1/resolve', 'Escrow resolution is disabled'],
     ['/api/wallet/topup', 'Wallet deposits are disabled'],
     ['/api/wallet/withdraw', 'Wallet withdrawals are disabled'],
     ['/api/items/item-1/promote', 'Paid listing promotion is disabled'],
+    ['/api/ads', 'Paid listing promotion is disabled'],
   ];
 
   for (const [path, message] of blockedOperations) {
     it(`rejects ${path} without touching persistence`, async () => {
       mutations = [];
-      const endpoint = path.includes('/items/') ? itemsHandler : handler;
+      const endpoint = path.includes('/items/') || path === '/api/ads' ? itemsHandler : handler;
       const response = await endpoint({ path, httpMethod: 'POST', body: '{}' });
 
       assert.equal(response.statusCode, 503);

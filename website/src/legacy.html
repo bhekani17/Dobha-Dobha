@@ -155,7 +155,7 @@
     </section>
 
     <section class="page hidden" id="page-orders" data-page="orders">
-      <section class="page-intro"><p class="eyebrow">YOUR ACCOUNT</p><h1>Your Dobha<br><span>activity.</span></h1><p>Keep track of order requests and what happens next.</p></section>
+      <section class="page-intro"><p class="eyebrow">YOUR ACCOUNT</p><h1>Your Dobha<br><span>activity.</span></h1><p>Historical order records may be shown here; checkout and order fulfillment are unavailable.</p></section>
       <section class="orders-page-section">
         <div class="section-heading"><div><p class="eyebrow">BUYING ON DOBHA</p><h2>Your orders</h2></div><button class="text-button" id="signout-button">Sign out</button></div>
         <div id="orders-list" class="orders-list"></div>
@@ -166,12 +166,9 @@
       <section class="page-intro"><p class="eyebrow">YOUR FINDS</p><h1>Your <span>shopping bag.</span></h1><p>Review and manage the items you have saved in your bag.</p></section>
       <section class="feature-section"><div id="cart-list" class="orders-list"></div>
         <form id="checkout-form" class="form-stack checkout-form">
-          <h2>Checkout</h2>
-          <label class="field">Delivery option<select name="delivery"><option>Seller-arranged courier</option><option>Buyer pickup</option><option>Courier service</option></select></label>
-          <label class="field">Payment option<select name="payment"><option>Card</option><option>Wallet</option></select></label>
-          <label class="field">Delivery address<input name="address" type="text" placeholder="Enter your delivery address"></label>
-          <p id="checkout-total" class="field-hint">Add available items to see subtotal.</p>
-          <button id="checkout-submit" class="button button-dark" disabled>Place order</button>
+          <h2>Checkout unavailable</h2>
+          <p id="checkout-total" class="field-hint">Dobha does not process payments or hold funds. Do not send money based on an in-app balance or order record.</p>
+          <button id="checkout-submit" class="button button-dark" type="button" disabled>Checkout unavailable</button>
         </form>
       </section>
     </section>
@@ -187,7 +184,7 @@
     </section>
 
     <section class="page hidden" id="page-wallet" data-page="wallet">
-      <section class="page-intro"><p class="eyebrow">DOBHA WALLET</p><h1>Your <span>balance.</span></h1><p>View your available funds, funds on hold in escrow, and pending payouts.</p></section>
+      <section class="page-intro"><p class="eyebrow">DOBHA WALLET</p><h1>Your <span>balance.</span></h1><p>Historical wallet records may be shown here. Dobha does not hold funds or process payments; balances are not proof of money owed or paid.</p></section>
       <section class="feature-section">
         <h2>Your wallet</h2>
         <div id="wallet-summary"></div><div id="wallet-transactions" class="orders-list"></div>
@@ -217,7 +214,7 @@
         <form id="profile-form" class="form-stack checkout-form"><h2>Edit profile</h2><label class="field">Name<input name="name" required minlength="2" maxlength="40"></label><label class="field">Phone<input name="phone" maxlength="20"></label><label class="field">Bio<textarea name="bio" maxlength="160"></textarea></label><label class="field">Location<input name="location" maxlength="60"></label><label class="field">Account type<select name="role"><option value="shopper">Shopper</option><option value="vendor">Seller</option></select></label><label class="field">Shop name<input name="shopName" maxlength="50"></label><label class="field">Shop location<input name="stallLocation" maxlength="100"></label><button class="button button-dark">Save profile</button><p id="profile-message" class="form-message" role="status"></p></form>
         <form id="avatar-form" class="form-stack checkout-form"><h2>Profile photo</h2><label class="field">Choose a photo<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" required></label><button class="button button-outline">Upload photo</button><button type="button" id="remove-avatar" class="text-button">Remove photo</button><p id="avatar-message" class="form-message" role="status"></p></form>
         <form id="password-form" class="form-stack checkout-form"><h2>Change password</h2><label class="field">Current password<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="field">New password<input name="newPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="button button-outline">Change password</button><p id="password-message" class="form-message" role="status"></p></form>
-        <form id="delete-account-form" class="form-stack checkout-form"><h2>Delete account</h2><p class="field-hint">This is permanent. Active orders or a non-empty wallet must be resolved first.</p><label class="field">Confirm by typing DELETE<input name="confirm" required pattern="DELETE" autocomplete="off"></label><label class="field">Password (password accounts only)<input name="password" type="password" autocomplete="current-password"></label><button class="button button-outline">Delete account</button><p id="delete-message" class="form-message" role="status"></p></form>
+        <form id="delete-account-form" class="form-stack checkout-form"><h2>Delete account</h2><p class="field-hint">This is permanent. Historical order or wallet records may remain without your profile and are not proof of payment or funds owed. If old records prevent deletion, contact support for help.</p><label class="field">Confirm by typing DELETE<input name="confirm" required pattern="DELETE" autocomplete="off"></label><label class="field">Password (password accounts only)<input name="password" type="password" autocomplete="current-password"></label><button class="button button-outline">Delete account</button><p id="delete-message" class="form-message" role="status"></p></form>
         <button class="button button-outline" id="signout-account">Sign out</button>
       </section>
     </section>
@@ -239,7 +236,7 @@
 
     <section class="page hidden" id="page-about" data-page="about">
       <section class="page-intro"><p class="eyebrow">ABOUT DOBHA-DOBHA</p><h1>A marketplace<br>with <span>room for all.</span></h1><p>Dobha-Dobha brings buyers and sellers together to pass along good things, discover local shops, and meet sellers live.</p></section>
-      <section class="about-grid"><article><span>01</span><h2>Find it</h2><p>Browse many kinds of listings and discover something useful, interesting, or simply yours.</p></article><article><span>02</span><h2>Pass it on</h2><p>Give things a next chapter by sharing a listing with the Dobha-Dobha community.</p></article><article><span>03</span><h2>Meet the seller</h2><p>Watch and host live streams from the website or mobile app. Checkout securely with escrow protection.</p></article></section>
+      <section class="about-grid"><article><span>01</span><h2>Find it</h2><p>Browse many kinds of listings and discover something useful, interesting, or simply yours.</p></article><article><span>02</span><h2>Pass it on</h2><p>Give things a next chapter by sharing a listing with the Dobha-Dobha community.</p></article><article><span>03</span><h2>Meet the seller</h2><p>Watch and host live streams from the website or mobile app. Checkout and payments are currently unavailable.</p></article></section>
     </section>
   </main>
 

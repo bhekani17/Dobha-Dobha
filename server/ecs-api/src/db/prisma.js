@@ -1,11 +1,13 @@
 'use strict';
 
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { PrismaClient } = require('@prisma/client');
 const { Pool } = require('pg');
 const { loadConfig } = require('../config');
 
-function createDatabase(config = loadConfig()) {
+async function createDatabase(config = loadConfig()) {
+  const [{ PrismaPg }, { PrismaClient }] = await Promise.all([
+    import('@prisma/adapter-pg'),
+    import('../generated/prisma/client.ts'),
+  ]);
   const pool = new Pool({
     connectionString: config.databaseUrl,
     max: config.dbPoolMax,

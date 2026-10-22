@@ -18,10 +18,10 @@ phases:
       - npm --prefix server ci
       - npm --prefix server test
       - npm --prefix server/ecs-api ci
-      - npm --prefix server/ecs-api run prisma:generate
+      - DATABASE_URL=postgresql://localhost:5432/dobha npm --prefix server/ecs-api run prisma:generate
       - npm --prefix server/ecs-api test
       - npm --prefix website ci
-      - npm --prefix website run build
+      - VITE_DEPLOYMENT_STAGE=dev VITE_API_BASE_URL=https://4mvo7623gl.execute-api.af-south-1.amazonaws.com/dev npm --prefix website run build
       - node --check server/src/items/handler.js
       - node --check server/src/orders/handler.js
       - node --check server/src/utils/response.js

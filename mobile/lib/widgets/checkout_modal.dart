@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../models/social.dart';
 import '../models/thrift_item.dart';
+import '../screens/chat_screens.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
-import 'item_photo.dart';
 import 'ui.dart';
 
-class CheckoutModal extends StatefulWidget {
+class CheckoutModal extends StatelessWidget {
   final List<ThriftItem> items;
   final Offer? offer;
 
@@ -33,207 +33,152 @@ class CheckoutModal extends StatefulWidget {
     );
   }
 
-  @override
-  State<CheckoutModal> createState() => _CheckoutModalState();
-}
-
-class _CheckoutModalState extends State<CheckoutModal> {
-  String _delivery = 'Seller-arranged courier';
-  String _payment = 'Card';
-  final _addressController = TextEditingController();
-  bool _busy = false;
-
-  Future<void> _checkout() async {
-    if (widget.items.isEmpty) return;
-    setState(() => _busy = true);
-    try {
-      await AppState().checkoutCart(
-        deliveryMethod: _delivery,
-        paymentMethod: _payment,
-        deliveryAddress: _addressController.text.trim(),
-      );
-      if (!mounted) return;
-      Navigator.of(context).pop();
+  Future<void> _contactSeller(BuildContext context, ThriftItem item) async {
+    final appState = AppState();
+    if (!appState.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Order placed successfully!'),
-        ),
+        const SnackBar(content: Text('Sign in to contact the seller.')),
       );
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.toString())));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
+      return;
     }
-  }
+    if (item.sellerId == appState.user.id) return;
 
-  @override
-  void dispose() {
-    _addressController.dispose();
-    super.dispose();
+    final acceptedOffer = offer?.item.id == item.id && offer?.status == 'accepted'
+        ? offer
+        : null;
+    final amount = acceptedOffer?.formattedAmount ?? item.formattedPrice;
+    final draft =
+        'Hi, I am interested in buying "${item.title}" for $amount. Is it still available? I understand payment is not handled by Dobha.';
+
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await navigator.push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatScreen(
+          userId: item.sellerId,
+          name: item.sellerName,
+          about: item,
+          initialMessage: draft,
+          initialPurchaseRequest: true,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final items = widget.items;
-    final subtotal =
-        widget.offer?.amountZar ??
-        items.fold<double>(0, (sum, item) => sum + item.priceZar);
+    final availableItems = items.where((item) => !item.isClaimed).toList();
     return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          14,
-          20,
-          MediaQuery.of(context).viewInsets.bottom + 20,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                margin: const EdgeInsets.only(bottom: 18),
-                decoration: Surfaces.well(radius: 3),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: Surfaces.well(radius: 3),
+                ),
               ),
-            ),
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Checkout',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3,
-                    ),
+              const Text(
+                'Contact seller to buy',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 14),
+              AppWell(
+                radius: 14,
+                child: Text(
+                  'Send the seller a purchase request and arrange payment and collection directly. This does not place an order, reserve an item, or process payment through Dobha.',
+                  style: TextStyle(
+                    color: DobhaColors.textSecondary,
+                    height: 1.4,
                   ),
                 ),
-                AppButton.icon(
-                  icon: Icons.close,
-                  size: 18,
-                  padding: 8,
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            if (items.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              AppCard(
-                radius: 16,
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    for (var index = 0; index < items.length; index++)
-                      Padding(
-                        padding: EdgeInsets.only(
-                          bottom: index == items.length - 1 ? 0 : 10,
-                        ),
+              ),
+              const SizedBox(height: 12),
+              if (availableItems.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'There are no available items to ask about.',
+                    style: TextStyle(color: DobhaColors.textSecondary),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: availableItems.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final item = availableItems[index];
+                      final appState = AppState();
+                      final isOwnItem = appState.isLoggedIn &&
+                          item.sellerId == appState.user.id;
+                      final itemOffer = acceptedOffer?.item.id == item.id
+                          ? acceptedOffer
+                          : null;
+                      final amount =
+                          itemOffer?.formattedAmount ?? item.formattedPrice;
+                      return AppWell(
+                        radius: 14,
                         child: Row(
                           children: [
-                            ItemThumb(item: items[index], size: 48),
-                            const SizedBox(width: 10),
                             Expanded(
-                              child: Text(
-                                items[index].title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${item.sellerName} · $amount',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: DobhaColors.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              index == 0 && widget.offer != null
-                                  ? widget.offer!.formattedAmount
-                                  : items[index].formattedPrice,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                              ),
+                            const SizedBox(width: 10),
+                            TextButton(
+                              onPressed: isOwnItem
+                                  ? null
+                                  : () => _contactSeller(context, item),
+                              child: Text(isOwnItem ? 'Your listing' : 'Message'),
                             ),
                           ],
                         ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            DropdownButtonFormField<String>(
-              initialValue: _delivery,
-              decoration: const InputDecoration(
-                labelText: 'Delivery option',
-              ),
-              items:
-                  const [
-                        'Seller-arranged courier',
-                        'Buyer pickup',
-                        'Courier service',
-                      ]
-                      .map(
-                        (option) => DropdownMenuItem(
-                          value: option,
-                          child: Text(option),
-                        ),
-                      )
-                      .toList(),
-              onChanged: (value) =>
-                  setState(() => _delivery = value ?? _delivery),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _payment,
-              decoration: const InputDecoration(
-                labelText: 'Payment option',
-              ),
-              items: const ['Card', 'Wallet']
-                  .map(
-                    (option) =>
-                        DropdownMenuItem(value: option, child: Text(option)),
-                  )
-                  .toList(),
-              onChanged: (value) =>
-                  setState(() => _payment = value ?? _payment),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _addressController,
-              decoration: const InputDecoration(
-                labelText: 'Delivery address',
-                hintText: 'Enter your delivery address',
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Subtotal: R ${subtotal.toStringAsFixed(2)}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
+                      );
+                    },
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            AppButton(
-              color: DobhaColors.green,
-              onPressed: _busy || items.isEmpty ? null : _checkout,
-              child: Text(_busy ? 'Placing order…' : 'Place order'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ],
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
         ),
       ),
     );

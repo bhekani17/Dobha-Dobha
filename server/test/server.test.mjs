@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { json, error, handleCors, parseBody } = require('../src/utils/response.js');
+const { json, error, handleCors, withCors, parseBody } = require('../src/utils/response.js');
 const { id, orderId, vaultRef, zar, toCents } = require('../src/utils/id.js');
 
 describe('Dobha Dobha - Utility & Core Business Logic Tests', () => {
@@ -25,6 +25,27 @@ describe('Dobha Dobha - Utility & Core Business Logic Tests', () => {
       const configuredResponse = require(modulePath).json(200, { success: true });
       assert.equal(configuredResponse.headers['Access-Control-Allow-Origin'], 'https://shop.example.com');
       assert.equal(configuredResponse.headers.Vary, 'Origin');
+      if (originalOrigin === undefined) delete process.env.ALLOWED_WEB_ORIGINS;
+      else process.env.ALLOWED_WEB_ORIGINS = originalOrigin;
+      delete require.cache[modulePath];
+      require(modulePath);
+    });
+
+    it('echoes only an explicitly allowed origin when multiple websites are configured', async () => {
+      const modulePath = require.resolve('../src/utils/response.js');
+      const originalOrigin = process.env.ALLOWED_WEB_ORIGINS;
+      process.env.ALLOWED_WEB_ORIGINS = 'https://dev.example.com, https://shop.example.com';
+      delete require.cache[modulePath];
+      const { withCors: withConfiguredCors, json: configuredJson } = require(modulePath);
+      const handler = withConfiguredCors(async () => configuredJson(200, { success: true }));
+
+      const productionResponse = await handler({ headers: { origin: 'https://shop.example.com' } });
+      assert.equal(productionResponse.headers['Access-Control-Allow-Origin'], 'https://shop.example.com');
+      assert.equal(productionResponse.headers.Vary, 'Origin');
+
+      const untrustedResponse = await handler({ headers: { origin: 'https://untrusted.example.com' } });
+      assert.equal(untrustedResponse.headers['Access-Control-Allow-Origin'], undefined);
+
       if (originalOrigin === undefined) delete process.env.ALLOWED_WEB_ORIGINS;
       else process.env.ALLOWED_WEB_ORIGINS = originalOrigin;
       delete require.cache[modulePath];

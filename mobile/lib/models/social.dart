@@ -306,11 +306,20 @@ class ChatMessage {
   final bool fromMe;
   final DateTime createdAt;
   final ChatItemRef? item;
+  final ChatPurchaseRequest? purchaseRequest;
 
-  const ChatMessage({required this.id, required this.text, required this.fromMe, required this.createdAt, this.item});
+  const ChatMessage({
+    required this.id,
+    required this.text,
+    required this.fromMe,
+    required this.createdAt,
+    this.item,
+    this.purchaseRequest,
+  });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     final item = json['item'] as Map<String, dynamic>?;
+    final purchaseRequest = json['purchaseRequest'] as Map<String, dynamic>?;
     return ChatMessage(
       id: json['id'] as String,
       text: json['text'] as String,
@@ -324,6 +333,34 @@ class ChatMessage {
               priceZar: (item['priceZar'] as num?)?.toDouble(),
               photoUrl: item['photoUrl'] as String?,
             ),
+      purchaseRequest: purchaseRequest == null
+          ? null
+          : ChatPurchaseRequest.fromJson(purchaseRequest),
     );
   }
+}
+
+class ChatPurchaseRequest {
+  final String status;
+  final bool buyerConfirmed;
+  final bool sellerConfirmed;
+  final bool confirmedByMe;
+  final bool paymentVerified;
+
+  const ChatPurchaseRequest({
+    required this.status,
+    required this.buyerConfirmed,
+    required this.sellerConfirmed,
+    required this.confirmedByMe,
+    required this.paymentVerified,
+  });
+
+  factory ChatPurchaseRequest.fromJson(Map<String, dynamic> json) =>
+      ChatPurchaseRequest(
+        status: json['status'] as String? ?? 'requested',
+        buyerConfirmed: json['buyerConfirmed'] as bool? ?? false,
+        sellerConfirmed: json['sellerConfirmed'] as bool? ?? false,
+        confirmedByMe: json['confirmedByMe'] as bool? ?? false,
+        paymentVerified: json['paymentVerified'] as bool? ?? false,
+      );
 }

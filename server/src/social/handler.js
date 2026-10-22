@@ -1,7 +1,7 @@
 'use strict';
 
 const dynamo = require('../utils/dynamo');
-const { json, error, handleCors, parseBody } = require('../utils/response');
+const { json, error, handleCors, withCors, parseBody } = require('../utils/response');
 const { getUser, requireUser } = require('../utils/auth');
 const { id, now, zar, toCents } = require('../utils/id');
 
@@ -17,6 +17,23 @@ function formatPeer(user, id) {
 }
 
 function formatMessage(message, viewerId, item = null) {
+  const purchaseRequest = message.purchase_request
+    ? {
+        status: message.buyer_confirmed_at && message.seller_confirmed_at
+          ? 'reported_complete'
+          : message.buyer_confirmed_at
+            ? 'buyer_confirmed'
+            : message.seller_confirmed_at
+              ? 'seller_confirmed'
+              : 'requested',
+        buyerConfirmed: Boolean(message.buyer_confirmed_at),
+        sellerConfirmed: Boolean(message.seller_confirmed_at),
+        confirmedByMe: viewerId === message.buyer_id
+          ? Boolean(message.buyer_confirmed_at)
+          : Boolean(message.seller_confirmed_at),
+        paymentVerified: false,
+      }
+    : null;
   return {
     id: message.id,
     senderId: message.sender_id,
@@ -24,6 +41,7 @@ function formatMessage(message, viewerId, item = null) {
     text: message.text,
     fromMe: message.sender_id === viewerId,
     createdAt: new Date(message.created_at).toISOString(),
+    ...(purchaseRequest ? { purchaseRequest } : {}),
     ...(item
       ? {
           item: {
@@ -37,7 +55,7 @@ function formatMessage(message, viewerId, item = null) {
   };
 }
 
-exports.handler = async (event) => {
+exports.handler = withCors(async (event) => {
   const cors = handleCors(event);
   if (cors) return cors;
 
@@ -614,6 +632,66 @@ exports.handler = async (event) => {
       return json(200, { chats });
     }
 
+    const purchaseConfirmationMatch = path.match(/^\/api\/chats\/([^\/]+)\/purchases\/([^\/]+)\/confirm$/);
+    if (purchaseConfirmationMatch && method === 'POST') {
+      const authUser = await requireUser(event);
+      const [, peerId, messageId] = purchaseConfirmationMatch;
+      if (peerId === authUser.id) return error(400, 'You cannot confirm a purchase with yourself');
+
+      const purchase = await dynamo.get(messagesTable, { id: messageId });
+      if (!purchase || !purchase.purchase_request) return error(404, 'Purchase request not found');
+      const isBuyer = purchase.buyer_id === authUser.id && purchase.seller_id === peerId;
+      const isSeller = purchase.seller_id === authUser.id && purchase.buyer_id === peerId;
+      if (!isBuyer && !isSeller) return error(403, 'Only the buyer and seller can confirm this purchase');
+
+      const confirmationField = isBuyer ? 'buyer_confirmed_at' : 'seller_confirmed_at';
+      let updatedPurchase = purchase;
+      if (!purchase[confirmationField]) {
+        try {
+          const result = await dynamo.update({
+            TableName: messagesTable,
+            Key: { id: messageId },
+            UpdateExpression: `SET ${confirmationField} = :time`,
+            ConditionExpression: `attribute_not_exists(${confirmationField})`,
+            ExpressionAttributeValues: { ':time': now() },
+            ReturnValues: 'ALL_NEW',
+          });
+          updatedPurchase = result.Attributes || await dynamo.get(messagesTable, { id: messageId });
+        } catch (err) {
+          if (err.name !== 'ConditionalCheckFailedException') throw err;
+          updatedPurchase = await dynamo.get(messagesTable, { id: messageId });
+        }
+      }
+
+      if (updatedPurchase.buyer_confirmed_at && updatedPurchase.seller_confirmed_at) {
+        const item = await dynamo.get(itemsTable, { id: updatedPurchase.item_id });
+        if (item && item.status === 'available') {
+          try {
+            await dynamo.update({
+              TableName: itemsTable,
+              Key: { id: updatedPurchase.item_id },
+              UpdateExpression: 'SET #st = :sold, off_app_sale_reported_at = :time, off_app_sale_buyer_id = :buyer',
+              ConditionExpression: '#st = :available',
+              ExpressionAttributeNames: { '#st': 'status' },
+              ExpressionAttributeValues: {
+                ':sold': 'sold',
+                ':available': 'available',
+                ':time': now(),
+                ':buyer': updatedPurchase.buyer_id,
+              },
+            });
+          } catch (err) {
+            if (err.name !== 'ConditionalCheckFailedException') throw err;
+          }
+        }
+      }
+
+      return json(200, {
+        message: 'Direct purchase confirmation recorded. Dobha has not verified payment.',
+        purchaseRequest: formatMessage(updatedPurchase, authUser.id).purchaseRequest,
+      });
+    }
+
     const chatMatch = path.match(/^\/api\/chats\/([^\/]+)$/);
     if (chatMatch) {
       const authUser = await requireUser(event);
@@ -670,12 +748,25 @@ exports.handler = async (event) => {
         const itemId = typeof body.itemId === 'string' ? body.itemId.trim() : '';
         const item = itemId ? await dynamo.get(itemsTable, { id: itemId }) : null;
         if (itemId && !item) return error(404, 'Item not found');
+        if (body.purchaseRequest === true) {
+          if (!itemId) return error(400, 'A listing is required for a purchase request');
+          if (item.seller_id !== peerId) return error(400, 'Purchase requests must be sent to the listing seller');
+          if (item.seller_id === authUser.id) return error(400, 'You cannot request to buy your own listing');
+          if (item.status !== 'available') return error(409, 'This listing is no longer available');
+        }
         const msg = {
           id: messageId,
           sender_id: authUser.id,
           recipient_id: peerId,
           text,
           ...(itemId ? { item_id: itemId } : {}),
+          ...(body.purchaseRequest === true
+            ? {
+                purchase_request: true,
+                buyer_id: authUser.id,
+                seller_id: peerId,
+              }
+            : {}),
           created_at: timestamp,
           read_at: 0,
         };
@@ -717,4 +808,4 @@ exports.handler = async (event) => {
     console.error('Social handler error:', err);
     return error(err.statusCode || 500, err.message || 'Internal Server Error');
   }
-};
+});
