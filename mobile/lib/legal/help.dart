@@ -17,7 +17,7 @@ const helpTopics = [
   HelpTopic('Buying', [
     HelpQuestion(
       'How do I buy a piece?',
-      'Tap Message seller on a listing to send a purchase request. Arrange payment and collection directly with the seller. After the handoff, both of you can confirm completion in chat; this is not proof of payment and Dobha cannot verify off-app transactions.',
+      'Tap Request to buy on a listing to send a purchase request without starting a chat yourself. Arrange payment and collection directly with the seller. After the handoff, both of you can confirm completion in chat; this is not proof of payment and Dobha cannot verify off-app transactions.',
     ),
     HelpQuestion(
       'Does Dobha hold or protect my money?',

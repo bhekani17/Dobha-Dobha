@@ -26,7 +26,7 @@ const termsSections = [
   ]),
   TermsSection('3. Buying', [
     'Items may be new or pre-owned. Look carefully at the photos, details, condition and description, and ask the seller in chat if anything is unclear.',
-    'A purchase request opens a message draft to the seller. It does not place an order, reserve an item, or process payment through Dobha. Agree on payment and collection directly with the seller and use care. After the direct handoff, both parties may report completion in chat; Dobha does not verify payment or the transaction.',
+    'A purchase request sends a message to the seller without requiring you to start a chat yourself. It does not place an order, reserve an item, or process payment through Dobha. Agree on payment and collection directly with the seller and use care. After the direct handoff, both parties may report completion in chat; Dobha does not verify payment or the transaction.',
   ]),
   TermsSection('4. Selling', [
     'You can sell once you add your shop name and stall location. You must own what you list and have the right to sell it.',

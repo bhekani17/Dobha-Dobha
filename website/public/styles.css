@@ -1588,6 +1588,12 @@ footer .brand-symbol img {
   font-size: 11px;
 }
 
+.sandbox-checkout-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 .product-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1655,6 +1661,78 @@ footer .brand-symbol img {
 
 .wallet-balance strong {
   font-size: 20px;
+}
+
+.wallet-deposit-preview {
+  margin: 18px 0 28px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.wallet-deposit-preview .section-heading {
+  margin-bottom: 8px;
+}
+
+.wallet-deposit-preview h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.wallet-deposit-preview > p {
+  color: var(--muted);
+}
+
+.wallet-deposit-preview fieldset {
+  display: grid;
+  grid-template-columns: minmax(130px, 180px) 1fr auto;
+  align-items: end;
+  gap: 14px;
+  margin: 16px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.wallet-payment-options {
+  display: grid;
+  gap: 8px;
+}
+
+.wallet-payment-options label {
+  display: grid;
+  grid-template-columns: auto 28px 1fr;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.payment-provider-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.wallet-payment-options label span {
+  grid-column: 3;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wallet-preview-badge {
+  align-self: center;
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.wallet-preview-notice {
+  margin-bottom: 0;
+  font-size: 12px;
 }
 
 .unread {
@@ -1892,6 +1970,10 @@ footer .brand-symbol img {
   }
 
   .wallet-balance {
+    grid-template-columns: 1fr;
+  }
+
+  .wallet-deposit-preview fieldset {
     grid-template-columns: 1fr;
   }
 

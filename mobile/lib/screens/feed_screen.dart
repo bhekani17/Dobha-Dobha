@@ -559,7 +559,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                         ? () => NewListingScreen.open(context, editing: item)
                         : () => CheckoutModal.show(context, item),
                     child: Text(
-                      isMine ? 'Edit listing' : 'Message seller',
+                      isMine ? 'Edit listing' : 'Request to buy',
                     ),
                   ),
                 ),

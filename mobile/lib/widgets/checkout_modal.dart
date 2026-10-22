@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../api.dart';
 import '../models/social.dart';
 import '../models/thrift_item.dart';
-import '../screens/chat_screens.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import 'ui.dart';
@@ -38,11 +38,11 @@ class CheckoutModal extends StatelessWidget {
     return offer;
   }
 
-  Future<void> _contactSeller(BuildContext context, ThriftItem item) async {
+  Future<void> _requestToBuy(BuildContext context, ThriftItem item) async {
     final appState = AppState();
     if (!appState.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign in to contact the seller.')),
+        const SnackBar(content: Text('Sign in to request to buy this item.')),
       );
       return;
     }
@@ -50,22 +50,27 @@ class CheckoutModal extends StatelessWidget {
 
     final itemOffer = _acceptedOfferFor(item);
     final amount = itemOffer?.formattedAmount ?? item.formattedPrice;
-    final draft =
-        'Hi, I am interested in buying "${item.title}" for $amount. Is it still available? I understand payment is not handled by Dobha.';
-
-    final navigator = Navigator.of(context);
-    navigator.pop();
-    await navigator.push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatScreen(
-          userId: item.sellerId,
-          name: item.sellerName,
-          about: item,
-          initialMessage: draft,
-          initialPurchaseRequest: true,
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await appState.sendPurchaseRequest(
+        item.sellerId,
+        item,
+        'I would like to buy "${item.title}" for $amount. Please confirm availability and arrange payment and collection with me.',
+      );
+      if (!context.mounted) return;
+      Navigator.of(context).pop();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Purchase request sent. Arrange payment and collection with the seller directly; Dobha has not processed payment.',
+          ),
         ),
-      ),
-    );
+      );
+    } on ApiException catch (error) {
+      if (context.mounted) {
+        messenger.showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    }
   }
 
   @override
@@ -91,7 +96,7 @@ class CheckoutModal extends StatelessWidget {
                 ),
               ),
               const Text(
-                'Contact seller to buy',
+                'Request to buy directly',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -102,7 +107,7 @@ class CheckoutModal extends StatelessWidget {
               AppWell(
                 radius: 14,
                 child: Text(
-                  'Send the seller a purchase request and arrange payment and collection directly. This does not place an order, reserve an item, or process payment through Dobha.',
+                  'Send a purchase request without starting a chat yourself. The seller receives it as a message. This does not place an order, reserve an item, or process payment through Dobha; arrange payment and collection directly.',
                   style: TextStyle(
                     color: DobhaColors.textSecondary,
                     height: 1.4,
@@ -165,8 +170,10 @@ class CheckoutModal extends StatelessWidget {
                             TextButton(
                               onPressed: isOwnItem
                                   ? null
-                                  : () => _contactSeller(context, item),
-                              child: Text(isOwnItem ? 'Your listing' : 'Message'),
+                                  : () => _requestToBuy(context, item),
+                              child: Text(
+                                isOwnItem ? 'Your listing' : 'Request to buy',
+                              ),
                             ),
                           ],
                         ),

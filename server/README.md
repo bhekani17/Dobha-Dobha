@@ -37,16 +37,32 @@ No existing client is cut over to it.
 
 ## Financial safety status
 
-Online payments are not enabled. Buyers can send a direct purchase request to a
-seller and arrange the transaction outside Dobha. After the handoff, both
-parties can report completion in chat, which marks the listing sold; these
-reports do not verify payment and are not orders or escrow records. The existing
-Lambda handlers reject order creation,
-dispatch, confirmation, escrow resolution, wallet deposits and withdrawals,
-and paid listing promotion with HTTP 503 responses before accessing
-persistence. The ECS API has no payment-provider integration. Do not treat
-historical order, wallet, or transaction records as evidence of real payment,
-delivery, refund, or payout.
+Production payments, wallet deposits/withdrawals, vouchers, cash on delivery,
+refunds, seller payouts, and paid listing promotion remain disabled. In the
+Lambda/DynamoDB dev stage only, an explicitly opted-in test flow supports
+PayFast hosted sandbox checkout with server-validated ITNs and Escrow.com
+sandbox transaction creation/status refresh. Both provider integrations require
+credentials from AWS Secrets Manager and default to disabled. The Escrow
+integration reports only the provider's sandbox secured status; it does not
+release funds. No provider test status credits a Dobha wallet or pays a seller.
+
+Dev orders require seller acceptance and reserve listing stock. Seller
+preparation, courier/pickup progress, seller handoff report, and buyer
+confirmation are manual test updates; they are not delivery verification.
+The existing production guards for dispatch, confirmation, escrow resolution,
+wallet deposits/withdrawals, and paid listing promotion remain in place. The
+ECS API has no payment-provider integration. Do not treat historical order,
+wallet, or transaction records as evidence of real payment, delivery, refund,
+or payout.
+
+To enable a provider for a dev deployment, first create the named secret in
+Secrets Manager and verify the dev callback/configuration. PayFast secret JSON
+uses `merchantId`, `merchantKey`, and `passphrase`; Escrow secret JSON uses
+`email` and `apiKey`. Then explicitly pass `EnablePayFastSandbox=true` and/or
+`EnableEscrowSandbox=true` when deploying with `Stage=dev`. PayFast also
+requires `SandboxSiteBaseUrl` and `SandboxApiBaseUrl`. Both flags default to
+`false`, and CloudFormation rejects enabling either in production. Never place
+provider credentials in website config or source control.
 
 The build pipeline is validation-only and does not deploy changes. Verify the live runtime, perform a reviewed staged release, and test the deployed endpoints before claiming that any production environment has these features.
 

@@ -52,6 +52,7 @@ const state = {
   savedItems: [],
   offers: [],
   orders: [],
+  sandboxPaymentProviders: [],
   notifications: [],
   storyQueue: [],
   storyPosition: 0,
@@ -480,11 +481,12 @@ function showProduct(id) {
       ${item.size && item.size !== 'N/A' ? `<p class="product-description">Size / Details: ${escapeHtml(item.size)}</p>` : ''}
       ${item.brand ? `<p class="product-description">Brand: ${escapeHtml(item.brand)}</p>` : ''}
       <p class="product-description">${Number(item.quantity) || 1} available · ${Number(item.likesCount) || 0} likes</p>
-      <div class="product-actions"><button class="button button-dark" id="cart-button">Add to bag</button><button class="button button-outline" id="save-button">${item.isSaved ? 'Unsave' : 'Save'}</button><button class="button button-outline" id="like-button">${item.isLiked ? 'Unlike' : 'Like'}</button><button class="button button-outline" id="offer-button">Make an offer</button></div>
+      <div class="product-actions"><button class="button button-dark" id="buy-request-button" ${state.user?.id === sellerId ? 'disabled' : ''}>${state.user?.id === sellerId ? 'Your listing' : 'Request to buy'}</button><button class="button button-outline" id="cart-button">Add to bag</button><button class="button button-outline" id="save-button">${item.isSaved ? 'Unsave' : 'Save'}</button><button class="button button-outline" id="like-button">${item.isLiked ? 'Unlike' : 'Like'}</button><button class="button button-outline" id="offer-button">Make an offer</button></div>
       <a class="text-button seller-profile-link" href="#profile?id=${encodeURIComponent(sellerId)}">View seller profile →</a>
       <button class="text-button" id="message-product-seller">Message seller →</button>
       <section class="product-comments"><h3>Comments</h3><div id="comments-list"><p class="muted">Loading comments…</p></div><form id="comment-form" class="form-stack"><label class="field">Add a comment<textarea name="text" maxlength="500" required></textarea></label><button class="button button-outline">Comment</button></form><button class="text-button" id="report-button">Report this listing</button></section>
     </div></div>`;
+  byId('buy-request-button').addEventListener('click', (event) => requestToBuy(item, event.currentTarget));
   byId('cart-button').addEventListener('click', () => addToCart(item.id));
   byId('save-button').addEventListener('click', () => itemAction(item.id, 'save', 'Saved items'));
   byId('like-button').addEventListener('click', () => itemAction(item.id, 'like', 'Likes'));
@@ -629,8 +631,9 @@ async function loadOrders() {
     const { orders } = await apiPrivate('/orders');
     state.orders = orders;
     byId('orders-list').innerHTML = orders.length ? orders.map((order) => `<article class="order-card feature-card">
-      <div><strong>${escapeHtml(order.item?.title || 'Dobha item')}</strong><span>${escapeHtml(order.id)} · ${escapeHtml(new Date(order.createdAt).toLocaleDateString())}</span><span>${order.isSeller ? 'Sale' : 'Purchase'} · ${escapeHtml(order.deliveryMethod || '')}</span><span class="field-hint">Historical order status only; it does not verify a real payment, delivery, or payout.</span></div>
+      <div><strong>${escapeHtml(order.item?.title || 'Dobha item')}</strong><span>${escapeHtml(order.id)} · ${escapeHtml(new Date(order.createdAt).toLocaleDateString())}</span><span>${order.isSeller ? 'Sale' : 'Purchase'} · ${escapeHtml(order.deliveryMethod || '')}</span>${order.providerTransactionId ? `<span>Escrow sandbox transaction: ${escapeHtml(order.providerTransactionId)}</span>` : ''}<span class="field-hint">${order.sandbox ? `Sandbox test · ${escapeHtml(order.paymentStatus)}. Delivery updates are manual reports; no live payment, delivery verification, wallet credit, or seller payout.` : 'Historical order record only; it does not verify a real payment, delivery, or payout.'}</span></div>
       <div><strong>${money(order.amountZar + (order.shippingFeeZar || 0))}</strong><span class="order-status">${escapeHtml(order.status)}</span>
+        ${order.sandbox ? sandboxOrderActions(order) : ''}
         ${!order.isSeller && ['paymentHeld','vendorDispatched'].includes(order.status) ? `<button data-order-action="dispute" data-order-id="${escapeHtml(order.id)}" class="button button-outline">Ask support about this record</button>` : ''}
         ${order.canReview ? `<button data-order-action="review" data-order-id="${escapeHtml(order.id)}" class="button button-outline">Review seller</button>` : ''}
       </div>
@@ -638,6 +641,41 @@ async function loadOrders() {
     byId('orders-list').querySelectorAll('[data-order-action]').forEach((button) => button.addEventListener('click', () => orderAction(button.dataset.orderId, button.dataset.orderAction)));
   } catch (error) {
     byId('orders-list').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
+  }
+function sandboxOrderActions(order) {
+    const id = escapeHtml(order.id);
+    if (order.status === 'sellerApprovalPending' && order.isSeller) {
+      return `<button data-order-action="accept" data-order-id="${id}" class="button button-dark">Accept test order</button><button data-order-action="decline" data-order-id="${id}" class="button button-outline">Decline</button>`;
+    }
+    if (order.status === 'sellerApprovalPending' && !order.isSeller) {
+      return '<span class="field-hint">Waiting for the seller to accept; no payment has been made.</span>';
+    }
+    if (order.status === 'sellerAccepted' && !order.isSeller) {
+      const providerLabel = order.paymentMethod === 'escrow_sandbox' ? 'Create Escrow sandbox transaction' : 'Pay with PayFast sandbox';
+      return `<button data-order-action="payment-session" data-order-id="${id}" class="button button-dark">${providerLabel}</button>`;
+    }
+    if (order.status === 'sellerAccepted' && order.paymentStatus === 'not_started') {
+      return `<button data-order-action="cancel-test" data-order-id="${id}" class="button button-outline">Cancel test order</button>`;
+    }
+    if (order.status === 'escrowSandboxTransactionCreated') {
+      return `<button data-order-action="escrow-refresh-test" data-order-id="${id}" class="button button-outline">Refresh Escrow sandbox status</button>`;
+    }
+    if (order.status === 'sandboxPaymentVerified' && order.isSeller) {
+      return `<button data-order-action="prepare" data-order-id="${id}" class="button button-dark">Mark preparing (test)</button>`;
+    }
+    if (order.status === 'preparingTest' && order.isSeller) {
+      return `<button data-order-action="ready" data-order-id="${id}" class="button button-dark">Mark ready (test)</button>`;
+    }
+    if (order.status === 'readyForCourierTest' && order.isSeller) {
+      return `<button data-order-action="dispatch-test" data-order-id="${id}" class="button button-dark">Mark courier collected (manual test)</button>`;
+    }
+    if (['inTransitTest', 'readyForCollectionTest'].includes(order.status) && order.isSeller) {
+      return `<button data-order-action="deliver-test" data-order-id="${id}" class="button button-dark">Report handoff complete (test)</button>`;
+    }
+    if (order.status === 'deliveryReportedTest' && !order.isSeller) {
+      return `<button data-order-action="confirm-test" data-order-id="${id}" class="button button-dark">Confirm handoff (test)</button>`;
+    }
+    return '';
   }
 }
 async function uploadFile(file) {
@@ -1296,18 +1334,47 @@ async function makeOffer(item) {
     notify(error.message, true);
   }
 }
+async function requestToBuy(item, button) {
+  if (!requireSignIn()) return;
+  const sellerId = item.seller?.id || item.sellerId;
+  if (!sellerId) {
+    notify('Seller details are missing for this listing. Please refresh and try again.', true);
+    return;
+  }
+  if (sellerId === state.user?.id) {
+    notify('You cannot request to buy your own listing.', true);
+    return;
+  }
+  button.disabled = true;
+  try {
+    await api(`/api/chats/${encodeURIComponent(sellerId)}`, {
+      method: 'POST',
+      body: {
+        text: `I would like to buy "${item.title}" for ${money(item.priceZar)}. Please confirm availability and arrange payment and collection with me.`,
+        itemId: item.id,
+        purchaseRequest: true,
+      },
+    });
+    button.textContent = 'Request sent';
+    notify('Purchase request sent. Arrange payment and collection with the seller directly; Dobha has not processed payment.');
+  } catch (error) {
+    button.disabled = false;
+    notify(error.message, true);
+  }
+}
 async function loadCart() {
   if (!requireSignIn()) return;
   byId('cart-list').innerHTML = '<p class="muted">Loading your bag…</p>';
   try {
     const items = await refreshCart();
-    byId('cart-list').innerHTML = items.length ? items.map((item) => `<article class="order-card"><div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.sellerName || '')}</span><span class="order-status">${item.available ? 'Available' : 'No longer available'}</span></div><button class="button button-outline" data-remove-cart="${escapeHtml(item.id)}">Remove</button></article>`).join('') : '<p class="muted">Your bag is empty. Browse the shop to find something good.</p>';
+    const capabilities = await api('/api/payments/sandbox-capabilities');
+    state.sandboxPaymentProviders = capabilities.providers || [];
+    byId('cart-list').innerHTML = items.length ? items.map((item) => `<article class="order-card"><div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.sellerName || '')}</span><span class="order-status">${item.available ? 'Available' : 'No longer available'}</span></div><div class="action-row"><button class="button button-outline" data-remove-cart="${escapeHtml(item.id)}">Remove</button></div></article>`).join('') : '<p class="muted">Your bag is empty. Browse the shop to find something good.</p>';
     byId('cart-list').querySelectorAll('[data-remove-cart]').forEach((button) => button.addEventListener('click', () => removeFromCart(button.dataset.removeCart)));
-    renderCheckout();
+    renderCheckout(items);
   } catch (error) {
     byId('cart-list').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
     byId('checkout-total').textContent = 'Cart details could not be loaded.';
-    byId('checkout-submit').disabled = true;
   }
 }
 async function refreshCart() {
@@ -1316,9 +1383,75 @@ async function refreshCart() {
   updateCartBadge();
   return items;
 }
-function renderCheckout() {
-  byId('checkout-total').textContent = 'Dobha does not process payments or hold funds. Do not send money based on an in-app balance or order record.';
-  byId('checkout-submit').disabled = true;
+function renderCheckout(items = state.cart) {
+  const availableItems = items.filter((item) => item.available);
+  byId('checkout-total').textContent = state.sandboxPaymentProviders.length
+    ? 'Sandbox checkout only. Seller acceptance is required before provider checkout. Courier progress is manually reported for testing; this does not book Uber Direct or verify delivery.'
+    : 'Sandbox checkout is not enabled on this environment. You can still use Request to buy from a listing to contact the seller.';
+  const paymentOptions = [
+    ['payfast_sandbox', 'PayFast hosted sandbox'],
+    ['escrow_sandbox', 'Escrow.com sandbox transaction'],
+  ].filter(([provider]) => state.sandboxPaymentProviders.includes(provider))
+    .map(([provider, label]) => `<option value="${provider}">${label}</option>`).join('');
+  byId('checkout-items').innerHTML = availableItems.length && paymentOptions ? availableItems.map((item) => `
+    <form class="order-card sandbox-checkout-form" data-checkout-item="${escapeHtml(item.id)}">
+      <div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.sellerName || 'Dobha seller')}</span></div>
+      <label class="field">Delivery option
+        <select name="deliveryMethod" required>
+          <option value="seller_pickup">Meet the seller / pickup (manual test)</option>
+          <option value="uber_direct_test">Courier (manual test status; no courier booking)</option>
+        </select>
+      </label>
+      <label class="field">Delivery or agreed pickup address
+        <textarea name="deliveryAddress" minlength="8" maxlength="500" required autocomplete="street-address"></textarea>
+      </label>
+      <label class="field">Test payment provider
+        <select name="paymentMethod" required>
+          ${paymentOptions}
+        </select>
+      </label>
+      <p class="field-hint">No Dobha wallet, card deposit, voucher, cash on delivery, real payment, refund, or seller payout is available.</p>
+      <button class="button button-dark" type="submit">Send test order request</button>
+      <p class="form-message" data-checkout-message role="status"></p>
+    </form>`).join('') : `<p class="muted">${availableItems.length ? 'Sandbox checkout is unavailable in this environment.' : 'Add an available listing to your bag to start a sandbox test order.'}</p>`;
+  byId('checkout-items').querySelectorAll('[data-checkout-item]').forEach((form) => {
+    form.addEventListener('submit', submitSandboxOrder);
+  });
+}
+async function submitSandboxOrder(event) {
+  event.preventDefault();
+  if (!requireSignIn()) return;
+  const form = event.currentTarget;
+  const submit = form.querySelector('button[type="submit"]');
+  const message = form.querySelector('[data-checkout-message]');
+  const data = new FormData(form);
+  submit.disabled = true;
+  message.textContent = 'Sending your test order to the seller…';
+  try {
+    const result = await api('/api/orders', {
+      method: 'POST',
+      body: {
+        itemId: form.dataset.checkoutItem,
+        deliveryMethod: data.get('deliveryMethod'),
+        deliveryAddress: data.get('deliveryAddress').trim(),
+        paymentMethod: data.get('paymentMethod'),
+      },
+    });
+    message.textContent = 'Test order request sent. The seller must accept before sandbox payment can start.';
+    try {
+      await api(`/api/cart/${encodeURIComponent(form.dataset.checkoutItem)}`, { method: 'DELETE' });
+      await refreshCart();
+      await loadCart();
+    } catch (cartError) {
+      console.error('Sandbox order was created, but the item could not be removed from the bag:', cartError);
+    }
+    notify(`Test order ${result.order.id} sent to the seller.`);
+    location.hash = 'orders';
+  } catch (error) {
+    message.textContent = error.message;
+    message.classList.add('error');
+    submit.disabled = false;
+  }
 }
 async function removeFromCart(itemId) {
   try {
@@ -1465,7 +1598,7 @@ async function loadChats() {
       <span class="chat-row-avatar" aria-hidden="true">${escapeHtml((chat.name || '?').slice(0, 1).toUpperCase())}</span>
       <span class="chat-row-copy"><strong>${escapeHtml(chat.name)} ${escapeHtml(chat.handle)}</strong><span>${escapeHtml(chat.lastMessage || 'Start a conversation')}</span></span>
       ${chat.unread ? `<b class="chat-unread">${Number(chat.unread)}</b>` : ''}
-    </button>`).join('') : '<p class="muted chat-empty-list">No conversations yet. Open a listing and message its seller.</p>';
+    </button>`).join('') : '<p class="muted chat-empty-list">No conversations yet. Request to buy from a listing or message a seller to start.</p>';
     byId('chat-list').querySelectorAll('[data-chat]').forEach((button) => button.addEventListener('click', () => loadChat(button.dataset.chat)));
     if (state.selectedChat) await loadChat(state.selectedChat);
   } catch (error) {
@@ -1623,6 +1756,47 @@ async function orderAction(orderId, action) {
     }
     return;
   }
+  const sandboxActions = new Set([
+    'accept',
+    'decline',
+    'cancel-test',
+    'payment-session',
+    'prepare',
+    'ready',
+    'dispatch-test',
+    'deliver-test',
+    'confirm-test',
+    'escrow-refresh-test',
+  ]);
+  if (sandboxActions.has(action)) {
+    try {
+      const result = await api(`/api/orders/${encodeURIComponent(orderId)}/${action}`, { method: 'POST' });
+      if (action === 'payment-session' && result.url && result.fields) {
+        if (result.url !== 'https://sandbox.payfast.co.za/eng/process') {
+          throw new Error('Unexpected payment provider URL; sandbox checkout was not opened.');
+        }
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = result.url;
+        form.hidden = true;
+        for (const [name, value] of Object.entries(result.fields)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = String(value);
+          form.append(input);
+        }
+        document.body.append(form);
+        form.submit();
+        return;
+      }
+      notify(result.message || 'Sandbox order updated.');
+      await loadOrders();
+    } catch (error) {
+      notify(error.message, true);
+    }
+    return;
+  }
   if (action !== 'dispute') return;
   if (!confirm('Ask support about this historical order record? Dobha does not hold funds or settle orders.')) return;
   try {
@@ -1690,6 +1864,26 @@ async function submitAuth(event) {
 function init() {
   applyTheme(state.theme);
   byId('year').textContent = new Date().getFullYear();
+  const logoDevKey = window.DOBHA_CONFIG?.logoDevPublishableKey;
+  if (logoDevKey) {
+    document.querySelectorAll('.payment-provider-logo').forEach((image) => {
+      image.src = `https://img.logo.dev/${image.dataset.logoDomain}?token=${encodeURIComponent(logoDevKey)}&format=png&size=64`;
+    });
+  }
+  byId('wallet-preview-submit').addEventListener('click', () => {
+    const amount = Number(byId('wallet-preview-amount').value);
+    if (!Number.isSafeInteger(amount) || amount < 1) {
+      setMessage('wallet-preview-message', 'Enter a whole amount of at least R1 for the preview.', true);
+      return;
+    }
+
+    const method = document.querySelector('input[name="wallet-deposit-method"]:checked').value;
+    const label = method === 'voucher' ? '1Voucher' : 'Yoco card checkout';
+    setMessage(
+      'wallet-preview-message',
+      `Preview only: ${label} for ${money(amount)} is not connected. No payment was attempted and your wallet was not changed.`,
+    );
+  });
   byId('search').addEventListener('input', (event) => {
     state.query = event.target.value.trim();
     if (state.query && state.page !== 'shop') location.hash = 'shop';

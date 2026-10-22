@@ -57,7 +57,7 @@
     </section>
 
     <section class="page hidden" id="page-reels" data-page="reels">
-      <section class="page-intro"><p class="eyebrow">FINDS FROM ACROSS THE MARKET</p><h1>Discover <span>Dobha.</span></h1><p>Swipe through real listing photos and product videos, follow the people behind them, and save the finds you want to revisit. Checkout is unavailable; no purchases or claims can be made here.</p></section>
+      <section class="page-intro"><p class="eyebrow">FINDS FROM ACROSS THE MARKET</p><h1>Discover <span>Dobha.</span></h1><p>Swipe through real listing photos and product videos, follow the people behind them, and save the finds you want to revisit. You can request to buy from a seller, but checkout and payment are not available; a request is not an order or completed purchase.</p></section>
       <section id="reels-feed" class="discovery-feed" aria-live="polite"><p class="muted">Finding the good stuff…</p></section>
     </section>
 
@@ -155,7 +155,7 @@
     </section>
 
     <section class="page hidden" id="page-orders" data-page="orders">
-      <section class="page-intro"><p class="eyebrow">YOUR ACCOUNT</p><h1>Your Dobha<br><span>activity.</span></h1><p>Historical order records may be shown here; checkout and order fulfillment are unavailable.</p></section>
+      <section class="page-intro"><p class="eyebrow">YOUR ACCOUNT</p><h1>Your Dobha<br><span>activity.</span></h1><p>Test orders can use PayFast or Escrow sandbox only. Delivery updates are manual test reports; Dobha does not verify delivery, hold real funds, or pay sellers.</p></section>
       <section class="orders-page-section">
         <div class="section-heading"><div><p class="eyebrow">BUYING ON DOBHA</p><h2>Your orders</h2></div><button class="text-button" id="signout-button">Sign out</button></div>
         <div id="orders-list" class="orders-list"></div>
@@ -165,11 +165,11 @@
     <section class="page hidden" id="page-cart" data-page="cart">
       <section class="page-intro"><p class="eyebrow">YOUR FINDS</p><h1>Your <span>shopping bag.</span></h1><p>Review and manage the items you have saved in your bag.</p></section>
       <section class="feature-section"><div id="cart-list" class="orders-list"></div>
-        <form id="checkout-form" class="form-stack checkout-form">
-          <h2>Checkout unavailable</h2>
-          <p id="checkout-total" class="field-hint">Dobha does not process payments or hold funds. Do not send money based on an in-app balance or order record.</p>
-          <button id="checkout-submit" class="button button-dark" type="button" disabled>Checkout unavailable</button>
-        </form>
+        <section id="checkout-form" class="form-stack checkout-form">
+          <h2>Checkout (sandbox)</h2>
+          <p id="checkout-total" class="field-hint">PayFast and Escrow sandbox only. No Dobha wallet, voucher, cash-on-delivery, live courier booking, or seller payout.</p>
+          <div id="checkout-items" class="orders-list"></div>
+        </section>
       </section>
     </section>
 
@@ -187,6 +187,23 @@
       <section class="page-intro"><p class="eyebrow">DOBHA WALLET</p><h1>Your <span>balance.</span></h1><p>Historical wallet records may be shown here. Dobha does not hold funds or process payments; balances are not proof of money owed or paid.</p></section>
       <section class="feature-section">
         <h2>Your wallet</h2>
+        <section class="wallet-deposit-preview" aria-labelledby="wallet-deposit-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">PAYMENT OPTIONS PREVIEW</p><h3 id="wallet-deposit-heading">Add funds</h3></div>
+            <span class="wallet-preview-badge">Preview only</span>
+          </div>
+          <p>Card and voucher deposits are not enabled. This preview does not collect payment details or change your balance.</p>
+          <fieldset>
+            <label class="field">Amount (ZAR)<input id="wallet-preview-amount" type="number" min="1" step="1" value="250" aria-label="Preview deposit amount in rand"></label>
+            <div class="wallet-payment-options" aria-label="Proposed deposit methods">
+              <label><input type="radio" name="wallet-deposit-method" value="card" checked><img class="payment-provider-logo" data-logo-domain="yoco.com" src="" alt="Yoco logo"> Card checkout <span>Yoco · integration pending</span></label>
+              <label><input type="radio" name="wallet-deposit-method" value="voucher"><img class="payment-provider-logo" data-logo-domain="1voucher.co.za" src="" alt="1Voucher logo"> Voucher <span>1Voucher · integration pending</span></label>
+            </div>
+            <button class="button button-dark" id="wallet-preview-submit" type="button">Continue to payment</button>
+          </fieldset>
+          <p class="wallet-preview-notice" role="note">No card or voucher PIN is requested. No deposit, withdrawal, or wallet credit will occur.</p>
+          <p class="form-message" id="wallet-preview-message" role="status" aria-live="polite"></p>
+        </section>
         <div id="wallet-summary"></div><div id="wallet-transactions" class="orders-list"></div>
       </section>
     </section>

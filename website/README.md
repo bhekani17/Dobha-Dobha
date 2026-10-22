@@ -53,8 +53,25 @@ website bucket only after verifying the build target and API CORS configuration.
 
 Anyone can browse listings and watch live streams without signing in. Any signed-in Dobha member, including buyers and sellers, can host a live stream after granting browser camera and microphone access. Sellers retain seller-only product pinning and listing controls.
 
-Checkout, wallet deposits/withdrawals, order fulfillment, escrow settlement,
-and paid listing promotion are unavailable. Do not treat historical order or
-wallet records as evidence of a real payment, delivery, refund, or payout. The
-website intentionally does not request payment or bank details. See
-[the backend status](../server/README.md) for migration and release details.
+Production checkout, wallet deposits/withdrawals, vouchers, cash on delivery,
+refunds, seller payouts, and paid listing promotion are unavailable. If the
+backend dev stage explicitly enables them, buyers can place sandbox test orders
+using PayFast hosted sandbox checkout or an Escrow.com sandbox transaction.
+Seller acceptance is required. Escrow status is refreshed server-side; the
+website does not release funds. Preparation, courier/pickup progress, seller
+handoff reports, and buyer confirmation are manual test statuses, not proof of
+delivery or payout. Do not treat historical records or sandbox statuses as
+evidence of real payment, delivery, refund, or payout. See
+[the backend status](../server/README.md) for provider setup and release details.
+
+The wallet page includes an interactive visual-only deposit preview for
+proposed Yoco card checkout and 1Voucher methods. Its controls only display a
+status message; they do not collect payment details, call a provider, or change
+wallet balances. Provider logos are served by Logo.dev using the public
+publishable key in `public/config.js`; restrict that key to Dobha's website
+domains in the Logo.dev dashboard.
+
+Buyers can send a direct purchase request from a listing without opening a chat
+first. That request is delivered to the seller as a message; it is not an order,
+item reservation, or payment. Sandbox checkout from the bag is a separate,
+dev-only test flow.

@@ -32,6 +32,50 @@ Parameters:
     Default: ''
     Description: Verified SES sender email address for password reset messages.
 
+  EnablePayFastSandbox:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enables test-only PayFast hosted checkout in the dev stage.
+
+  SandboxSiteBaseUrl:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/?$'
+    Description: HTTPS origin of the dev website used for PayFast sandbox returns.
+
+  SandboxApiBaseUrl:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^https://[A-Za-z0-9.-]+(:[0-9]{1,5})?/dev/?$'
+    Description: HTTPS base URL of the dev API, including its /dev stage path.
+
+  EnableEscrowSandbox:
+    Type: String
+    Default: 'false'
+    AllowedValues:
+      - 'true'
+      - 'false'
+    Description: Enables test-only Escrow.com sandbox transactions in the dev stage.
+
+Rules:
+  PayFastSandboxMustUseDev:
+    RuleCondition: !Equals [!Ref EnablePayFastSandbox, 'true']
+    Assertions:
+      - Assert: !Equals [!Ref Stage, dev]
+        AssertDescription: PayFast sandbox must only be enabled in the dev stage.
+      - Assert: !Not [!Equals [!Ref SandboxSiteBaseUrl, '']]
+        AssertDescription: Set SandboxSiteBaseUrl when enabling PayFast sandbox.
+      - Assert: !Not [!Equals [!Ref SandboxApiBaseUrl, '']]
+        AssertDescription: Set SandboxApiBaseUrl when enabling PayFast sandbox.
+  EscrowSandboxMustUseDev:
+    RuleCondition: !Equals [!Ref EnableEscrowSandbox, 'true']
+    Assertions:
+      - Assert: !Equals [!Ref Stage, dev]
+        AssertDescription: Escrow sandbox must only be enabled in the dev stage.
+
 Globals:
   Function:
     Runtime: nodejs22.x
@@ -43,6 +87,14 @@ Globals:
         ADMIN_EMAILS: !Ref AdminEmails
         GOOGLE_CLIENT_IDS: !Ref GoogleClientId
         ALLOWED_WEB_ORIGINS: !Ref AllowedOrigin
+
+Conditions:
+  PayFastSandboxEnabled: !And
+    - !Equals [!Ref Stage, dev]
+    - !Equals [!Ref EnablePayFastSandbox, 'true']
+  EscrowSandboxEnabled: !And
+    - !Equals [!Ref Stage, dev]
+    - !Equals [!Ref EnableEscrowSandbox, 'true']
 
 Resources:
   # ============================================
@@ -1087,6 +1139,18 @@ Resources:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
+          /api/payments/payfast/itn:
+            post:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+          /api/payments/sandbox-capabilities:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
           /api/wallet:
             options:
               x-amazon-apigateway-integration:
@@ -1409,6 +1473,12 @@ Resources:
           REVIEWS_TABLE: !Ref ReviewsTable
           ITEMS_TABLE: !Ref ItemsTable
           NOTIFICATIONS_TABLE: !Ref NotificationsTable
+          PAYFAST_SANDBOX_ENABLED: !If [PayFastSandboxEnabled, 'true', 'false']
+          PAYFAST_SECRET_ARN: !If [PayFastSandboxEnabled, !Sub '${Stage}/dobha/payfast-sandbox', '']
+          SITE_BASE_URL: !Ref SandboxSiteBaseUrl
+          API_BASE_URL: !Ref SandboxApiBaseUrl
+          ESCROW_SANDBOX_ENABLED: !If [EscrowSandboxEnabled, 'true', 'false']
+          ESCROW_SECRET_ARN: !If [EscrowSandboxEnabled, !Sub '${Stage}/dobha/escrow-sandbox', '']
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref SessionsTable
@@ -1426,6 +1496,16 @@ Resources:
             TableName: !Ref ItemsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref NotificationsTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Stage}/dobha/payfast-sandbox-*'
+        - Statement:
+            - Effect: Allow
+              Action:
+                - secretsmanager:GetSecretValue
+              Resource: !Sub 'arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${Stage}/dobha/escrow-sandbox-*'
 
   SocialLambda:
     Type: AWS::Serverless::Function
