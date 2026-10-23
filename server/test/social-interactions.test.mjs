@@ -18,6 +18,7 @@ const tables = {
   SAVES_TABLE: 'saves',
   COMMENTS_TABLE: 'comments',
   MESSAGES_TABLE: 'messages',
+  OFFERS_TABLE: 'offers',
   USERS_TABLE: 'users',
 };
 const originalEnv = Object.fromEntries(Object.keys(tables).map((key) => [key, process.env[key]]));
@@ -28,6 +29,7 @@ let likes;
 let saves;
 let comments;
 let messages;
+let offers;
 let users;
 
 function conditionFailed() {
@@ -45,12 +47,14 @@ before(() => {
     if (table === tables.LIKES_TABLE) return likes.get(`${key.user_id}:${key.item_id}`) || null;
     if (table === tables.SAVES_TABLE) return saves.get(`${key.user_id}:${key.item_id}`) || null;
     if (table === tables.MESSAGES_TABLE) return messages.find((message) => message.id === key.id) || null;
+    if (table === tables.OFFERS_TABLE) return offers.get(key.id) || null;
     return null;
   };
   dynamo.put = async (table, value) => {
     if (table === tables.COMMENTS_TABLE) comments.push(value);
     if (table === tables.MESSAGES_TABLE) messages.push(value);
     if (table === tables.SAVES_TABLE) saves.set(`${value.user_id}:${value.item_id}`, value);
+    if (table === tables.OFFERS_TABLE) offers.set(value.id, value);
   };
   dynamo.delete = async (table, key) => {
     if (table === tables.SAVES_TABLE) saves.delete(`${key.user_id}:${key.item_id}`);
@@ -152,6 +156,7 @@ beforeEach(() => {
   likes = new Map();
   saves = new Map();
   comments = [];
+  offers = new Map();
   messages = [
     { id: 'msg-old', sender_id: user.id, recipient_id: 'usr-seller', text: 'Is it available?', created_at: 100, read_at: 0 },
     { id: 'msg-new', sender_id: 'usr-seller', recipient_id: user.id, text: 'Yes, it is.', created_at: 200, read_at: 0 },
@@ -172,6 +177,20 @@ after(() => {
 });
 
 describe('social interactions', () => {
+  it('creates an offer through the deployed social offers route', async () => {
+    const response = await socialHandler({
+      path: '/api/offers',
+      httpMethod: 'POST',
+      body: JSON.stringify({ itemId: 'item-1', amountZar: 180 }),
+    });
+    const { offer } = JSON.parse(response.body);
+    assert.equal(response.statusCode, 201);
+    assert.equal(offer.item_id, 'item-1');
+    assert.equal(offer.amountZar, 'R 180.00');
+    assert.equal(offer.status, 'pending');
+    assert.equal(offers.get(offer.id).buyer_id, user.id);
+  });
+
   it('toggles listing likes and returns the updated listing for clients', async () => {
     const first = await itemsHandler({ path: '/api/items/item-1/like', httpMethod: 'POST' });
     const firstBody = JSON.parse(first.body);

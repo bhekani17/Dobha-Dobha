@@ -1429,7 +1429,10 @@ async function makeOffer(item) {
   const amount = Number(prompt(`Your offer in ZAR (listed for ${money(item.priceZar ?? item.price)}):`));
   if (!Number.isFinite(amount) || amount <= 0) return;
   try {
-    await api(`/api/items/${encodeURIComponent(item.id)}/offers`, { method: 'POST', body: { amountZar: amount } });
+    await api('/api/offers', {
+      method: 'POST',
+      body: { itemId: item.id, amountZar: amount },
+    });
     notify('Your offer has been sent to the seller. They can accept, decline, or counter it from Offers.');
   } catch (error) {
     notify(error.message, true);
@@ -1660,7 +1663,7 @@ async function loadAccountWallet(userId) {
       </div>
       <section class="account-sandbox-total" aria-label="Sandbox checkout total">
         <div><span class="account-sandbox-label">SANDBOX CHECKOUT TOTAL</span><strong>${escapeHtml(money(sandboxPaidTotal))}</strong><small>${sandboxPaidOrders.length} confirmed test ${sandboxPaidOrders.length === 1 ? 'checkout' : 'checkouts'}</small></div>
-        <p>PayFast sandbox confirmations are tests, not real payments. This total is not a wallet balance; no funds were received.</p>
+        <p>Test total only — no real payment was received.</p>
       </section>
       <h3 class="account-wallet-subheading">Recorded wallet amounts</h3>
       <div class="account-wallet-balances">

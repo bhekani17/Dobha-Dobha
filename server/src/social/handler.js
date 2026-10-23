@@ -457,13 +457,16 @@ exports.handler = withCors(async (event) => {
     }
 
     // -------------------------------------------------------------
-    // Bargaining / Offers: POST /api/items/{id}/offers, GET /api/offers
+    // Bargaining / Offers: POST /api/offers, GET /api/offers
     // -------------------------------------------------------------
     const offerMatch = path.match(/^\/api\/items\/([^\/]+)\/offers$/);
-    if (offerMatch && method === 'POST') {
+    if ((offerMatch || path === '/api/offers') && method === 'POST') {
       const authUser = await requireUser(event);
-      const itemId = offerMatch[1];
       const body = parseBody(event);
+      const itemId = offerMatch?.[1] || body.itemId;
+      if (typeof itemId !== 'string' || !itemId.trim()) {
+        return error(400, 'Item ID is required');
+      }
       const amountZar = body.amountZar || body.amount;
       const amountCents = body.amountCents || toCents(amountZar);
 
