@@ -106,7 +106,7 @@ function buildCheckoutFields({ credentials, order, siteUrl, apiUrl }) {
     merchant_key: credentials.merchantKey,
     return_url: `${site.origin}${site.pathname.replace(/\/+$/, '')}/#orders`,
     cancel_url: `${site.origin}${site.pathname.replace(/\/+$/, '')}/#orders`,
-    notify_url: `${api.origin}${api.pathname.replace(/\/+$/, '')}/api/payments/payfast/itn`,
+    notify_url: `${api.origin}${api.pathname.replace(/\/+$/, '')}/api/orders/payfast/itn`,
     m_payment_id: order.id,
     amount: (order.total_cents / 100).toFixed(2),
     item_name: order.item_title.slice(0, 100),

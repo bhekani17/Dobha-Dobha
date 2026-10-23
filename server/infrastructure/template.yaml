@@ -1139,18 +1139,13 @@ Resources:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
-          /api/payments/payfast/itn:
+          /api/orders/payfast/itn:
             post:
               x-amazon-apigateway-integration:
                 uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
                 httpMethod: POST
                 type: aws_proxy
-          /api/payments/sandbox-capabilities:
-            get:
-              x-amazon-apigateway-integration:
-                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrdersLambda.Arn}/invocations'
-                httpMethod: POST
-                type: aws_proxy
+
           /api/wallet:
             options:
               x-amazon-apigateway-integration:

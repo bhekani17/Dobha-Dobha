@@ -93,7 +93,7 @@ function request(path, userId, body = {}) {
 describe('test-only order workflow', () => {
   it('reports only explicitly enabled test payment providers', async () => {
     const response = await handler({
-      path: '/api/payments/sandbox-capabilities',
+      path: '/api/orders/sandbox-capabilities',
       httpMethod: 'GET',
     });
     assert.equal(response.statusCode, 200);

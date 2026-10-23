@@ -99,7 +99,7 @@ exports.handler = withCors(async (event) => {
   const path = event.path || (event.requestContext && event.requestContext.http && event.requestContext.http.path) || '';
   const method = (event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || '').toUpperCase();
 
-  if (path === '/api/payments/payfast/itn' && method === 'POST') {
+  if (path === '/api/orders/payfast/itn' && method === 'POST') {
     if (!sandboxEnabled) return error(503, 'PayFast sandbox notifications are disabled');
     try {
       const credentials = await getCredentials();
@@ -192,7 +192,7 @@ exports.handler = withCors(async (event) => {
 
   try {
     // -------------------------------------------------------------
-    if (path === '/api/payments/sandbox-capabilities' && method === 'GET') {
+    if (path === '/api/orders/sandbox-capabilities' && method === 'GET') {
       const providers = [];
       if (sandboxEnabled) providers.push('payfast_sandbox');
       if (escrowSandboxEnabled) providers.push('escrow_sandbox');

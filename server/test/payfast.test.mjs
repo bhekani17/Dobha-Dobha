@@ -27,7 +27,7 @@ describe('PayFast sandbox helper', () => {
 
     assert.equal(checkout.url, 'https://sandbox.payfast.co.za/eng/process');
     assert.equal(checkout.fields.amount, '125.00');
-    assert.equal(checkout.fields.notify_url, 'https://api.example.test/dev/api/payments/payfast/itn');
+    assert.equal(checkout.fields.notify_url, 'https://api.example.test/dev/api/orders/payfast/itn');
     assert.equal(
       checkout.fields.signature,
       signatureFor(Object.fromEntries(Object.entries(checkout.fields).filter(([key]) => key !== 'signature')), credentials.passphrase),

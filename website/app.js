@@ -1367,7 +1367,7 @@ async function loadCart() {
   byId('cart-list').innerHTML = '<p class="muted">Loading your bag…</p>';
   try {
     const items = await refreshCart();
-    const capabilities = await api('/api/payments/sandbox-capabilities');
+    const capabilities = await api('/api/orders/sandbox-capabilities');
     state.sandboxPaymentProviders = capabilities.providers || [];
     byId('cart-list').innerHTML = items.length ? items.map((item) => `<article class="order-card"><div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.sellerName || '')}</span><span class="order-status">${item.available ? 'Available' : 'No longer available'}</span></div><div class="action-row"><button class="button button-outline" data-remove-cart="${escapeHtml(item.id)}">Remove</button></div></article>`).join('') : '<p class="muted">Your bag is empty. Browse the shop to find something good.</p>';
     byId('cart-list').querySelectorAll('[data-remove-cart]').forEach((button) => button.addEventListener('click', () => removeFromCart(button.dataset.removeCart)));
