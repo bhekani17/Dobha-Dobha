@@ -59,6 +59,12 @@ jobs:
           --dart-define=DEPLOYMENT_STAGE=dev
           --dart-define=API_BASE_URL=https://4mvo7623gl.execute-api.af-south-1.amazonaws.com/dev
 
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: mobile/build/app/outputs/flutter-apk/app-release.apk
+
       - name: Install Firebase CLI
         run: npm install --global firebase-tools
 
@@ -77,9 +83,3 @@ jobs:
             --release-notes "$RELEASE_NOTES" \
             --testers "ndlovubhekani17@gmail.com" \
             --token "$FIREBASE_TOKEN"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: mobile/build/app/outputs/flutter-apk/app-release.apk

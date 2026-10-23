@@ -7,7 +7,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import 'ui.dart';
 
-class CheckoutModal extends StatelessWidget {
+class CheckoutModal extends StatefulWidget {
   final List<ThriftItem> items;
   final Offer? offer;
 
@@ -17,28 +17,65 @@ class CheckoutModal extends StatelessWidget {
     BuildContext context,
     ThriftItem item, {
     Offer? offer,
-  }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => CheckoutModal(items: [item], offer: offer),
-    );
+  }) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    builder: (ctx) => CheckoutModal(items: [item], offer: offer),
+  );
+
+  static Future<void> showCart(BuildContext context) =>
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (ctx) => CheckoutModal(items: AppState().cartAvailable),
+      );
+
+  @override
+  State<CheckoutModal> createState() => _CheckoutModalState();
+}
+
+class _CheckoutModalState extends State<CheckoutModal> {
+  final _formKey = GlobalKey<FormState>();
+  final _address = TextEditingController();
+  List<String> _providers = [];
+  String? _selectedItemId;
+  String? _provider;
+  String _deliveryMethod = 'seller_pickup';
+  String? _loadError;
+  bool _loadingProviders = true;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProviders();
   }
 
-  static Future<void> showCart(BuildContext context) {
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => CheckoutModal(items: AppState().cartAvailable),
-    );
+  @override
+  void dispose() {
+    _address.dispose();
+    super.dispose();
   }
 
-  Offer? _acceptedOfferFor(ThriftItem item) {
-    if (offer?.item.id != item.id || offer?.status != 'accepted') return null;
-    return offer;
+  Future<void> _loadProviders() async {
+    try {
+      final providers = await AppState().loadSandboxPaymentProviders();
+      if (!mounted) return;
+      setState(() {
+        _providers = providers;
+        _provider = providers.isEmpty ? null : providers.first;
+        _loadingProviders = false;
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = error.message;
+        _loadingProviders = false;
+      });
+    }
   }
 
-  Future<void> _requestToBuy(BuildContext context, ThriftItem item) async {
+  Future<void> _requestToBuy(ThriftItem item) async {
     final appState = AppState();
     if (!appState.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -48,16 +85,14 @@ class CheckoutModal extends StatelessWidget {
     }
     if (item.sellerId == appState.user.id) return;
 
-    final itemOffer = _acceptedOfferFor(item);
-    final amount = itemOffer?.formattedAmount ?? item.formattedPrice;
     final messenger = ScaffoldMessenger.of(context);
     try {
       await appState.sendPurchaseRequest(
         item.sellerId,
         item,
-        'I would like to buy "${item.title}" for $amount. Please confirm availability and arrange payment and collection with me.',
+        'I would like to buy "${item.title}" for ${item.formattedPrice}. Please confirm availability and arrange payment and collection with me.',
       );
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.of(context).pop();
       messenger.showSnackBar(
         const SnackBar(
@@ -67,24 +102,64 @@ class CheckoutModal extends StatelessWidget {
         ),
       );
     } on ApiException catch (error) {
-      if (context.mounted) {
+      if (mounted) {
         messenger.showSnackBar(SnackBar(content: Text(error.message)));
       }
     }
   }
 
+  Future<void> _createTestOrder() async {
+    if (!_formKey.currentState!.validate() || _selectedItemId == null) return;
+    if (_provider == null || !_providers.contains(_provider)) {
+      setState(() => _loadError = 'No sandbox payment provider is enabled.');
+      return;
+    }
+    final item = widget.items.firstWhere(
+      (entry) => entry.id == _selectedItemId,
+    );
+    setState(() => _busy = true);
+    try {
+      await AppState().checkout(
+        item: item,
+        deliveryMethod: _deliveryMethod,
+        paymentMethod: _provider!,
+        deliveryAddress: _address.text.trim(),
+      );
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.of(context).pop();
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Sandbox test order sent. The seller must accept before payment checkout can start; no payment has been made.',
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _loadError = error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final availableItems = items.where((item) => !item.isClaimed).toList();
+    final availableItems = widget.items
+        .where((item) => !item.isClaimed)
+        .toList();
     return SafeArea(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            14,
+            20,
+            MediaQuery.viewInsetsOf(context).bottom + 20,
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Center(
@@ -96,18 +171,18 @@ class CheckoutModal extends StatelessWidget {
                 ),
               ),
               const Text(
-                'Request to buy directly',
+                'Checkout options',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 8),
               AppWell(
                 radius: 14,
                 child: Text(
-                  'Send a purchase request without starting a chat yourself. The seller receives it as a message. This does not place an order, reserve an item, or process payment through Dobha; arrange payment and collection directly.',
+                  'Sandbox checkout is for testing only. It does not add funds to a Dobha wallet, verify delivery, or pay the seller. You can also send a direct purchase request and arrange payment outside Dobha.',
                   style: TextStyle(
                     color: DobhaColors.textSecondary,
                     height: 1.4,
@@ -119,71 +194,186 @@ class CheckoutModal extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
-                    'There are no available items to ask about.',
+                    'There are no available items in your cart.',
                     style: TextStyle(color: DobhaColors.textSecondary),
                   ),
                 )
               else
-                Flexible(
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: availableItems.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      final item = availableItems[index];
-                      final appState = AppState();
-                      final isOwnItem = appState.isLoggedIn &&
-                          item.sellerId == appState.user.id;
-                      final itemOffer = _acceptedOfferFor(item);
-                      final amount =
-                          itemOffer?.formattedAmount ?? item.formattedPrice;
-                      return AppWell(
-                        radius: 14,
-                        child: Row(
+                for (final item in availableItems) ...[
+                  AppWell(
+                    radius: 14,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          item.title,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${item.sellerName} · ${item.formattedPrice}',
+                          style: TextStyle(
+                            color: DobhaColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 4,
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    '${item.sellerName} · $amount',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: DobhaColors.textSecondary,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            OutlinedButton(
+                              onPressed: () => _requestToBuy(item),
+                              child: const Text('Request to buy directly'),
                             ),
-                            const SizedBox(width: 10),
-                            TextButton(
-                              onPressed: isOwnItem
-                                  ? null
-                                  : () => _requestToBuy(context, item),
-                              child: Text(
-                                isOwnItem ? 'Your listing' : 'Request to buy',
+                            if (_providers.isNotEmpty)
+                              FilledButton(
+                                onPressed: _busy
+                                    ? null
+                                    : () => setState(() {
+                                        _selectedItemId = item.id;
+                                        _loadError = null;
+                                      }),
+                                child: Text(
+                                  _selectedItemId == item.id
+                                      ? 'Selected for sandbox checkout'
+                                      : 'Sandbox checkout',
+                                ),
                               ),
-                            ),
                           ],
                         ),
-                      );
-                    },
+                      ],
+                    ),
+                  ),
+                ],
+              if (_loadingProviders)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_loadError != null && _selectedItemId == null)
+                AppWell(
+                  radius: 14,
+                  tint: DobhaColors.red,
+                  child: Text(
+                    _loadError!,
+                    style: TextStyle(color: DobhaColors.red),
+                  ),
+                )
+              else if (_providers.isEmpty)
+                AppWell(
+                  radius: 14,
+                  child: Text(
+                    'Sandbox checkout is not enabled here. Direct purchase requests remain available.',
+                    style: TextStyle(color: DobhaColors.textSecondary),
                   ),
                 ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+              if (_selectedItemId != null) ...[
+                const SizedBox(height: 4),
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      DropdownButtonFormField<String>(
+                        initialValue: _deliveryMethod,
+                        decoration: const InputDecoration(
+                          labelText: 'Delivery option',
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'seller_pickup',
+                            child: Text('Meet seller / pickup (manual test)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'uber_direct_test',
+                            child: Text('Courier status (manual test only)'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _deliveryMethod = value);
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: _address,
+                        minLines: 2,
+                        maxLines: 3,
+                        maxLength: 500,
+                        decoration: const InputDecoration(
+                          labelText: 'Delivery or agreed pickup address',
+                          alignLabelWithHint: true,
+                        ),
+                        validator: (value) {
+                          final address = value?.trim() ?? '';
+                          if (address.length < 8) {
+                            return 'Enter at least 8 characters.';
+                          }
+                          if (address.length > 500) {
+                            return 'Address must be 500 characters or fewer.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButtonFormField<String>(
+                        initialValue: _provider,
+                        decoration: const InputDecoration(
+                          labelText: 'Test payment provider',
+                        ),
+                        items: [
+                          for (final provider in _providers)
+                            DropdownMenuItem(
+                              value: provider,
+                              child: Text(switch (provider) {
+                                'payfast_sandbox' => 'PayFast hosted sandbox',
+                                'escrow_sandbox' => 'Escrow.com sandbox',
+                                _ => provider,
+                              }),
+                            ),
+                        ],
+                        onChanged: (value) => setState(() => _provider = value),
+                      ),
+                      const SizedBox(height: 8),
+                      if (_loadError != null)
+                        AppWell(
+                          radius: 14,
+                          tint: DobhaColors.red,
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: Text(
+                            _loadError!,
+                            style: TextStyle(color: DobhaColors.red),
+                          ),
+                        ),
+                      AppButton(
+                        color: DobhaColors.green,
+                        onPressed: _busy ? null : _createTestOrder,
+                        child: _busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : const Text('Send sandbox test order'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
               ),
             ],
           ),

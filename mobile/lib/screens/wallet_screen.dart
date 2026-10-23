@@ -47,7 +47,7 @@ class WalletScreen extends StatelessWidget {
                 AppWell(
                   radius: 14,
                   child: Text(
-                    'Order, wallet and transaction records may be historical or test data. Dobha does not hold funds or process payments; these records do not prove payment, delivery, refund or payout.',
+                    'Sandbox checkout is test-only. Wallet deposits, withdrawals, escrow release, refunds, and seller payouts are unavailable. Historical and test records do not prove real payment or delivery.',
                     style: TextStyle(
                       color: DobhaColors.textSecondary,
                       height: 1.4,
@@ -66,7 +66,7 @@ class WalletScreen extends StatelessWidget {
                     radius: 18,
                     padding: const EdgeInsets.all(20),
                     child: Text(
-                      'No order records. Checkout and order fulfillment are currently unavailable.',
+                      'No order records yet. Dev sandbox checkout is available only when a provider is enabled.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: DobhaColors.muted,

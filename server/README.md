@@ -45,6 +45,9 @@ sandbox transaction creation/status refresh. Both provider integrations require
 credentials from AWS Secrets Manager and default to disabled. The Escrow
 integration reports only the provider's sandbox secured status; it does not
 release funds. No provider test status credits a Dobha wallet or pays a seller.
+The current dev stack has PayFast sandbox enabled and Escrow sandbox disabled.
+The web client is deployed to the dev site. Mobile checkout targets the dev API
+and requires a separate tester build for distribution.
 
 Dev orders require seller acceptance and reserve listing stock. Seller
 preparation, courier/pickup progress, seller handoff report, and buyer

@@ -77,7 +77,7 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Tap the bag on a listing to save it here, then request to buy directly without starting a chat yourself.',
+                          'Add a listing here to send a direct purchase request or start a dev sandbox test order without starting a chat.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: DobhaColors.muted,
@@ -129,7 +129,7 @@ class _CartScreenState extends State<CartScreen> {
                             color: DobhaColors.green,
                             onPressed: () => CheckoutModal.showCart(context),
                             child: const Text(
-                              'Request to buy',
+                              'Checkout or request to buy',
                               style: TextStyle(fontSize: 15),
                             ),
                           ),

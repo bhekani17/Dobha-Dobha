@@ -558,9 +558,7 @@ class _ReelItemCardState extends State<_ReelItemCard> {
                     onPressed: isMine
                         ? () => NewListingScreen.open(context, editing: item)
                         : () => CheckoutModal.show(context, item),
-                    child: Text(
-                      isMine ? 'Edit listing' : 'Request to buy',
-                    ),
+                    child: Text(isMine ? 'Edit listing' : 'Request to buy'),
                   ),
                 ),
                 if (!isMine) ...[
@@ -797,7 +795,7 @@ class ItemInfoSheet extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Message the seller to ask about buying. Payment and orders are not handled by Dobha.',
+                        'Request to buy directly and arrange payment outside Dobha, or use the dev sandbox checkout for provider testing.',
                         style: TextStyle(
                           fontSize: 13,
                           color: DobhaColors.textSecondary,
@@ -813,7 +811,7 @@ class ItemInfoSheet extends StatelessWidget {
                 AppButton(
                   color: DobhaColors.green,
                   onPressed: () => CheckoutModal.show(context, item),
-                  child: const Text('Message seller'),
+                  child: const Text('Request to buy / test checkout'),
                 ),
                 const SizedBox(height: 10),
                 Row(

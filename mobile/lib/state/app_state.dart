@@ -681,7 +681,14 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ---- Orders & wallet (payments are unavailable until provider integration) ----
+  // ---- Orders & wallet ----
+
+  Future<List<String>> loadSandboxPaymentProviders() async {
+    final response =
+        await _call(() => _api.get('/api/orders/sandbox-capabilities'))
+            as Map<String, dynamic>;
+    return List<String>.from(response['providers'] as List? ?? const []);
+  }
 
   Future<EscrowOrder> checkout({
     required ThriftItem item,
@@ -701,16 +708,37 @@ class AppState extends ChangeNotifier {
     );
     final order = EscrowOrder.fromJson(res['order'] as Map<String, dynamic>);
     _orders = [order, ..._orders];
-    if (item.quantity <= 1) {
-      _feed = _feed.where((i) => i.id != item.id).toList();
-    } else {
-      loadFeed().catchError((_) {});
-    }
     _cart = _cart.where((i) => i.id != item.id).toList();
     notifyListeners();
+    loadFeed().catchError((_) {});
     loadWallet().catchError((_) {});
     if (offerId != null) loadOffers().catchError((_) {});
     return order;
+  }
+
+  Future<Map<String, dynamic>> sandboxOrderAction(
+    String orderId,
+    String action,
+  ) async {
+    final response =
+        await _call(() => _api.post('/api/orders/$orderId/$action'))
+            as Map<String, dynamic>;
+    if (response['order'] is Map<String, dynamic>) {
+      final updated = EscrowOrder.fromJson(
+        response['order'] as Map<String, dynamic>,
+      );
+      _orders = [
+        for (final order in _orders)
+          if (order.id == orderId) updated else order,
+      ];
+      if (!_orders.any((order) => order.id == orderId)) {
+        _orders = [updated, ..._orders];
+      }
+      notifyListeners();
+      loadFeed().catchError((_) {});
+      loadCart().catchError((_) {});
+    }
+    return response;
   }
 
   /// [trackingNumber] is required unless the order is collected at the Safe Hub.
@@ -980,7 +1008,8 @@ class AppState extends ChangeNotifier {
       () => _api.post('/api/chats/$peerId/purchases/$messageId/confirm'),
     );
     final purchaseRequest =
-        (response as Map<String, dynamic>)['purchaseRequest'] as Map<String, dynamic>;
+        (response as Map<String, dynamic>)['purchaseRequest']
+            as Map<String, dynamic>;
     if (purchaseRequest['status'] == 'reported_complete') {
       final item = [
         ..._feed,

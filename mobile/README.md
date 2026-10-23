@@ -4,13 +4,27 @@ The mobile client is a Flutter application for browsing listings, messaging,
 and live streams. It currently uses the existing API configured in the app;
 the separate ECS/PostgreSQL API is not a production client target yet.
 
-## Financial features
+## Checkout and financial features
 
-Checkout, payment, escrow settlement, wallet deposits and withdrawals, and
-paid listing promotion are unavailable. The backend rejects these operations;
-the app does not process payments or hold funds. Historical order, wallet, and
-transaction records are not proof of payment, delivery, refund, or payout.
-Do not send money to a seller based on an in-app balance or order record.
+The dev environment supports provider sandbox checkout from the bag or listing
+screen. A buyer sends a test order request, the seller accepts it, then the
+buyer can open the provider sandbox checkout from Orders. Order cards expose
+manual test preparation, dispatch/handoff, and completion reports. The app
+labels these orders SANDBOX; they are not Dobha orders with verified payment or
+delivery.
+
+PayFast sandbox is enabled on dev. Escrow sandbox is available only when its
+provider credentials are configured and the dev deployment enables it. Do not
+use live provider credentials in the app. The app does not credit a Dobha
+wallet or release funds to a seller. Wallet deposits and withdrawals, voucher
+funding, cash on delivery, refunds, real delivery verification, seller payouts,
+and paid listing promotion remain unavailable. Historical order, wallet, and
+transaction records are not evidence of real payment, delivery, refund, or
+payout.
+
+Use an available listing and a second account acting as its seller to test the
+full flow. Direct purchase requests remain available for arranging an off-app
+transaction and do not create an order or verify payment.
 
 ## Development
 

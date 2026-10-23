@@ -304,11 +304,8 @@ class _ProfileScreenState extends State<ProfileScreen>
           AppWell(
             radius: 14,
             child: Text(
-              'Historical order records may be test or legacy data. They do not verify payment, delivery, refund or payout.',
-              style: TextStyle(
-                color: DobhaColors.textSecondary,
-                height: 1.4,
-              ),
+              'Orders marked SANDBOX are provider tests; delivery updates are manual. Neither sandbox nor historical records prove real payment, delivery, refund, or payout.',
+              style: TextStyle(color: DobhaColors.textSecondary, height: 1.4),
             ),
           ),
           const SizedBox(height: 12),

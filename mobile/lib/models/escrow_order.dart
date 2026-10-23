@@ -8,6 +8,18 @@ enum EscrowStatus {
   payoutReleased, // Buyer confirmed "Received as Shown"; vendor paid
   disputed, // Buyer reported a problem; funds frozen for support
   refunded, // Dispute settled for the buyer; money back in their wallet
+  sellerApprovalPending,
+  sellerAccepted,
+  sandboxPaymentVerified,
+  preparingTest,
+  readyForCollectionTest,
+  readyForCourierTest,
+  inTransitTest,
+  deliveryReportedTest,
+  buyerConfirmedTest,
+  sellerDeclined,
+  cancelled,
+  escrowSandboxTransactionCreated,
 }
 
 extension EscrowStatusX on EscrowStatus {
@@ -24,6 +36,30 @@ extension EscrowStatusX on EscrowStatus {
         return 'Problem reported';
       case EscrowStatus.refunded:
         return 'Refunded';
+      case EscrowStatus.sellerApprovalPending:
+        return 'Awaiting seller';
+      case EscrowStatus.sellerAccepted:
+        return 'Seller accepted';
+      case EscrowStatus.sandboxPaymentVerified:
+        return 'Sandbox payment test';
+      case EscrowStatus.preparingTest:
+        return 'Preparing (test)';
+      case EscrowStatus.readyForCollectionTest:
+        return 'Ready for pickup (test)';
+      case EscrowStatus.readyForCourierTest:
+        return 'Ready for courier (test)';
+      case EscrowStatus.inTransitTest:
+        return 'In transit (test)';
+      case EscrowStatus.deliveryReportedTest:
+        return 'Handoff reported (test)';
+      case EscrowStatus.buyerConfirmedTest:
+        return 'Completed (test)';
+      case EscrowStatus.sellerDeclined:
+        return 'Declined';
+      case EscrowStatus.cancelled:
+        return 'Cancelled';
+      case EscrowStatus.escrowSandboxTransactionCreated:
+        return 'Escrow sandbox created';
     }
   }
 
@@ -40,6 +76,25 @@ extension EscrowStatusX on EscrowStatus {
         return 'Legacy order record. No money is held by Dobha; contact support if you need help with this record.';
       case EscrowStatus.refunded:
         return 'Legacy order record. This status does not verify that a real refund occurred.';
+      case EscrowStatus.sellerApprovalPending:
+        return 'Sandbox test order only. Waiting for the seller; no payment has been made.';
+      case EscrowStatus.sellerAccepted:
+        return 'Sandbox test order only. The seller accepted; start provider checkout to continue testing.';
+      case EscrowStatus.sandboxPaymentVerified:
+        return 'Sandbox test status only. It is not a real payment, delivery, or payout record.';
+      case EscrowStatus.preparingTest:
+      case EscrowStatus.readyForCollectionTest:
+      case EscrowStatus.readyForCourierTest:
+      case EscrowStatus.inTransitTest:
+      case EscrowStatus.deliveryReportedTest:
+      case EscrowStatus.buyerConfirmedTest:
+        return 'Sandbox order only. Delivery updates are manual reports and do not verify delivery or cause a seller payout.';
+      case EscrowStatus.sellerDeclined:
+        return 'The seller declined this sandbox test order; no payment was made.';
+      case EscrowStatus.cancelled:
+        return 'This sandbox test order was cancelled; no payment or payout occurred.';
+      case EscrowStatus.escrowSandboxTransactionCreated:
+        return 'Escrow sandbox transaction only. Dobha does not verify real payment or release funds.';
     }
   }
 
@@ -53,6 +108,18 @@ extension EscrowStatusX on EscrowStatus {
         return 3;
       case EscrowStatus.disputed:
       case EscrowStatus.refunded:
+      case EscrowStatus.sellerApprovalPending:
+      case EscrowStatus.sellerAccepted:
+      case EscrowStatus.sandboxPaymentVerified:
+      case EscrowStatus.preparingTest:
+      case EscrowStatus.readyForCollectionTest:
+      case EscrowStatus.readyForCourierTest:
+      case EscrowStatus.inTransitTest:
+      case EscrowStatus.deliveryReportedTest:
+      case EscrowStatus.buyerConfirmedTest:
+      case EscrowStatus.sellerDeclined:
+      case EscrowStatus.cancelled:
+      case EscrowStatus.escrowSandboxTransactionCreated:
         return -1;
     }
   }
@@ -76,6 +143,9 @@ class EscrowOrder {
 
   /// True when the signed-in user is the vendor on this order.
   final bool isSeller;
+  final bool sandbox;
+  final String paymentStatus;
+  final String? providerTransactionId;
 
   /// The buyer's star rating (1-5) once they have left one.
   final int? reviewRating;
@@ -99,6 +169,9 @@ class EscrowOrder {
     required this.trackingNumber,
     required this.buyerName,
     required this.isSeller,
+    this.sandbox = false,
+    this.paymentStatus = 'legacy_unverified',
+    this.providerTransactionId,
     this.reviewRating,
     this.canReview = false,
   });
@@ -110,23 +183,51 @@ class EscrowOrder {
 
   factory EscrowOrder.fromJson(Map<String, dynamic> json) {
     DateTime? date(String key) => parseNullableJsonDateTime(json[key]);
+    double money(String key) {
+      final value = json[key];
+      if (value is num) return value.toDouble();
+      if (value is String) {
+        final parsed = double.tryParse(
+          value.replaceAll(RegExp(r'[^0-9,.-]'), '').replaceAll(',', ''),
+        );
+        if (parsed != null) return parsed;
+      }
+      throw FormatException('Order is missing a valid $key value');
+    }
+
+    final itemJson = Map<String, dynamic>.from(
+      json['item'] as Map<String, dynamic>,
+    );
+    final sellerId = json['sellerId'] as String? ?? 'unknown-seller';
+    itemJson.putIfAbsent('sellerId', () => sellerId);
+    itemJson.putIfAbsent('sellerHandle', () => sellerId);
+    itemJson.putIfAbsent('sellerName', () => 'Vendor');
+    itemJson.putIfAbsent('priceZar', () => json['amountZar']);
+    itemJson.putIfAbsent('createdAt', () => json['createdAt']);
     return EscrowOrder(
       id: json['id'] as String,
-      item: ThriftItem.fromJson(json['item'] as Map<String, dynamic>),
-      amountZar: (json['amountZar'] as num).toDouble(),
-      shippingFeeZar: (json['shippingFeeZar'] as num).toDouble(),
-      status: EscrowStatus.values.firstWhere((s) => s.name == json['status'], orElse: () => EscrowStatus.paymentHeld),
+      item: ThriftItem.fromJson(itemJson),
+      amountZar: money('amountZar'),
+      shippingFeeZar: money('shippingFeeZar'),
+      status: EscrowStatus.values.firstWhere(
+        (s) => s.name == json['status'],
+        orElse: () => EscrowStatus.paymentHeld,
+      ),
       deliveryMethod: json['deliveryMethod'] as String,
-      deliveryAddress: json['deliveryAddress'] as String,
-      paymentMethod: json['paymentMethod'] as String,
+      deliveryAddress: json['deliveryAddress'] as String? ?? '',
+      paymentMethod: json['paymentMethod'] as String? ?? 'unknown',
       createdAt: parseJsonDateTime(json['createdAt']),
       dispatchedAt: date('dispatchedAt'),
       confirmedAt: date('confirmedAt'),
-      escrowVaultRef: json['escrowVaultRef'] as String,
-      trackingNumber: json['trackingNumber'] as String,
+      escrowVaultRef: json['escrowVaultRef'] as String? ?? '',
+      trackingNumber: json['trackingNumber'] as String? ?? '',
       buyerName: json['buyerName'] as String? ?? '',
       isSeller: json['isSeller'] as bool? ?? false,
-      reviewRating: (json['review'] as Map<String, dynamic>?)?['rating'] as int?,
+      sandbox: json['sandbox'] as bool? ?? false,
+      paymentStatus: json['paymentStatus'] as String? ?? 'legacy_unverified',
+      providerTransactionId: json['providerTransactionId'] as String?,
+      reviewRating:
+          (json['review'] as Map<String, dynamic>?)?['rating'] as int?,
       canReview: json['canReview'] as bool? ?? false,
     );
   }
