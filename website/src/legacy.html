@@ -78,11 +78,17 @@
       <section class="live-strip live-page-section">
         <div class="section-heading live-heading"><div><p class="eyebrow">HAPPENING RIGHT NOW</p><h2>Live from the market</h2></div><button class="text-button" id="refresh-live">Refresh streams ↻</button></div>
         <section id="inline-live-player" class="inline-live-player hidden" aria-label="Live stream player">
-          <div class="inline-player-heading"><div><p class="eyebrow">NOW PLAYING</p><h3 id="inline-live-title">Live stream</h3></div><button class="text-button" id="stop-inline-stream">Stop watching ×</button></div>
-          <div class="video-frame inline-video-frame" id="inline-video-frame"><video id="inline-live-video" autoplay playsinline controls></video><p id="inline-live-placeholder">Connecting to the live stream…</p></div>
-          <div class="live-pinned" data-live-pinned></div>
-          <p class="form-message" id="inline-live-message" role="status"></p>
-          <div class="live-chat"><div class="live-chat-messages" data-live-chat aria-live="polite"></div><form data-live-chat-form><input name="message" maxlength="300" autocomplete="off" placeholder="Say something…" required><button class="button button-dark">Send</button></form></div>
+          <div class="live-viewer-stage">
+            <div class="video-frame inline-video-frame" id="inline-video-frame"><video id="inline-live-video" autoplay playsinline controls></video><p id="inline-live-placeholder">Connecting to the live stream…</p></div>
+            <div class="live-floating-header"><div><span class="live-floating-badge"><span class="live-status-dot"></span> LIVE</span><h3 id="inline-live-title">Live stream</h3></div><button class="live-floating-close" id="stop-inline-stream" type="button" aria-label="Stop watching">×</button></div>
+            <div class="live-floating-chat">
+              <div class="live-pinned" data-live-pinned></div>
+              <div class="live-chat-messages" data-live-chat aria-live="polite"></div>
+              <form data-live-chat-form><input name="message" maxlength="300" autocomplete="off" placeholder="Comment…" aria-label="Write a live comment" required><button class="live-chat-send" aria-label="Send comment">↑</button></form>
+            </div>
+            <div class="live-floating-actions"><div class="live-reaction-floats" aria-hidden="true"></div><button type="button" class="live-like-button" data-live-like aria-label="Like the live stream"><span aria-hidden="true">♥</span><small>Like</small></button><span class="live-like-count" data-live-like-count>♥ 0</span></div>
+            <p class="form-message live-floating-message" id="inline-live-message" role="status"></p>
+          </div>
         </section>
         <div id="live-list" class="live-list"><p class="muted">Checking who's live...</p></div>
       </section>
@@ -164,12 +170,23 @@
 
     <section class="page hidden" id="page-cart" data-page="cart">
       <section class="page-intro"><p class="eyebrow">YOUR FINDS</p><h1>Your <span>shopping bag.</span></h1><p>Review and manage the items you have saved in your bag.</p></section>
-      <section class="feature-section"><div id="cart-list" class="orders-list"></div>
-        <section id="checkout-form" class="form-stack checkout-form">
-          <h2>Checkout (sandbox)</h2>
-          <p id="checkout-total" class="field-hint">PayFast and Escrow sandbox only. No Dobha wallet, voucher, cash-on-delivery, live courier booking, or seller payout.</p>
-          <div id="checkout-items" class="orders-list"></div>
-        </section>
+      <section class="feature-section checkout-section">
+        <div class="checkout-heading">
+          <div><p class="eyebrow">READY WHEN YOU ARE</p><h2>Make it yours.</h2></div>
+          <a class="text-button" href="#shop">Continue browsing <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="checkout-layout">
+          <aside class="checkout-bag-panel" aria-labelledby="checkout-bag-title">
+            <div class="checkout-panel-heading"><div><p class="eyebrow">YOUR SELECTION</p><h3 id="checkout-bag-title">Shopping bag</h3></div><span class="checkout-step">01</span></div>
+            <div id="cart-list" class="checkout-bag-list"></div>
+            <div id="checkout-summary" class="checkout-summary" aria-live="polite"></div>
+          </aside>
+          <section id="checkout-form" class="checkout-form" aria-labelledby="checkout-form-title">
+            <div class="checkout-panel-heading"><div><p class="eyebrow">DELIVERY & PAYMENT</p><h3 id="checkout-form-title">Send an order request</h3></div><span class="checkout-step">02</span></div>
+            <p id="checkout-total" class="checkout-disclosure">Sandbox test checkout · seller acceptance required.</p>
+            <div id="checkout-items" class="checkout-order-list"></div>
+          </section>
+        </div>
       </section>
     </section>
 
@@ -225,6 +242,7 @@
       <section class="page-intro"><p class="eyebrow">YOUR DOBHA</p><h1>Account & <span>settings.</span></h1><p>Manage your profile, shop, orders, conversations, and marketplace activity.</p></section>
       <section class="feature-section account-layout">
         <div id="account-summary" class="account-summary"></div>
+        <div id="account-wallet-summary" class="account-wallet-summary" aria-live="polite"></div>
         <nav class="account-links" aria-label="Account pages">
           <a href="#orders">Orders & sales</a><a href="#saved">Saved items</a><a href="#offers">Offers</a><a href="#wallet">Wallet</a><a href="#messages">Messages</a><a href="#notifications">Notifications</a><a href="#people">Find people</a><a href="#support">Help & support</a>
         </nav>
@@ -283,6 +301,18 @@
   </dialog>
 
   <dialog id="product-dialog" class="dialog dialog-wide"><button class="dialog-close" data-close aria-label="Close">×</button><div id="product-detail"></div></dialog>
-  <dialog id="live-dialog" class="dialog dialog-wide live-dialog"><button class="dialog-close" data-close aria-label="Close">×</button><p class="eyebrow">LIVE FROM DOBHA</p><h2 id="live-title">Join the stream</h2><div class="video-frame" id="video-frame"><video id="live-video" autoplay playsinline controls></video><p id="live-placeholder">Connecting to the live stream…</p></div><div class="live-pinned" data-live-pinned></div><p class="form-message" id="live-message" role="status"></p><div class="live-chat"><div class="live-chat-messages" data-live-chat aria-live="polite"></div><form data-live-chat-form><input name="message" maxlength="300" autocomplete="off" placeholder="Say something…" required><button class="button button-dark">Send</button></form></div></dialog>
+  <dialog id="live-dialog" class="dialog dialog-wide live-dialog">
+    <div class="live-viewer-stage">
+      <div class="video-frame" id="video-frame"><video id="live-video" autoplay playsinline controls></video><p id="live-placeholder">Connecting to the live stream…</p></div>
+      <div class="live-floating-header"><div><span class="live-floating-badge"><span class="live-status-dot"></span> LIVE</span><h2 id="live-title">Join the stream</h2></div><button class="live-floating-close" data-close aria-label="Close live stream">×</button></div>
+      <div class="live-floating-chat">
+        <div class="live-pinned" data-live-pinned></div>
+        <div class="live-chat-messages" data-live-chat aria-live="polite"></div>
+        <form data-live-chat-form><input name="message" maxlength="300" autocomplete="off" placeholder="Comment…" aria-label="Write a live comment" required><button class="live-chat-send" aria-label="Send comment">↑</button></form>
+      </div>
+      <div class="live-floating-actions"><div class="live-reaction-floats" aria-hidden="true"></div><button type="button" class="live-like-button" data-live-like aria-label="Like the live stream"><span aria-hidden="true">♥</span><small>Like</small></button><span class="live-like-count" data-live-like-count>♥ 0</span></div>
+      <p class="form-message live-floating-message" id="live-message" role="status"></p>
+    </div>
+  </dialog>
   <dialog id="story-dialog" class="dialog dialog-wide story-dialog"><button class="dialog-close" data-close aria-label="Close">×</button><div id="story-viewer"></div><div class="story-navigation"><button class="button button-outline" id="story-previous" type="button">Previous</button><button class="button button-dark" id="story-next" type="button">Next</button></div></dialog>
   <div id="toast" class="toast" role="status"></div>

@@ -46,6 +46,7 @@ const state = {
   location: 'All Joburg',
   page: 'home',
   inlineStream: false,
+  liveLikes: 0,
   authMode: 'login',
   stream: null,
   cart: [],
@@ -455,6 +456,9 @@ function listingMediaEntries(item) {
     ...videos.map((url) => ({ kind: 'video', url })),
   ].filter((entry) => entry.url);
 }
+function isCartItemAvailable(item) {
+  return item.available ?? item.status === 'available';
+}
 function showProduct(id) {
   const item = state.items.find((listing) => listing.id === id);
   if (!item) return;
@@ -473,7 +477,14 @@ function showProduct(id) {
       </div>`).join('')
     : `<div class="product-preview-empty">${categoryPlaceholder(item.category)}</div>`;
   byId('product-detail').innerHTML = `<div class="product-detail">
-    <div class="product-preview" aria-label="${mediaEntries.length} listing photos and videos">${media}</div>
+    <div class="product-gallery">
+      <div class="product-preview" id="product-preview" role="region" aria-label="${mediaEntries.length} listing photos and videos" tabindex="0">${media}</div>
+      ${mediaEntries.length > 1 ? `<div class="product-gallery-controls">
+        <button type="button" class="button button-outline" id="product-gallery-prev" aria-label="Previous photo or video">‹ Previous</button>
+        <span id="product-gallery-count" aria-live="polite">1 / ${mediaEntries.length}</span>
+        <button type="button" class="button button-outline" id="product-gallery-next" aria-label="Next photo or video">Next ›</button>
+      </div>` : ''}
+    </div>
     <div class="product-copy"><p class="eyebrow">${escapeHtml(item.category)} · ${escapeHtml(item.condition || 'Pre-loved')}</p>
       <h2>${escapeHtml(item.title)}</h2><p class="product-price">${money(item.priceZar)}</p>
       <p class="seller-line">Listed by ${escapeHtml(sellerName)} ${escapeHtml(sellerHandle)}</p>
@@ -486,6 +497,30 @@ function showProduct(id) {
       <button class="text-button" id="message-product-seller">Message seller →</button>
       <section class="product-comments"><h3>Comments</h3><div id="comments-list"><p class="muted">Loading comments…</p></div><form id="comment-form" class="form-stack"><label class="field">Add a comment<textarea name="text" maxlength="500" required></textarea></label><button class="button button-outline">Comment</button></form><button class="text-button" id="report-button">Report this listing</button></section>
     </div></div>`;
+  const gallery = byId('product-preview');
+  if (mediaEntries.length > 1) {
+    const counter = byId('product-gallery-count');
+    const previous = byId('product-gallery-prev');
+    const next = byId('product-gallery-next');
+    const updateGallery = () => {
+      const index = gallery.clientWidth
+        ? Math.min(mediaEntries.length - 1, Math.max(0, Math.round(gallery.scrollLeft / gallery.clientWidth)))
+        : 0;
+      counter.textContent = `${index + 1} / ${mediaEntries.length}`;
+      previous.disabled = index === 0;
+      next.disabled = index === mediaEntries.length - 1;
+    };
+    gallery.addEventListener('scroll', updateGallery, { passive: true });
+    previous.addEventListener('click', () => gallery.scrollBy({ left: -gallery.clientWidth, behavior: 'smooth' }));
+    next.addEventListener('click', () => gallery.scrollBy({ left: gallery.clientWidth, behavior: 'smooth' }));
+    gallery.addEventListener('keydown', (event) => {
+      if (event.target === gallery && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+        event.preventDefault();
+        (event.key === 'ArrowLeft' ? previous : next).click();
+      }
+    });
+    updateGallery();
+  }
   byId('buy-request-button').addEventListener('click', (event) => requestToBuy(item, event.currentTarget));
   byId('cart-button').addEventListener('click', () => addToCart(item.id));
   byId('save-button').addEventListener('click', () => itemAction(item.id, 'save', 'Saved items'));
@@ -561,12 +596,14 @@ async function watchStream(room, inline = false) {
     : { frame: byId('video-frame'), video: byId('live-video'), placeholder: byId('live-placeholder'), message: 'live-message' };
   if (inline) {
     state.inlineStream = true;
-    byId('inline-live-title').textContent = 'Live stream';
+    byId('inline-live-title').textContent = `Watching ${room}`;
     byId('inline-live-player').classList.remove('hidden');
   } else {
-    byId('live-title').textContent = 'Join the stream';
+    byId('live-title').textContent = `Watching ${room}`;
     openDialog('live-dialog');
   }
+  state.liveLikes = 0;
+  document.querySelectorAll('[data-live-like-count]').forEach((count) => { count.textContent = '♥ 0'; });
   player.placeholder.textContent = 'Connecting to the live stream…';
   player.placeholder.classList.remove('hidden');
   player.video.srcObject = null;
@@ -580,6 +617,12 @@ async function watchStream(room, inline = false) {
     const liveRoom = new Room();
     state.stream = liveRoom;
     liveRoom.on(RoomEvent.DataReceived, handleLiveData);
+    liveRoom.on(RoomEvent.ParticipantConnected, (participant) => {
+      appendLiveSystem(`${participant.name || 'A viewer'} joined the live`);
+    });
+    liveRoom.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      appendLiveSystem(`${participant.name || 'A viewer'} left the live`);
+    });
     liveRoom.on(RoomEvent.TrackSubscribed, (track) => {
       if (track.kind === Track.Kind.Video) {
         track.attach(player.video);
@@ -817,8 +860,14 @@ async function startLiveHost(event) {
     const updateViewers = () => {
       byId('host-live-viewers').textContent = `${room.remoteParticipants.size} watching`;
     };
-    room.on(client.RoomEvent.ParticipantConnected, updateViewers);
-    room.on(client.RoomEvent.ParticipantDisconnected, updateViewers);
+    room.on(client.RoomEvent.ParticipantConnected, (participant) => {
+      updateViewers();
+      appendLiveSystem(`${participant.name || 'A viewer'} joined the live`);
+    });
+    room.on(client.RoomEvent.ParticipantDisconnected, (participant) => {
+      updateViewers();
+      appendLiveSystem(`${participant.name || 'A viewer'} left the live`);
+    });
     await room.connect(token.url, token.token);
     for (const track of tracks) await room.localParticipant.publishTrack(track, { name: track.kind });
     state.hostRoom = room;
@@ -942,6 +991,8 @@ function handleLiveData(data, participant) {
     const message = JSON.parse(new TextDecoder().decode(data));
     if (message.type === 'chat' && typeof message.text === 'string') {
       appendLiveChat(participant?.name || 'Seller', message.text);
+    } else if (message.type === 'reaction' && (message.kind === 'heart' || message.reaction === 'like')) {
+      appendLiveReaction();
     } else if (message.type === 'pin_item' && message.item) {
       renderPinnedLiveItem(message.item);
     } else if (message.type === 'unpin_item') {
@@ -959,10 +1010,60 @@ function appendLiveChat(name, text) {
     target.scrollTop = target.scrollHeight;
   });
 }
+function appendLiveSystem(text) {
+  document.querySelectorAll('[data-live-chat]').forEach((target) => {
+    const line = document.createElement('p');
+    line.className = 'live-system-message';
+    line.textContent = text;
+    target.append(line);
+    target.scrollTop = target.scrollHeight;
+  });
+}
 function renderPinnedLiveItem(item) {
   document.querySelectorAll('[data-live-pinned]').forEach((target) => {
-    target.innerHTML = `<p><strong>${escapeHtml(item.title || 'Pinned listing')}</strong> · ${escapeHtml(item.price || '')}</p><p class="field-hint">Checkout is unavailable; this pin does not reserve or sell the item.</p>`;
+    if (!item?.id) {
+      target.innerHTML = `<p><strong>${escapeHtml(item.title || 'Pinned listing')}</strong> · ${escapeHtml(item.price || '')}</p>`;
+      return;
+    }
+    const listing = state.items.find((entry) => entry.id === item.id);
+    const sellerId = listing?.seller?.id || listing?.sellerId;
+    const isSeller = Boolean(state.user?.id && sellerId === state.user.id);
+    target.innerHTML = `<div class="live-pinned-card"><div><span class="live-pinned-label">ON THE LIVE</span><strong>${escapeHtml(item.title || 'Pinned listing')}</strong><span>${escapeHtml(item.price || '')}${item.size ? ` · ${escapeHtml(item.size)}` : ''}</span></div>${isSeller
+      ? '<a class="live-offer-button" href="#offers">Offers ↗</a>'
+      : `<button type="button" class="live-offer-button" data-live-offer="${escapeHtml(item.id)}" data-live-price="${escapeHtml(item.price || '')}">Make an offer</button>`}</div>`;
+    target.querySelectorAll('[data-live-offer]').forEach((button) => button.addEventListener('click', () => {
+      makeOffer({ id: button.dataset.liveOffer, title: item.title, priceZar: button.dataset.livePrice });
+    }));
   });
+}
+function appendLiveReaction() {
+  state.liveLikes += 1;
+  document.querySelectorAll('[data-live-like-count]').forEach((count) => {
+    count.textContent = `♥ ${state.liveLikes}`;
+  });
+  document.querySelectorAll('.live-reaction-floats').forEach((container) => {
+    const heart = document.createElement('span');
+    heart.className = 'live-floating-heart';
+    heart.textContent = '♥';
+    container.append(heart);
+    setTimeout(() => heart.remove(), 1800);
+  });
+}
+async function sendLiveLike() {
+  const room = state.hostRoom || state.stream;
+  if (!room?.localParticipant) {
+    notify('Join the live stream to send a like.', true);
+    return;
+  }
+  try {
+    await room.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify({ type: 'reaction', kind: 'heart' })),
+      { reliable: true },
+    );
+    appendLiveReaction();
+  } catch (error) {
+    notify(error.message || 'Your like could not be sent.', true);
+  }
 }
 async function sendLiveChat(event) {
   event.preventDefault();
@@ -1325,11 +1426,11 @@ async function reportItem(itemId) {
 }
 async function makeOffer(item) {
   if (!requireSignIn()) return;
-  const amount = Number(prompt(`Your offer in ZAR (listed for ${money(item.priceZar)}):`));
+  const amount = Number(prompt(`Your offer in ZAR (listed for ${money(item.priceZar ?? item.price)}):`));
   if (!Number.isFinite(amount) || amount <= 0) return;
   try {
-    await api(`/api/items/${item.id}/offers`, { method: 'POST', body: { amountZar: amount } });
-    notify('Your offer has been sent.');
+    await api(`/api/items/${encodeURIComponent(item.id)}/offers`, { method: 'POST', body: { amountZar: amount } });
+    notify('Your offer has been sent to the seller. They can accept, decline, or counter it from Offers.');
   } catch (error) {
     notify(error.message, true);
   }
@@ -1369,8 +1470,28 @@ async function loadCart() {
     const items = await refreshCart();
     const capabilities = await api('/api/orders/sandbox-capabilities');
     state.sandboxPaymentProviders = capabilities.providers || [];
-    byId('cart-list').innerHTML = items.length ? items.map((item) => `<article class="order-card"><div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.sellerName || '')}</span><span class="order-status">${item.available ? 'Available' : 'No longer available'}</span></div><div class="action-row"><button class="button button-outline" data-remove-cart="${escapeHtml(item.id)}">Remove</button></div></article>`).join('') : '<p class="muted">Your bag is empty. Browse the shop to find something good.</p>';
+    byId('cart-list').innerHTML = items.length ? items.map((item) => {
+      const media = listingMediaEntries(item)[0];
+      const available = isCartItemAvailable(item);
+      const thumbnail = media
+        ? `<img src="${escapeHtml(resolveMedia(media.url))}" alt="" loading="lazy">`
+        : '<span class="checkout-item-placeholder" aria-hidden="true">Photo</span>';
+      return `<article class="checkout-bag-item">
+        <div class="checkout-item-image">${thumbnail}</div>
+        <div class="checkout-item-copy"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.sellerName || 'Dobha seller')}</span><span class="checkout-item-status ${available ? 'is-available' : ''}">${available ? 'Available' : 'Unavailable'}</span></div>
+        <div class="checkout-item-price"><strong>${money(item.priceZar)}</strong><button class="text-button" type="button" data-remove-cart="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.title)} from bag">Remove</button></div>
+      </article>`;
+    }).join('') : '<div class="checkout-empty"><span aria-hidden="true">＋</span><strong>Your bag is waiting.</strong><p>Browse the shop and save something you love here.</p><a class="button button-outline" href="#shop">Explore the shop</a></div>';
     byId('cart-list').querySelectorAll('[data-remove-cart]').forEach((button) => button.addEventListener('click', () => removeFromCart(button.dataset.removeCart)));
+    const availableTotal = items.filter(isCartItemAvailable).reduce((sum, item) => {
+      const value = typeof item.priceZar === 'string'
+        ? Number.parseFloat(item.priceZar.replace(/[^0-9.]/g, ''))
+        : Number(item.priceZar);
+      return sum + (Number.isFinite(value) ? value : 0);
+    }, 0);
+    byId('checkout-summary').innerHTML = items.length
+      ? `<div><span>Available items subtotal</span><strong>${money(availableTotal)}</strong></div><p>Delivery is arranged with the seller and is not included.</p>`
+      : '';
     renderCheckout(items);
   } catch (error) {
     byId('cart-list').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
@@ -1384,35 +1505,35 @@ async function refreshCart() {
   return items;
 }
 function renderCheckout(items = state.cart) {
-  const availableItems = items.filter((item) => item.available);
+  const availableItems = items.filter(isCartItemAvailable);
   byId('checkout-total').textContent = state.sandboxPaymentProviders.length
-    ? 'Sandbox checkout only. Seller acceptance is required before provider checkout. Courier progress is manually reported for testing; this does not book Uber Direct or verify delivery.'
+    ? 'Sandbox test checkout · seller acceptance required.'
     : 'Sandbox checkout is not enabled on this environment. You can still use Request to buy from a listing to contact the seller.';
   const paymentOptions = [
     ['payfast_sandbox', 'PayFast hosted sandbox'],
     ['escrow_sandbox', 'Escrow.com sandbox transaction'],
   ].filter(([provider]) => state.sandboxPaymentProviders.includes(provider))
     .map(([provider, label]) => `<option value="${provider}">${label}</option>`).join('');
-  byId('checkout-items').innerHTML = availableItems.length && paymentOptions ? availableItems.map((item) => `
-    <form class="order-card sandbox-checkout-form" data-checkout-item="${escapeHtml(item.id)}">
-      <div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.sellerName || 'Dobha seller')}</span></div>
-      <label class="field">Delivery option
+  byId('checkout-items').innerHTML = availableItems.length && paymentOptions ? availableItems.map((item, index) => `
+    <form class="checkout-order-card" data-checkout-item="${escapeHtml(item.id)}">
+      <div class="checkout-order-heading"><span class="checkout-order-number">${String(index + 1).padStart(2, '0')}</span><div><strong>${escapeHtml(item.title)}</strong><span>${money(item.priceZar)} · ${escapeHtml(item.sellerName || 'Dobha seller')}</span></div></div>
+      <label class="field"><span class="checkout-field-label">How would you like to receive it?</span>
         <select name="deliveryMethod" required>
-          <option value="seller_pickup">Meet the seller / pickup (manual test)</option>
-          <option value="uber_direct_test">Courier (manual test status; no courier booking)</option>
+          <option value="seller_pickup">Meet the seller / arrange pickup</option>
+          <option value="uber_direct_test">Arrange a courier with the seller</option>
         </select>
       </label>
-      <label class="field">Delivery or agreed pickup address
+      <label class="field"><span class="checkout-field-label">Delivery or agreed pickup address</span>
         <textarea name="deliveryAddress" minlength="8" maxlength="500" required autocomplete="street-address"></textarea>
       </label>
-      <label class="field">Test payment provider
+      <label class="field"><span class="checkout-field-label">Sandbox payment provider</span>
         <select name="paymentMethod" required>
           ${paymentOptions}
         </select>
       </label>
-      <p class="field-hint">No Dobha wallet, card deposit, voucher, cash on delivery, real payment, refund, or seller payout is available.</p>
-      <button class="button button-dark" type="submit">Send test order request</button>
-      <p class="form-message" data-checkout-message role="status"></p>
+      <div class="checkout-test-note"><span aria-hidden="true">i</span><p>Test only. The seller must accept first. No real funds are taken, and courier status is manual.</p></div>
+      <button class="button button-dark checkout-submit" type="submit">Send test order request <span aria-hidden="true">→</span></button>
+      <p class="form-message" data-checkout-message role="status" aria-live="polite"></p>
     </form>`).join('') : `<p class="muted">${availableItems.length ? 'Sandbox checkout is unavailable in this environment.' : 'Add an available listing to your bag to start a sandbox test order.'}</p>`;
   byId('checkout-items').querySelectorAll('[data-checkout-item]').forEach((form) => {
     form.addEventListener('submit', submitSandboxOrder);
@@ -1514,6 +1635,43 @@ async function loadWallet() {
     byId('wallet-transactions').innerHTML = wallet.transactions.length ? wallet.transactions.map((transaction) => `<article class="order-card"><div><strong>${escapeHtml(transaction.title)}</strong><span>${escapeHtml(transaction.subtitle || '')} · ${escapeHtml(transaction.date ? new Date(transaction.date).toLocaleDateString() : '')}</span></div><div><strong>${money(transaction.amountZar)}</strong><span class="order-status">${escapeHtml(transaction.status)}</span></div></article>`).join('') : '<p class="muted">No wallet transactions.</p>';
   } catch (error) {
     byId('wallet-summary').innerHTML = `<p class="form-message error">${escapeHtml(error.message)}</p>`;
+  }
+}
+async function loadAccountWallet(userId) {
+  const target = byId('account-wallet-summary');
+  target.innerHTML = '<p class="muted">Loading account amounts…</p>';
+  try {
+    const [wallet, result] = await Promise.all([
+      api('/api/wallet'),
+      api('/api/orders'),
+    ]);
+    if (state.user?.id !== userId) return;
+    const sandboxPaidOrders = result.orders.filter(
+      (order) => order.sandbox === true && order.paymentStatus === 'sandbox_verified' && !order.isSeller,
+    );
+    const sandboxPaidTotal = sandboxPaidOrders.reduce((total, order) => {
+      const amount = Number(order.totalZar ?? (Number(order.amountZar || 0) + Number(order.shippingFeeZar || 0)));
+      return Number.isFinite(amount) ? total + amount : total;
+    }, 0);
+    target.innerHTML = `
+      <div class="account-wallet-heading">
+        <div><p class="eyebrow">ACCOUNT AMOUNTS</p><h2>Checkout & wallet</h2></div>
+        <a class="text-button" href="#wallet">View wallet history →</a>
+      </div>
+      <section class="account-sandbox-total" aria-label="Sandbox checkout total">
+        <div><span class="account-sandbox-label">SANDBOX CHECKOUT TOTAL</span><strong>${escapeHtml(money(sandboxPaidTotal))}</strong><small>${sandboxPaidOrders.length} confirmed test ${sandboxPaidOrders.length === 1 ? 'checkout' : 'checkouts'}</small></div>
+        <p>PayFast sandbox confirmations are tests, not real payments. This total is not a wallet balance; no funds were received.</p>
+      </section>
+      <h3 class="account-wallet-subheading">Recorded wallet amounts</h3>
+      <div class="account-wallet-balances">
+        <article><span>Available</span><strong>${escapeHtml(money(wallet.availableZar))}</strong></article>
+        <article><span>On hold</span><strong>${escapeHtml(money(wallet.lockedZar))}</strong></article>
+        <article><span>Pending</span><strong>${escapeHtml(money(wallet.pendingZar))}</strong></article>
+      </div>
+      <p class="account-wallet-notice">Historical wallet amounts are unverified and are not available to withdraw. Sandbox checkouts do not add funds to this wallet.</p>`;
+  } catch (error) {
+    if (state.user?.id !== userId) return;
+    target.innerHTML = `<p class="form-message error">Could not load wallet amounts: ${escapeHtml(error.message)}</p>`;
   }
 }
 async function loadNotifications() {
@@ -1654,9 +1812,11 @@ function renderAccount() {
   const user = state.user;
   if (!user) {
     byId('account-summary').innerHTML = '<p class="muted">Loading your profile…</p>';
+    byId('account-wallet-summary').innerHTML = '';
     return;
   }
   byId('account-summary').innerHTML = `<h2>${escapeHtml(user.name || 'Dobha member')}</h2><p>${escapeHtml(user.handle || '')} · ${escapeHtml(user.email || '')}</p><p>${escapeHtml(user.role || 'shopper')}${user.shopName ? ` · ${escapeHtml(user.shopName)}` : ''}</p>`;
+  loadAccountWallet(user.id);
   const form = byId('profile-form');
   for (const field of ['name', 'phone', 'bio', 'location', 'shopName', 'stallLocation', 'role']) form.elements[field].value = user[field] || '';
   byId('password-form').classList.toggle('hidden', !user.hasPassword);
@@ -1961,6 +2121,7 @@ function init() {
   });
   byId('enable-browser-notifications').addEventListener('click', enableBrowserNotifications);
   byId('stop-inline-stream').addEventListener('click', stopStream);
+  document.querySelectorAll('[data-live-like]').forEach((button) => button.addEventListener('click', sendLiveLike));
   document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
   document.querySelectorAll('dialog').forEach((dialog) => dialog.addEventListener('click', (event) => {
     if (event.target === dialog) dialog.close();
