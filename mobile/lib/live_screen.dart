@@ -71,6 +71,7 @@ class _LiveScreenState extends State<LiveScreen> {
     _listener
       ..on<DataReceivedEvent>(_onData)
       ..on<ParticipantConnectedEvent>(_onParticipantConnected)
+      ..on<ParticipantDisconnectedEvent>(_onParticipantDisconnected)
       ..on<RoomDisconnectedEvent>((_) {
         if (!_leaving && mounted) Navigator.of(context).pop();
       });
@@ -102,10 +103,30 @@ class _LiveScreenState extends State<LiveScreen> {
 
   void _onParticipantConnected(ParticipantConnectedEvent e) {
     _refresh();
+    if (!mounted) return;
+    final name = e.participant.name.trim();
+    _addMessage(
+      '',
+      '${name.isEmpty ? 'A viewer' : name} joined the live',
+      isSystem: true,
+      icon: Icons.person_add_alt_1_rounded,
+    );
     // If we are host and an item is currently pinned, broadcast it so the new viewer sees it immediately.
     if (widget.host && _pinnedItem != null) {
       _sendData({'type': 'pin_item', 'item': _pinnedItem!.toJson()});
     }
+  }
+
+  void _onParticipantDisconnected(ParticipantDisconnectedEvent e) {
+    _refresh();
+    if (!mounted) return;
+    final name = e.participant.name.trim();
+    _addMessage(
+      '',
+      '${name.isEmpty ? 'A viewer' : name} left the live',
+      isSystem: true,
+      icon: Icons.person_remove_alt_1_rounded,
+    );
   }
 
   void _onData(DataReceivedEvent e) {

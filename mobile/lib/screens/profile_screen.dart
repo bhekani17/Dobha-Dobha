@@ -48,6 +48,18 @@ class _ProfileScreenState extends State<ProfileScreen>
         if (!appState.isLoggedIn) return const SizedBox.shrink();
         final user = appState.user;
         final orders = appState.orders;
+        final sandboxPaidOrders = orders
+            .where(
+              (order) =>
+                  !order.isSeller &&
+                  order.sandbox &&
+                  order.paymentStatus == 'sandbox_verified',
+            )
+            .toList();
+        final sandboxPaidTotal = sandboxPaidOrders.fold<double>(
+          0,
+          (total, order) => total + order.totalZar,
+        );
         final saved = appState.savedItems;
 
         return Scaffold(
@@ -196,6 +208,105 @@ class _ProfileScreenState extends State<ProfileScreen>
                             _Stat(
                               label: 'Sales records',
                               value: '${user.salesCount}',
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      AppCard(
+                        radius: 18,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'SANDBOX CHECKOUT TOTAL',
+                              style: TextStyle(
+                                color: DobhaColors.amber,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'R ${sandboxPaidTotal.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: DobhaColors.text,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.8,
+                              ),
+                            ),
+                            Text(
+                              '${sandboxPaidOrders.length} confirmed test ${sandboxPaidOrders.length == 1 ? 'checkout' : 'checkouts'}',
+                              style: TextStyle(
+                                color: DobhaColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Test total only — no real payment was received.',
+                              style: TextStyle(
+                                color: DobhaColors.muted,
+                                fontSize: 11,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      AppCard(
+                        radius: 18,
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Expanded(
+                                  child: Text(
+                                    'Recorded wallet amounts',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: appState.loadWallet,
+                                  child: const Text('Refresh'),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            _AccountBalanceRow(
+                              label: 'Available',
+                              amount: appState.availableBalance,
+                              prominent: true,
+                            ),
+                            const SizedBox(height: 6),
+                            _AccountBalanceRow(
+                              label: 'On hold',
+                              amount: appState.lockedEscrowFunds,
+                            ),
+                            if (appState.isVendor) ...[
+                              const SizedBox(height: 6),
+                              _AccountBalanceRow(
+                                label: 'Pending',
+                                amount: appState.vendorPendingPayouts,
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            Text(
+                              'Historical or test amounts are unverified and are not available to withdraw. PayFast sandbox payments do not add real funds to this wallet.',
+                              style: TextStyle(
+                                color: DobhaColors.muted,
+                                fontSize: 11,
+                                height: 1.4,
+                              ),
                             ),
                           ],
                         ),
@@ -413,6 +524,42 @@ class _ProfileScreenState extends State<ProfileScreen>
               ],
             ),
           ),
+      ],
+    );
+  }
+}
+
+class _AccountBalanceRow extends StatelessWidget {
+  final String label;
+  final double amount;
+  final bool prominent;
+
+  const _AccountBalanceRow({
+    required this.label,
+    required this.amount,
+    this.prominent = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: DobhaColors.textSecondary,
+            fontSize: prominent ? 13 : 12,
+          ),
+        ),
+        Text(
+          'R ${amount.toStringAsFixed(2)}',
+          style: TextStyle(
+            color: prominent ? DobhaColors.green : DobhaColors.text,
+            fontSize: prominent ? 22 : 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ],
     );
   }

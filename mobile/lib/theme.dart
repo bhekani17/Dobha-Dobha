@@ -26,32 +26,31 @@ class _Palette {
 }
 
 const _dark = _Palette(
-  bg: Color(0xFF000000),
-  surface: Color(0xFF101010),
-  well: Color(0xFF080808),
-  cardElevated: Color(0xFF1C1C1C),
+  bg: Color(0xFF080D09),
+  surface: Color(0xFF111913),
+  well: Color(0xFF0C120E),
+  cardElevated: Color(0xFF1B271F),
   text: Color(0xFFFFFFFF),
-  textSecondary: Color(0xFFC7C7C7),
-  muted: Color(0xFF8C8C8C),
-  border: Color(0xFF222222),
-  borderLight: Color(0xFF2E2E2E),
-  green: Color(0xFF00A93B),
+  textSecondary: Color(0xFFC8D3CB),
+  muted: Color(0xFF94A198),
+  border: Color(0xFF26332A),
+  borderLight: Color(0xFF35463A),
+  green: Color(0xFF35D17C),
   red: Color(0xFFFF453A),
   amber: Color(0xFFFFB800),
 );
 
-// Green is deeper on white so text in it stays readable.
 const _light = _Palette(
-  bg: Color(0xFFFFFFFF),
-  surface: Color(0xFFF7F7F7),
-  well: Color(0xFFEFEFEF),
-  cardElevated: Color(0xFFEDEDED),
-  text: Color(0xFF0A0A0A),
-  textSecondary: Color(0xFF3D3D3D),
-  muted: Color(0xFF6B6B6B),
-  border: Color(0xFFE6E6E6),
-  borderLight: Color(0xFFD4D4D4),
-  green: Color(0xFF00A650),
+  bg: Color(0xFFFAFCFA),
+  surface: Color(0xFFF2F6F3),
+  well: Color(0xFFE9F0EB),
+  cardElevated: Color(0xFFFFFFFF),
+  text: Color(0xFF101611),
+  textSecondary: Color(0xFF3F4B43),
+  muted: Color(0xFF707C73),
+  border: Color(0xFFDCE6DF),
+  borderLight: Color(0xFFC3D1C7),
+  green: Color(0xFF078B4A),
   red: Color(0xFFD92D20),
   amber: Color(0xFFF59E0B),
 );
@@ -121,10 +120,10 @@ TextTheme _textTheme() {
 
 ThemeData _buildTheme(Brightness brightness) {
   final fieldBorder = OutlineInputBorder(
-    borderRadius: BorderRadius.circular(12),
+    borderRadius: BorderRadius.circular(14),
     borderSide: BorderSide(color: DobhaColors.border),
   );
-  final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(12));
+  final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(14));
 
   return ThemeData(
     useMaterial3: true,
@@ -209,7 +208,7 @@ ThemeData _buildTheme(Brightness brightness) {
       backgroundColor: DobhaColors.surface,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: DobhaColors.border)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: BorderSide(color: DobhaColors.border)),
     ),
     listTileTheme: ListTileThemeData(
       iconColor: DobhaColors.textSecondary,
