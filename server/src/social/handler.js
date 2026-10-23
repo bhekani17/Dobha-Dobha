@@ -101,6 +101,15 @@ exports.handler = withCors(async (event) => {
           return n.includes(search) || h.includes(search) || s.includes(search) || l.includes(search);
         });
       }
+      const followingIds = new Set();
+      if (user && followsTable) {
+        const followingRes = await dynamo.query({
+          TableName: followsTable,
+          KeyConditionExpression: 'follower_id = :fid',
+          ExpressionAttributeValues: { ':fid': user.id },
+        });
+        followingRes.items.forEach((follow) => followingIds.add(follow.seller_id));
+      }
 
       return json(200, {
         users: profiles.map((u) => ({
@@ -108,6 +117,9 @@ exports.handler = withCors(async (event) => {
           name: u.name,
           handle: u.handle,
           role: u.role || 'buyer',
+          isVendor: u.role === 'vendor',
+          isMe: user?.id === u.id,
+          isFollowing: followingIds.has(u.id),
           shopName: u.shop_name || '',
           stallLocation: u.stall_location || '',
           bio: u.bio || '',

@@ -19,10 +19,11 @@ const tables = {
   COMMENTS_TABLE: 'comments',
   MESSAGES_TABLE: 'messages',
   OFFERS_TABLE: 'offers',
+  FOLLOWS_TABLE: 'follows',
   USERS_TABLE: 'users',
 };
 const originalEnv = Object.fromEntries(Object.keys(tables).map((key) => [key, process.env[key]]));
-const originalDynamo = Object.fromEntries(['get', 'put', 'delete', 'update', 'query', 'transactWrite'].map((key) => [key, dynamo[key]]));
+const originalDynamo = Object.fromEntries(['get', 'put', 'delete', 'update', 'query', 'scan', 'transactWrite'].map((key) => [key, dynamo[key]]));
 
 let items;
 let likes;
@@ -30,6 +31,7 @@ let saves;
 let comments;
 let messages;
 let offers;
+let follows;
 let users;
 
 function conditionFailed() {
@@ -48,6 +50,7 @@ before(() => {
     if (table === tables.SAVES_TABLE) return saves.get(`${key.user_id}:${key.item_id}`) || null;
     if (table === tables.MESSAGES_TABLE) return messages.find((message) => message.id === key.id) || null;
     if (table === tables.OFFERS_TABLE) return offers.get(key.id) || null;
+    if (table === tables.FOLLOWS_TABLE) return follows.get(`${key.follower_id}:${key.seller_id}`) || null;
     return null;
   };
   dynamo.put = async (table, value) => {
@@ -55,9 +58,11 @@ before(() => {
     if (table === tables.MESSAGES_TABLE) messages.push(value);
     if (table === tables.SAVES_TABLE) saves.set(`${value.user_id}:${value.item_id}`, value);
     if (table === tables.OFFERS_TABLE) offers.set(value.id, value);
+    if (table === tables.FOLLOWS_TABLE) follows.set(`${value.follower_id}:${value.seller_id}`, value);
   };
   dynamo.delete = async (table, key) => {
     if (table === tables.SAVES_TABLE) saves.delete(`${key.user_id}:${key.item_id}`);
+    if (table === tables.FOLLOWS_TABLE) follows.delete(`${key.follower_id}:${key.seller_id}`);
   };
   dynamo.update = async ({ TableName, Key, ExpressionAttributeValues, UpdateExpression, ConditionExpression }) => {
     if (TableName === tables.ITEMS_TABLE) {
@@ -86,6 +91,13 @@ before(() => {
     }
   };
   dynamo.query = async ({ TableName, IndexName, ExpressionAttributeValues, KeyConditionExpression }) => {
+    if (TableName === tables.FOLLOWS_TABLE) {
+      const records = [...follows.values()];
+      const result = IndexName === 'SellerIndex'
+        ? records.filter((record) => record.seller_id === ExpressionAttributeValues[':sid'])
+        : records.filter((record) => record.follower_id === ExpressionAttributeValues[':fid']);
+      return { items: result, count: result.length };
+    }
     if (TableName === tables.COMMENTS_TABLE) {
       const result = comments.filter((comment) => comment.item_id === ExpressionAttributeValues[':iid']);
       return { items: result, count: result.length };
@@ -104,6 +116,13 @@ before(() => {
       return { items: messages.filter((message) => message.recipient_id === ExpressionAttributeValues[':uid']) };
     }
     return { items: [] };
+  };
+  dynamo.scan = async ({ TableName }) => {
+    if (TableName === tables.USERS_TABLE) {
+      const results = [...users.values()];
+      return { items: results, count: results.length };
+    }
+    return { items: [], count: 0 };
   };
   dynamo.transactWrite = async (transactions) => {
     for (const transaction of transactions) {
@@ -157,13 +176,14 @@ beforeEach(() => {
   saves = new Map();
   comments = [];
   offers = new Map();
+  follows = new Map();
   messages = [
     { id: 'msg-old', sender_id: user.id, recipient_id: 'usr-seller', text: 'Is it available?', created_at: 100, read_at: 0 },
     { id: 'msg-new', sender_id: 'usr-seller', recipient_id: user.id, text: 'Yes, it is.', created_at: 200, read_at: 0 },
   ];
   users = new Map([
     ['usr-current', user],
-    ['usr-seller', { id: 'usr-seller', name: 'Seller', shop_name: 'Seller Shop', handle: 'seller_shop' }],
+    ['usr-seller', { id: 'usr-seller', name: 'Seller', shop_name: 'Seller Shop', handle: 'seller_shop', role: 'vendor' }],
   ]);
 });
 
@@ -177,6 +197,42 @@ after(() => {
 });
 
 describe('social interactions', () => {
+  it('returns follow state and self identity for people search', async () => {
+    follows.set(`${user.id}:usr-seller`, {
+      follower_id: user.id,
+      seller_id: 'usr-seller',
+    });
+    const response = await socialHandler({
+      path: '/api/users',
+      httpMethod: 'GET',
+      queryStringParameters: { q: 'seller' },
+    });
+    const { users } = JSON.parse(response.body);
+    assert.equal(response.statusCode, 200);
+    assert.equal(users[0].id, 'usr-seller');
+    assert.equal(users[0].isFollowing, true);
+    assert.equal(users[0].isMe, false);
+    assert.equal(users[0].isVendor, true);
+  });
+
+  it('allows a member to follow and unfollow another person', async () => {
+    const followed = await socialHandler({
+      path: '/api/users/usr-seller/follow',
+      httpMethod: 'POST',
+    });
+    assert.equal(followed.statusCode, 200);
+    assert.equal(JSON.parse(followed.body).following, true);
+    assert.equal(follows.has(`${user.id}:usr-seller`), true);
+
+    const unfollowed = await socialHandler({
+      path: '/api/users/usr-seller/follow',
+      httpMethod: 'DELETE',
+    });
+    assert.equal(unfollowed.statusCode, 200);
+    assert.equal(JSON.parse(unfollowed.body).following, false);
+    assert.equal(follows.has(`${user.id}:usr-seller`), false);
+  });
+
   it('creates an offer through the deployed social offers route', async () => {
     const response = await socialHandler({
       path: '/api/offers',
@@ -262,6 +318,25 @@ describe('social interactions', () => {
     assert.equal(message.text, 'Can I see another photo?');
     assert.equal(message.fromMe, true);
     assert.equal(message.item.id, 'item-1');
+  });
+
+  it('starts a new chat from a community profile', async () => {
+    users.set('usr-new-member', { id: 'usr-new-member', name: 'New Member', handle: 'new_member' });
+    const emptyThread = await socialHandler({
+      path: '/api/chats/usr-new-member',
+      httpMethod: 'GET',
+    });
+    assert.equal(emptyThread.statusCode, 200);
+    assert.deepEqual(JSON.parse(emptyThread.body).messages, []);
+
+    const sent = await socialHandler({
+      path: '/api/chats/usr-new-member',
+      httpMethod: 'POST',
+      body: JSON.stringify({ text: 'Hi, I would like to chat.' }),
+    });
+    assert.equal(sent.statusCode, 201);
+    assert.equal(JSON.parse(sent.body).message.text, 'Hi, I would like to chat.');
+    assert.equal(messages.at(-1).recipient_id, 'usr-new-member');
   });
 
   it('records a direct purchase only after both parties confirm, without verifying payment', async () => {

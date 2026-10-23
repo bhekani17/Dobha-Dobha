@@ -1310,7 +1310,12 @@ async function loadMyListings() {
     target.innerHTML = '<p class="muted">Searching…</p>';
     try {
       const { users } = await api(`/api/users?q=${encodeURIComponent(query)}`);
-      target.innerHTML = users.length ? users.map((person) => `<article class="order-card"><div><strong>${escapeHtml(person.name)} ${escapeHtml(person.handle)}</strong><span>${person.isVendor ? 'Seller' : 'Community member'}</span></div><div class="action-row"><a class="button button-outline" href="#profile?id=${encodeURIComponent(person.id)}">Profile</a>${!person.isMe ? `<button class="button button-dark" data-follow-person="${escapeHtml(person.id)}" data-following="${person.isFollowing}">${person.isFollowing ? 'Unfollow' : 'Follow'}</button>` : ''}</div></article>`).join('') : '<p class="muted">No people matched that search.</p>';
+      target.innerHTML = users.length ? users.map((person) => `<article class="order-card"><div><strong>${escapeHtml(person.name)} ${escapeHtml(person.handle)}</strong><span>${person.isVendor ? 'Seller' : 'Community member'}</span></div><div class="action-row"><a class="button button-outline" href="#profile?id=${encodeURIComponent(person.id)}">Profile</a>${!person.isMe ? `<button class="button button-outline" data-message-person="${escapeHtml(person.id)}">Message</button><button class="button button-dark" data-follow-person="${escapeHtml(person.id)}" data-following="${person.isFollowing}">${person.isFollowing ? 'Following · Unfollow' : 'Follow'}</button>` : ''}</div></article>`).join('') : '<p class="muted">No people matched that search.</p>';
+      target.querySelectorAll('[data-message-person]').forEach((button) => button.addEventListener('click', () => {
+        if (!requireSignIn()) return;
+        state.selectedChat = button.dataset.messagePerson;
+        location.hash = 'messages';
+      }));
       target.querySelectorAll('[data-follow-person]').forEach((button) => button.addEventListener('click', async () => {
         try {
           const method = button.dataset.following === 'true' ? 'DELETE' : 'POST';
