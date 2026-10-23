@@ -48,18 +48,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         if (!appState.isLoggedIn) return const SizedBox.shrink();
         final user = appState.user;
         final orders = appState.orders;
-        final sandboxPaidOrders = orders
-            .where(
-              (order) =>
-                  !order.isSeller &&
-                  order.sandbox &&
-                  order.paymentStatus == 'sandbox_verified',
-            )
-            .toList();
-        final sandboxPaidTotal = sandboxPaidOrders.fold<double>(
-          0,
-          (total, order) => total + order.totalZar,
-        );
         final saved = appState.savedItems;
 
         return Scaffold(
@@ -219,51 +207,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'SANDBOX CHECKOUT TOTAL',
-                              style: TextStyle(
-                                color: DobhaColors.amber,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'R ${sandboxPaidTotal.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                color: DobhaColors.text,
-                                fontSize: 28,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.8,
-                              ),
-                            ),
-                            Text(
-                              '${sandboxPaidOrders.length} confirmed test ${sandboxPaidOrders.length == 1 ? 'checkout' : 'checkouts'}',
-                              style: TextStyle(
-                                color: DobhaColors.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            Text(
-                              'Test total only — no real payment was received.',
-                              style: TextStyle(
-                                color: DobhaColors.muted,
-                                fontSize: 11,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      AppCard(
-                        radius: 18,
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
                             Row(
                               children: [
                                 const Expanded(
@@ -301,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             ],
                             const SizedBox(height: 12),
                             Text(
-                              'Historical or test amounts are unverified and are not available to withdraw. PayFast sandbox payments do not add real funds to this wallet.',
+                              'Wallet payments and withdrawals are not available yet.',
                               style: TextStyle(
                                 color: DobhaColors.muted,
                                 fontSize: 11,
@@ -411,17 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen>
       onRefresh: AppState().loadOrders,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-        children: [
-          AppWell(
-            radius: 14,
-            child: Text(
-              'Orders marked SANDBOX are provider tests; delivery updates are manual. Neither sandbox nor historical records prove real payment, delivery, refund, or payout.',
-              style: TextStyle(color: DobhaColors.textSecondary, height: 1.4),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...orders.map((order) => EscrowTrackerCard(order: order)),
-        ],
+        children: [...orders.map((order) => EscrowTrackerCard(order: order))],
       ),
     );
   }

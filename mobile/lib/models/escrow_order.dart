@@ -41,7 +41,7 @@ extension EscrowStatusX on EscrowStatus {
       case EscrowStatus.sellerAccepted:
         return 'Seller accepted';
       case EscrowStatus.sandboxPaymentVerified:
-        return 'Sandbox payment test';
+        return 'Test payment complete';
       case EscrowStatus.preparingTest:
         return 'Preparing (test)';
       case EscrowStatus.readyForCollectionTest:
@@ -59,7 +59,7 @@ extension EscrowStatusX on EscrowStatus {
       case EscrowStatus.cancelled:
         return 'Cancelled';
       case EscrowStatus.escrowSandboxTransactionCreated:
-        return 'Escrow sandbox created';
+        return 'Test transaction created';
     }
   }
 
@@ -77,24 +77,24 @@ extension EscrowStatusX on EscrowStatus {
       case EscrowStatus.refunded:
         return 'Legacy order record. This status does not verify that a real refund occurred.';
       case EscrowStatus.sellerApprovalPending:
-        return 'Sandbox test order only. Waiting for the seller; no payment has been made.';
+        return 'Test order request sent. Waiting for the seller; no payment has been made.';
       case EscrowStatus.sellerAccepted:
-        return 'Sandbox test order only. The seller accepted; start provider checkout to continue testing.';
+        return 'Test order accepted. Continue to test checkout; no payment has been made.';
       case EscrowStatus.sandboxPaymentVerified:
-        return 'Sandbox test status only. It is not a real payment, delivery, or payout record.';
+        return 'Test status only. It does not verify real payment, delivery, or payout.';
       case EscrowStatus.preparingTest:
       case EscrowStatus.readyForCollectionTest:
       case EscrowStatus.readyForCourierTest:
       case EscrowStatus.inTransitTest:
       case EscrowStatus.deliveryReportedTest:
       case EscrowStatus.buyerConfirmedTest:
-        return 'Sandbox order only. Delivery updates are manual reports and do not verify delivery or cause a seller payout.';
+        return 'Test order only. Delivery updates are manual reports and do not verify delivery or cause a seller payout.';
       case EscrowStatus.sellerDeclined:
-        return 'The seller declined this sandbox test order; no payment was made.';
+        return 'The seller declined this test order; no payment was made.';
       case EscrowStatus.cancelled:
-        return 'This sandbox test order was cancelled; no payment or payout occurred.';
+        return 'This test order was cancelled; no payment or payout occurred.';
       case EscrowStatus.escrowSandboxTransactionCreated:
-        return 'Escrow sandbox transaction only. Dobha does not verify real payment or release funds.';
+        return 'Test transaction only. Dobha does not verify real payment or release funds.';
     }
   }
 

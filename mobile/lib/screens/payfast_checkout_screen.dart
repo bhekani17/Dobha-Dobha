@@ -77,9 +77,9 @@ class _PayFastCheckoutScreenState extends State<PayFastCheckoutScreen> {
         .join();
     return '<!doctype html><html><head><meta name="viewport" '
         'content="width=device-width, initial-scale=1"></head><body>'
-        '<p>Opening PayFast sandbox checkout…</p>'
+        '<p>Opening PayFast test checkout…</p>'
         '<form id="checkout" method="post" action="${PayFastCheckoutScreen._checkoutUrl}">'
-        '$inputs<button type="submit">Continue to PayFast sandbox</button></form>'
+        '$inputs<button type="submit">Continue to PayFast test</button></form>'
         '<script>document.getElementById("checkout").submit();</script>'
         '</body></html>';
   }
@@ -87,7 +87,7 @@ class _PayFastCheckoutScreenState extends State<PayFastCheckoutScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('PayFast sandbox'),
+      title: const Text('PayFast test checkout'),
       actions: [
         IconButton(
           tooltip: 'Close checkout',
@@ -103,7 +103,7 @@ class _PayFastCheckoutScreenState extends State<PayFastCheckoutScreen> {
           color: DobhaColors.cardElevated,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: const Text(
-            'Sandbox test only. Do not use live payment details. This is not a Dobha wallet deposit or seller payout.',
+            'Test payment only. Do not use live payment details. No wallet funds or seller payout are created.',
             style: TextStyle(fontSize: 12),
           ),
         ),
@@ -113,7 +113,7 @@ class _PayFastCheckoutScreenState extends State<PayFastCheckoutScreen> {
                   child: Padding(
                     padding: EdgeInsets.all(24),
                     child: Text(
-                      'Could not open PayFast sandbox checkout. Check your connection, then close this screen and retry from your order.',
+                      'Could not open PayFast test checkout. Check your connection, then close this screen and retry from your order.',
                       textAlign: TextAlign.center,
                     ),
                   ),

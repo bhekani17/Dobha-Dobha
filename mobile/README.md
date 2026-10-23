@@ -26,6 +26,13 @@ Use an available listing and a second account acting as its seller to test the
 full flow. Direct purchase requests remain available for arranging an off-app
 transaction and do not create an order or verify payment.
 
+## Notifications
+
+The app refreshes marketplace notifications while open and when it resumes, and
+shows an in-app alert for new activity. Background push delivery is not enabled
+because the API does not yet register devices or send Firebase Cloud Messaging
+notifications.
+
 ## Development
 
 Install Flutter using the official Flutter setup guide. From this directory:
@@ -63,7 +70,8 @@ The APK is for testing on your own device. Google Sign-In for Android depends
 on the app package name and signing certificate SHA registered in Firebase /
 Google Cloud. If sign-in reports a developer configuration error, add the
 SHA-1 of the signing key used for that build to the Android OAuth client and
-download the updated `google-services.json`.
+download the updated `google-services.json`. The current tester build signer is
+registered in Firebase and included in the checked-in Android config.
 
 ### Sign in and host a live stream
 

@@ -12,7 +12,6 @@ import '../models/social.dart';
 import '../models/support.dart';
 import '../models/thrift_item.dart';
 import '../models/user_profile.dart';
-import '../push.dart';
 
 /// A photo or video picked on the device, waiting to be uploaded with a listing.
 class PendingMedia {
@@ -68,6 +67,8 @@ class AppState extends ChangeNotifier {
   List<AppNotification> _notifications = [];
   int _unread = 0;
   int _unreadMessages = 0;
+  bool _hasPolledNotifications = false;
+  bool _pollingNotifications = false;
   List<ThriftItem> _cart = [];
   List<Offer> _offers = [];
   int _followers = 0, _following = 0;
@@ -139,7 +140,6 @@ class AppState extends ChangeNotifier {
         _user = UserProfile.fromJson(res['user'] as Map<String, dynamic>);
         refreshAll();
         _startPolling();
-        _startPush();
       }
     } on ApiException catch (e) {
       if (e.isUnauthorized) await _clearSession();
@@ -189,7 +189,6 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await Push.stop(_api);
     try {
       await _api.post('/api/auth/logout');
     } catch (_) {
@@ -252,20 +251,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     refreshAll();
     _startPolling();
-    _startPush();
   }
 
-  /// Set by the app shell: opens the screen a tapped push notification is about.
-  void Function(Map<String, dynamic> data)? onPushTap;
-
-  void _startPush() {
-    // Not awaited: the permission prompt shouldn't hold up the app.
-    Push.start(
-      _api,
-      onMessage: pollNotifications,
-      onOpen: (data) => onPushTap?.call(data),
-    );
-  }
+  void Function(AppNotification notification)? onNewNotification;
 
   Future<void> _clearSession() async {
     _pollTimer?.cancel();
@@ -283,6 +271,7 @@ class AppState extends ChangeNotifier {
     _notifications = [];
     _unread = 0;
     _unreadMessages = 0;
+    _hasPolledNotifications = false;
     _cart = [];
     _offers = [];
     _stories = [];
@@ -306,27 +295,42 @@ class AppState extends ChangeNotifier {
 
   // ---- Notifications ----
 
-  /// Checks for new notifications every [_pollEvery] while signed in. Push
-  /// notifications (Firebase) would replace this once a Firebase project is set up.
+  /// Checks for new notifications every [_pollEvery] while signed in.
   void _startPolling() {
     _pollTimer?.cancel();
+    _hasPolledNotifications = false;
     pollNotifications();
     _pollTimer = Timer.periodic(_pollEvery, (_) => pollNotifications());
   }
 
   /// Refreshes the unread count; new ones usually mean an order changed, so orders and wallet reload too.
   Future<void> pollNotifications() async {
-    if (_user == null) return;
+    if (_user == null || _pollingNotifications) return;
+    _pollingNotifications = true;
     try {
       final res = await _call(() => _api.get('/api/notifications/unread'));
       final unread = res['unread'] as int;
       final messages = res['messages'] as int? ?? 0;
+      final hasNewNotification = _hasPolledNotifications && unread > _unread;
+      final hasNewMessage =
+          _hasPolledNotifications && messages > _unreadMessages;
+      _hasPolledNotifications = true;
       if (unread == _unread && messages == _unreadMessages) return;
       final grew = unread > _unread;
       _unread = unread;
       _unreadMessages = messages;
       notifyListeners();
       if (grew) {
+        await loadNotifications();
+        AppNotification? latest;
+        for (final notification in _notifications) {
+          if (!notification.read) {
+            latest = notification;
+            break;
+          }
+        }
+        if (hasNewNotification && latest != null)
+          onNewNotification?.call(latest);
         await Future.wait(
           [
             loadOrders(),
@@ -335,8 +339,22 @@ class AppState extends ChangeNotifier {
           ].map((f) => f.catchError((_) {})),
         );
       }
-    } catch (_) {
-      // Offline or a server blip; the next poll tries again.
+      if (hasNewMessage && !grew) {
+        onNewNotification?.call(
+          AppNotification(
+            id: 'message-${DateTime.now().millisecondsSinceEpoch}',
+            kind: 'message',
+            title: 'New message',
+            body: 'You have an unread message.',
+            read: false,
+            createdAt: DateTime.now(),
+          ),
+        );
+      }
+    } on ApiException catch (error) {
+      debugPrint('Notification refresh failed: ${error.message}');
+    } finally {
+      _pollingNotifications = false;
     }
   }
 
@@ -353,6 +371,7 @@ class AppState extends ChangeNotifier {
     if (_unread == 0) return;
     await _call(() => _api.post('/api/notifications/read'));
     _unread = 0;
+    _notifications = _notifications.map((n) => n.copyWith(read: true)).toList();
     notifyListeners();
   }
 

@@ -26,15 +26,29 @@ class GoogleAuth {
   /// Idempotent. Every successful Google sign-in (the phone flow or the web
   /// button) arrives on the events stream and is exchanged for a Dobha session.
   static Future<void> ensureInitialized() {
-    return _init ??= () async {
-      final isIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
-      await GoogleSignIn.instance.initialize(
-        clientId: kIsWeb ? webClientId : (isIos && iosClientId.isNotEmpty ? iosClientId : null),
-        // Makes Android and iOS mint ID tokens for the web client, which the server accepts.
-        serverClientId: kIsWeb ? null : webClientId,
-      );
-      GoogleSignIn.instance.authenticationEvents.listen(_onEvent, onError: _onError);
-    }();
+    final initialized = _init;
+    if (initialized != null) return initialized;
+    final future = _initialize().catchError((Object error) {
+      _init = null;
+      Error.throwWithStackTrace(error, StackTrace.current);
+    });
+    _init = future;
+    return future;
+  }
+
+  static Future<void> _initialize() async {
+    final isIos = !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+    await GoogleSignIn.instance.initialize(
+      clientId: kIsWeb
+          ? webClientId
+          : (isIos && iosClientId.isNotEmpty ? iosClientId : null),
+      // Makes Android and iOS mint ID tokens for the web client, which the server accepts.
+      serverClientId: kIsWeb ? null : webClientId,
+    );
+    GoogleSignIn.instance.authenticationEvents.listen(
+      _onEvent,
+      onError: _onError,
+    );
   }
 
   static Future<void> _onEvent(GoogleSignInAuthenticationEvent event) async {
@@ -56,14 +70,31 @@ class GoogleAuth {
   }
 
   static void _onError(Object e) {
-    if (e is GoogleSignInException && e.code == GoogleSignInExceptionCode.canceled) return;
+    if (e is GoogleSignInException) {
+      if (e.code == GoogleSignInExceptionCode.canceled) return;
+      final details = e.description?.trim();
+      final message = switch (e.code) {
+        GoogleSignInExceptionCode.clientConfigurationError ||
+        GoogleSignInExceptionCode.providerConfigurationError =>
+          'Google sign-in is not configured correctly.',
+        GoogleSignInExceptionCode.uiUnavailable =>
+          'Google sign-in could not open. Please try again.',
+        GoogleSignInExceptionCode.interrupted =>
+          'Google sign-in was interrupted. Please try again.',
+        _ => 'Google sign-in failed. Please try again.',
+      };
+      _errors.add(
+        details == null || details.isEmpty ? message : '$message $details',
+      );
+      return;
+    }
     _errors.add('Google sign-in failed. Please try again.');
   }
 
   /// Phone flow. On web, Google's own rendered button is used instead.
   static Future<void> signIn() async {
-    await ensureInitialized();
     try {
+      await ensureInitialized();
       await GoogleSignIn.instance.authenticate();
     } catch (e) {
       _onError(e);

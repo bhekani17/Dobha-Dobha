@@ -22,7 +22,8 @@ class AppNotification {
     required this.createdAt,
   });
 
-  factory AppNotification.fromJson(Map<String, dynamic> json) => AppNotification(
+  factory AppNotification.fromJson(Map<String, dynamic> json) =>
+      AppNotification(
         id: json['id'] as String,
         kind: json['kind'] as String,
         title: json['title'] as String,
@@ -32,4 +33,15 @@ class AppNotification {
         read: json['read'] as bool? ?? false,
         createdAt: parseJsonDateTime(json['createdAt']),
       );
+
+  AppNotification copyWith({bool? read}) => AppNotification(
+    id: id,
+    kind: kind,
+    title: title,
+    body: body,
+    orderId: orderId,
+    itemId: itemId,
+    read: read ?? this.read,
+    createdAt: createdAt,
+  );
 }

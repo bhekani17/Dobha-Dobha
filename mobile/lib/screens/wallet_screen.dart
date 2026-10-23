@@ -44,17 +44,6 @@ class WalletScreen extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
               children: [
-                AppWell(
-                  radius: 14,
-                  child: Text(
-                    'Sandbox checkout is test-only. Wallet deposits, withdrawals, escrow release, refunds, and seller payouts are unavailable. Historical and test records do not prove real payment or delivery.',
-                    style: TextStyle(
-                      color: DobhaColors.textSecondary,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
                 if (openOffers.isNotEmpty) ...[
                   const SectionTitle('Offers'),
                   ...openOffers.map((o) => OfferCard(offer: o)),
@@ -66,7 +55,7 @@ class WalletScreen extends StatelessWidget {
                     radius: 18,
                     padding: const EdgeInsets.all(20),
                     child: Text(
-                      'No order records yet. Dev sandbox checkout is available only when a provider is enabled.',
+                      'No order records yet.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: DobhaColors.muted,

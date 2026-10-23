@@ -77,7 +77,7 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Add a listing here to send a direct purchase request or start a dev sandbox test order without starting a chat.',
+                          'Add a listing here to send a direct purchase request or start a test order without starting a chat.',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: DobhaColors.muted,

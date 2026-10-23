@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 
+import 'models/app_notification.dart';
 import 'screens/auth_screens.dart';
-import 'screens/chat_screens.dart';
 import 'screens/main_shell.dart';
 import 'screens/notifications_screen.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 
+final _navigatorKey = GlobalKey<NavigatorState>();
+final _messengerKey = GlobalKey<ScaffoldMessengerState>();
+
 void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
-  DobhaColors.isDark = binding.platformDispatcher.platformBrightness == Brightness.dark;
-  // Firebase is only for push on phones, so it starts there (Push.start), never holding up the app.
+  DobhaColors.isDark =
+      binding.platformDispatcher.platformBrightness == Brightness.dark;
   runApp(const DobhaLiveApp());
 }
 
@@ -22,7 +25,8 @@ class DobhaLiveApp extends StatefulWidget {
   State<DobhaLiveApp> createState() => _DobhaLiveAppState();
 }
 
-class _DobhaLiveAppState extends State<DobhaLiveApp> with WidgetsBindingObserver {
+class _DobhaLiveAppState extends State<DobhaLiveApp>
+    with WidgetsBindingObserver {
   final _light = dobhaTheme(Brightness.light);
   final _dark = dobhaTheme(Brightness.dark);
 
@@ -46,7 +50,9 @@ class _DobhaLiveAppState extends State<DobhaLiveApp> with WidgetsBindingObserver
 
   @override
   void didChangePlatformBrightness() {
-    final dark = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;
+    final dark =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+        Brightness.dark;
     if (dark == DobhaColors.isDark) return;
     DobhaColors.isDark = dark;
     // Screens read DobhaColors directly, so rebuild everything in place (routes and state are kept).
@@ -67,6 +73,8 @@ class _DobhaLiveAppState extends State<DobhaLiveApp> with WidgetsBindingObserver
       theme: _light,
       darkTheme: _dark,
       themeMode: DobhaColors.isDark ? ThemeMode.dark : ThemeMode.light,
+      navigatorKey: _navigatorKey,
+      scaffoldMessengerKey: _messengerKey,
       home: const AuthGate(),
     );
   }
@@ -88,7 +96,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    AppState().onPushTap = _openPush;
+    AppState().onNewNotification = _showNotification;
     // Keep the splash up long enough to register, even when restoring is instant.
     Future.wait([
       AppState().restoreSession(),
@@ -98,17 +106,26 @@ class _AuthGateState extends State<AuthGate> {
     });
   }
 
-  /// A tapped push notification: chat messages open the inbox, everything else the notifications list.
-  void _openPush(Map<String, dynamic> data) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !AppState().isLoggedIn) return;
-      AppState().pollNotifications();
-      if (data['kind'] == 'message') {
-        ChatsScreen.open(context);
-      } else {
-        NotificationsScreen.open(context);
-      }
-    });
+  void _showNotification(AppNotification notification) {
+    final messenger = _messengerKey.currentState;
+    if (messenger == null) return;
+    final body = notification.body.trim();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            body.isEmpty ? notification.title : '${notification.title}: $body',
+          ),
+          action: SnackBarAction(
+            label: 'View',
+            onPressed: () {
+              final context = _navigatorKey.currentContext;
+              if (context != null) NotificationsScreen.open(context);
+            },
+          ),
+        ),
+      );
   }
 
   @override
@@ -133,7 +150,10 @@ class _AuthGateState extends State<AuthGate> {
         } else {
           child = const MainShell(key: ValueKey('app'));
         }
-        return AnimatedSwitcher(duration: const Duration(milliseconds: 400), child: child);
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 400),
+          child: child,
+        );
       },
     );
   }

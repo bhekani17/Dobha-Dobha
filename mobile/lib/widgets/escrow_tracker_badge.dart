@@ -52,7 +52,7 @@ class EscrowTrackerCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (order.sandbox) AppTag('SANDBOX', color: DobhaColors.amber),
+              if (order.sandbox) AppTag('TEST', color: DobhaColors.amber),
               if (order.sandbox) const SizedBox(width: 6),
               AppTag(
                 status.label(isSeller: isVendorView),
@@ -143,7 +143,7 @@ class EscrowTrackerCard extends StatelessWidget {
           if (order.sandbox) ...[
             const SizedBox(height: 6),
             Text(
-              'Provider status: ${order.paymentStatus}. Test-only; not proof of real payment or delivery.',
+              'Payment status: ${order.paymentStatus}. This does not confirm real payment or delivery.',
               style: TextStyle(fontSize: 11, color: DobhaColors.textSecondary),
             ),
           ],
@@ -308,15 +308,15 @@ class EscrowTrackerCard extends StatelessWidget {
     } else if (order.status == EscrowStatus.sellerAccepted && !isVendorView) {
       actions.add((
         order.paymentMethod == 'escrow_sandbox'
-            ? 'Create Escrow sandbox transaction'
-            : 'Start PayFast sandbox checkout',
+            ? 'Create Escrow test transaction'
+            : 'Start PayFast test checkout',
         'payment-session',
       ));
       if (order.paymentStatus == 'not_started') {
         actions.add(('Cancel test order', 'cancel-test'));
       }
     } else if (order.status == EscrowStatus.escrowSandboxTransactionCreated) {
-      actions.add(('Refresh Escrow sandbox status', 'escrow-refresh-test'));
+      actions.add(('Refresh test status', 'escrow-refresh-test'));
     } else if (order.status == EscrowStatus.sandboxPaymentVerified &&
         isVendorView) {
       actions.add(('Start preparing (test)', 'prepare'));
@@ -344,7 +344,7 @@ class EscrowTrackerCard extends StatelessWidget {
           ),
         if (order.status == EscrowStatus.sellerAccepted && isVendorView)
           Text(
-            'You accepted this test order. The buyer must start sandbox checkout; no payment has been made.',
+            'You accepted this test order. The buyer must continue to test checkout; no payment has been made.',
             style: TextStyle(color: DobhaColors.textSecondary, fontSize: 12),
           ),
         if (actions.isNotEmpty)
@@ -381,8 +381,7 @@ class EscrowTrackerCard extends StatelessWidget {
           messenger.showSnackBar(
             SnackBar(
               content: Text(
-                response['message'] as String? ??
-                    'Escrow sandbox transaction created.',
+                response['message'] as String? ?? 'Test transaction created.',
               ),
             ),
           );
@@ -393,7 +392,7 @@ class EscrowTrackerCard extends StatelessWidget {
         if (response['sandbox'] != true ||
             url != 'https://sandbox.payfast.co.za/eng/process' ||
             fields is! Map) {
-          throw ApiException(502, 'Unexpected sandbox checkout response.');
+          throw ApiException(502, 'Unexpected test checkout response.');
         }
         await navigator.push(
           MaterialPageRoute<void>(
@@ -411,7 +410,7 @@ class EscrowTrackerCard extends StatelessWidget {
       messenger.showSnackBar(
         SnackBar(
           content: Text(
-            response['message'] as String? ?? 'Sandbox order updated.',
+            response['message'] as String? ?? 'Test order updated.',
           ),
         ),
       );

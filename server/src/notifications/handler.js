@@ -30,6 +30,7 @@ exports.handler = withCors(async (event) => {
       });
 
       return json(200, {
+        unread: res.items.filter((n) => !n.read).length,
         notifications: res.items.map((n) => ({
           id: n.id,
           kind: n.kind,

@@ -795,7 +795,7 @@ class ItemInfoSheet extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Request to buy directly and arrange payment outside Dobha, or use the dev sandbox checkout for provider testing.',
+                        'Request to buy directly and arrange payment outside Dobha, or use test checkout when available.',
                         style: TextStyle(
                           fontSize: 13,
                           color: DobhaColors.textSecondary,

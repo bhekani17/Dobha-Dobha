@@ -111,7 +111,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
   Future<void> _createTestOrder() async {
     if (!_formKey.currentState!.validate() || _selectedItemId == null) return;
     if (_provider == null || !_providers.contains(_provider)) {
-      setState(() => _loadError = 'No sandbox payment provider is enabled.');
+      setState(() => _loadError = 'No test payment provider is enabled.');
       return;
     }
     final item = widget.items.firstWhere(
@@ -131,7 +131,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
       messenger.showSnackBar(
         const SnackBar(
           content: Text(
-            'Sandbox test order sent. The seller must accept before payment checkout can start; no payment has been made.',
+            'Test order request sent. The seller must accept before checkout can continue; no payment has been made.',
           ),
         ),
       );
@@ -182,7 +182,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
               AppWell(
                 radius: 14,
                 child: Text(
-                  'Sandbox checkout is for testing only. It does not add funds to a Dobha wallet, verify delivery, or pay the seller. You can also send a direct purchase request and arrange payment outside Dobha.',
+                  'Test checkout only. No real payment is charged, wallet funds are added, or seller payout is made.',
                   style: TextStyle(
                     color: DobhaColors.textSecondary,
                     height: 1.4,
@@ -237,8 +237,8 @@ class _CheckoutModalState extends State<CheckoutModal> {
                                       }),
                                 child: Text(
                                   _selectedItemId == item.id
-                                      ? 'Selected for sandbox checkout'
-                                      : 'Sandbox checkout',
+                                      ? 'Selected for test checkout'
+                                      : 'Test checkout',
                                 ),
                               ),
                           ],
@@ -267,7 +267,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                 AppWell(
                   radius: 14,
                   child: Text(
-                    'Sandbox checkout is not enabled here. Direct purchase requests remain available.',
+                    'Test checkout is not enabled here. Direct purchase requests remain available.',
                     style: TextStyle(color: DobhaColors.textSecondary),
                   ),
                 ),
@@ -331,8 +331,8 @@ class _CheckoutModalState extends State<CheckoutModal> {
                             DropdownMenuItem(
                               value: provider,
                               child: Text(switch (provider) {
-                                'payfast_sandbox' => 'PayFast hosted sandbox',
-                                'escrow_sandbox' => 'Escrow.com sandbox',
+                                'payfast_sandbox' => 'PayFast test checkout',
+                                'escrow_sandbox' => 'Escrow.com test checkout',
                                 _ => provider,
                               }),
                             ),
@@ -362,7 +362,7 @@ class _CheckoutModalState extends State<CheckoutModal> {
                                   color: Colors.black,
                                 ),
                               )
-                            : const Text('Send sandbox test order'),
+                            : const Text('Send test order'),
                       ),
                     ],
                   ),
